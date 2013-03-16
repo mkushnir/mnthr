@@ -1,0 +1,75 @@
+#include "mrkcommon/dumpm.h"
+#include "mrkcommon/util.h"
+#include "mrkthr.h"
+#include "unittest.h"
+
+static int
+ff (UNUSED int id, UNUSED void *argv[])
+{
+    uint64_t before, after;
+    int n = (int)(argv[0]);
+
+    before = mrkthr_get_now();
+    //CTRACE("before=%ld", before);
+    //CTRACE("sleeping for %d", n * 500);
+    if (mrkthr_sleep(n * 1000) != 0) {
+        return(1);
+    }
+    after = mrkthr_get_now();
+    //CTRACE("after=%ld", after);
+    CTRACE("sleep=%ld (%Lf)", after-before, mrkthr_ticks2sec(after-before));
+    return(0);
+}
+
+static int
+f (int id, UNUSED void *argv[])
+{
+    int i;
+    mrkthr_ctx_t *t;
+
+    CTRACE("id=%d", id);
+
+    for (i = 0; i < 10; ++i) {
+        if ((t = mrkthr_new(NULL, ff, 1, i)) == NULL) {
+            return i + 100;
+        }
+        mrkthr_set_resume(t);
+    }
+
+    return(0);
+}
+
+static void
+test0 (void)
+{
+    int res;
+    mrkthr_ctx_t *t;
+
+    if (mrkthr_init() != 0) {
+        perror("mrkthr_init");
+        return;
+    }
+
+    if ((t = mrkthr_new("qweqwe", f, 0)) == NULL) {
+        perror("mrkthr_new");
+        return;
+    }
+    mrkthr_set_resume(t);
+
+    res = mrkthr_loop();
+
+    if (mrkthr_fini() != 0) {
+        perror("mrkthr_fini");
+        return;
+    }
+
+    return;
+}
+
+int
+main(UNUSED int argc, UNUSED char *argv[])
+{
+    test0();
+    return 0;
+}
+
