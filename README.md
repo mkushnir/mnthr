@@ -20,6 +20,8 @@ Features:
 
 *   relatively good performance and scalability.
 
+Dependencies: [mkushnir/mrkcommon](https://github.com/mkushnir/mrkcommon).
+
 The porject is still in very early stage.
 
 TODO
