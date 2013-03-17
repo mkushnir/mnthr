@@ -52,7 +52,7 @@ void mrkthr_set_interrupt(mrkthr_ctx_t *);
 ssize_t mrkthr_get_rbuflen(int);
 int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
 int mrkthr_read_all(int, char **, off_t *);
-ssize_t mrkthr_read_allb(int, char *);
+ssize_t mrkthr_read_allb(int, char *, ssize_t);
 ssize_t mrkthr_get_wbuflen(int);
 int mrkthr_write_all(int, const char *, size_t);
 
@@ -66,4 +66,5 @@ void mrkthr_cond_signal_all(mrkthr_cond_t *);
 int mrkthr_cond_fini(mrkthr_cond_t *);
 
 uint64_t mrkthr_get_now(void);
+uint64_t mrkthr_get_now_precise(void);
 #endif

@@ -188,6 +188,13 @@ mrkthr_get_now(void)
     return nsec_now;
 }
 
+uint64_t
+mrkthr_get_now_precise(void)
+{
+    update_now();
+    return nsec_now;
+}
+
 UNUSED static void
 dump_ucontext (ucontext_t *uc)
 {
@@ -612,7 +619,6 @@ push_free_ctx(mrkthr_ctx_t *ctx)
     } else {
         *pctx = ctx;
     }
-
 }
 
 static mrkthr_ctx_t *
@@ -620,9 +626,9 @@ pop_free_ctx(void)
 {
     mrkthr_ctx_t *ctx = NULL;
     mrkthr_ctx_t **pctx = NULL;
-    array_iter_t ait;
+    array_iter_t it;
 
-    if ((pctx = array_last(&free_ctxes, &ait)) != NULL) {
+    if ((pctx = array_last(&free_ctxes, &it)) != NULL) {
         ctx = *pctx;
         if (array_decr(&free_ctxes) != 0) {
             FAIL("array_decr");
@@ -1526,7 +1532,7 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
 
 /**
  * Allocate enough space in *buf beyond *offset for a single read
- * operation and read into that location from ctx->in.
+ * operation and read into that location from fd.
  */
 int
 mrkthr_read_all(int fd, char **buf, off_t *offset)
@@ -1570,11 +1576,11 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
 }
 
 /**
- * Perform a single read from ctx->in into buf.
+ * Perform a single read from fd into buf.
  * Return the number of bytes read or -1 in case of error.
  */
 ssize_t
-mrkthr_read_allb(int fd, char *buf)
+mrkthr_read_allb(int fd, char *buf, ssize_t sz)
 {
     ssize_t navail;
     ssize_t nread;
@@ -1585,13 +1591,15 @@ mrkthr_read_allb(int fd, char *buf)
         return -1;
     }
 
-    if ((nread = read(fd, buf, navail)) == -1) {
+    sz = MIN(navail, sz);
+
+    if ((nread = read(fd, buf, sz)) == -1) {
         perror("read");
         return -1;
     }
 
-    if (nread < navail) {
-        TRACE("nread=%ld navail=%ld", nread, navail);
+    if (nread < sz) {
+        TRACE("nread=%ld sz=%ld", nread, sz);
         if (nread == 0) {
             return -1;
         }
