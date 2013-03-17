@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign
 CLEANFILES = *.core
 #CLEANFILES += *.in
 
-noinst_PROGRAMS=testco testsleep testclock
+noinst_PROGRAMS=testco testsleep testclock testwaitfor
 
 distdir = ../../$(PACKAGE)-$(VERSION)/src/test
 dist_HEADERS = unittest.h
@@ -27,6 +27,11 @@ nodist_testclock_SOURCES = ../diag.c
 testclock_SOURCES = ../mrkthr.c ../kevent_util.c testclock.c
 testclock_CFLAGS =
 testclock_LDFLAGS =
+
+nodist_testwaitfor_SOURCES = ../diag.c
+testwaitfor_SOURCES = ../mrkthr.c ../kevent_util.c testwaitfor.c
+testwaitfor_CFLAGS =
+testwaitfor_LDFLAGS =
 
 ../diag.c ../diag.h: ../diag.txt
 	sh ../gen-diag

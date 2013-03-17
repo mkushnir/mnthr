@@ -60,6 +60,8 @@
  * TODO list:
  *  - time API. Currently the only API is mrkthr_get_now() which reports
  *    the number of nanoseconds since the Epoch.
+ *  - wait_for() function that would run another function and wait for its
+ *    return.
  *  - port to Linux epoll
  */
 #include <sys/types.h>
@@ -128,6 +130,7 @@ static int mrkthr_ctx_fini(mrkthr_ctx_t *);
 static struct kevent *new_event(int, int, int *);
 static int co_init(struct _co *);
 static int co_fini(struct _co *);
+static mrkthr_ctx_t *mrkthr_vnew(const char *, cofunc, int, va_list);
 static void resume_waitq_all(array_t *);
 static int discard_event(int, int);
 static void push_free_ctx(mrkthr_ctx_t *);
@@ -658,12 +661,12 @@ pop_free_ctx(void)
  * be freed, and should be treated as an opaque object. It's internally
  * reclaimed as soon as the worker function returns.
  */
-mrkthr_ctx_t *
-mrkthr_new(const char *name, cofunc f, int argc, ...)
+
+static mrkthr_ctx_t *
+mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
 {
     int i;
     list_iter_t it;
-    va_list ap;
     mrkthr_ctx_t *ctx = NULL;
 
 
@@ -703,12 +706,10 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
         if ((ctx->co.argv = malloc(sizeof(void *) * ctx->co.argc)) == NULL) {
             FAIL("malloc");
         }
-        va_start(ap, argc);
         for (i = 0; i < ctx->co.argc; ++i) {
             ctx->co.argv[i] = va_arg(ap, void *);
             //CTRACE("ctx->co.argv[%d]=%p", i, ctx->co.argv[i]);
         }
-        va_end(ap);
     }
 
     if (_getcontext(&ctx->co.uc) != 0) {
@@ -716,6 +717,18 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
     }
     makecontext(&ctx->co.uc, (void(*)(void))f, 2, ctx->co.argc, ctx->co.argv);
 
+    return ctx;
+}
+
+mrkthr_ctx_t *
+mrkthr_new(const char *name, cofunc f, int argc, ...)
+{
+    va_list ap;
+    mrkthr_ctx_t *ctx = NULL;
+
+    va_start(ap, argc);
+    ctx = mrkthr_vnew(name, f, argc, ap);
+    va_end(ap);
     return ctx;
 }
 
@@ -739,8 +752,11 @@ mrkthr_dump(const mrkthr_ctx_t *ctx, UNUSED void *udata)
            ctx->co.state == CO_STATE_EVENT_JOINWAITQ ? "EVENT_JOINWAITQ" :
            ctx->co.state == CO_STATE_EVENT_RESUME ? "EVENT_RESUME" :
            ctx->co.state == CO_STATE_EVENT_INTERRUPT ? "EVENT_INTERRUPT" :
+           ctx->co.state == CO_STATE_EVENT_WAITFOR ? "EVENT_WAITFOR" :
            "",
-           ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" : "OK",
+           ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
+           ctx->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
+           "OK",
            ctx->expire_ticks
     );
 
@@ -805,13 +821,9 @@ yield(void)
     return me->co.rc;
 }
 
-int
-mrkthr_sleep(uint64_t msec)
+static int
+_mrkthr_sleep(uint64_t msec)
 {
-    assert(me != NULL);
-
-    me->co.state = CO_STATE_EVENT_SLEEP;
-
     if (msec == mrkthr_SLEEP_FOREVER) {
         me->expire_ticks = mrkthr_SLEEP_FOREVER;
     } else {
@@ -829,6 +841,14 @@ mrkthr_sleep(uint64_t msec)
     return yield();
 }
 
+int
+mrkthr_sleep(uint64_t msec)
+{
+    assert(me != NULL);
+    me->co.state = CO_STATE_EVENT_SLEEP;
+    return _mrkthr_sleep(msec);
+}
+
 long double
 mrkthr_ticks2sec(uint64_t ticks)
 {
@@ -836,11 +856,8 @@ mrkthr_ticks2sec(uint64_t ticks)
 }
 
 
-/**
- * Sleep until the target ctx has exited.
- */
-static int
-join_waitq(array_t *waitq)
+static void
+append_to_waitq(array_t *waitq)
 {
     mrkthr_ctx_t **t;
     array_iter_t it;
@@ -864,6 +881,15 @@ join_waitq(array_t *waitq)
     }
 
     *t = me;
+}
+
+/**
+ * Sleep until the target ctx has exited.
+ */
+static int
+join_waitq(array_t *waitq)
+{
+    append_to_waitq(waitq);
     me->co.state = CO_STATE_EVENT_JOINWAITQ;
     return yield();
 }
@@ -917,6 +943,7 @@ resume(mrkthr_ctx_t *ctx)
         TRRET(RESUME + 1);
     }
 
+    ctx->co.yield_state = ctx->co.state;
     ctx->co.state = CO_STATE_RESUMED;
 
     me = ctx;
@@ -939,8 +966,8 @@ resume(mrkthr_ctx_t *ctx)
         /*
          * This is the case of the exited (dead) thread.
          */
-        //CTRACE("Assuming dead ...");
-        //mrkthr_dump(ctx, NULL);
+        CTRACE("Assuming dead ...");
+        mrkthr_dump(ctx, NULL);
         resume_waitq_all(&ctx->waitq);
         co_fini(&ctx->co);
         push_free_ctx(ctx);
@@ -972,7 +999,6 @@ mrkthr_set_resume(mrkthr_ctx_t *ctx)
 
     ctx->co.state = CO_STATE_EVENT_RESUME;
     ctx->expire_ticks = 0;
-    //ctx->expire_ticks = tsc_now;
     sleepq_enqueue(ctx);
 }
 
@@ -1726,5 +1752,36 @@ mrkthr_cond_fini(mrkthr_cond_t *cond)
     mrkthr_cond_signal_all(cond);
     array_fini(&cond->waitq);
     return 0;
+}
+
+int
+mrkthr_wait_for(uint64_t msec, cofunc f, int argc, ...)
+{
+    va_list ap;
+    int res;
+    mrkthr_ctx_t *ctx;
+
+    va_start(ap, argc);
+    ctx = mrkthr_vnew(NULL, f, argc, ap);
+    va_end(ap);
+
+    if (ctx == NULL) {
+        FAIL("mrkthr_wait_for");
+    }
+
+    append_to_waitq(&ctx->waitq);
+    mrkthr_set_resume(ctx);
+
+    assert(me != NULL);
+    me->co.state = CO_STATE_EVENT_WAITFOR;
+    res = _mrkthr_sleep(msec);
+
+    if (me->co.yield_state == CO_STATE_EVENT_WAITFOR) {
+        ctx->co.rc = CO_RC_TIMEDOUT;
+        res = CO_RC_TIMEDOUT;
+    }
+    sleepq_remove(ctx);
+
+    return res;
 }
 
