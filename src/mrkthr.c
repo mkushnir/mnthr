@@ -102,6 +102,7 @@ static array_t kevents1;
 
 static list_t ctxes;
 static mrkthr_ctx_t *me;
+static array_t free_ctxes;
 
 /*
  * Sleep list holds threads that are waiting for resume
@@ -129,6 +130,8 @@ static int co_init(struct _co *);
 static int co_fini(struct _co *);
 static void resume_waitq_all(array_t *);
 static int discard_event(int, int);
+static void push_free_ctx(mrkthr_ctx_t *);
+static mrkthr_ctx_t *pop_free_ctx(void);
 
 #ifdef USE_RBT
 RB_PROTOTYPE_STATIC(sleepq, _mrkthr_ctx, sleepq_link, sleepq_cmp);
@@ -451,6 +454,11 @@ mrkthr_init(void)
 {
     size_t sz;
 
+    if (array_init(&free_ctxes, sizeof(mrkthr_ctx_t *), 0,
+                  NULL, NULL) != 0) {
+        FAIL("array_init");
+    }
+
     if (list_init(&ctxes, sizeof(mrkthr_ctx_t), 0,
                   (list_initializer_t)mrkthr_ctx_init,
                   (list_finalizer_t)mrkthr_ctx_fini) != 0) {
@@ -504,6 +512,7 @@ mrkthr_fini(void)
     array_fini(&kevents0);
     array_fini(&kevents1);
     list_fini(&ctxes);
+    array_fini(&free_ctxes);
     close(q0);
     return 0;
 }
@@ -575,6 +584,7 @@ mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
     ctx->co.uc.uc_stack.ss_sp = NULL;
     ctx->co.uc.uc_stack.ss_size = 0;
     co_fini(&ctx->co);
+    push_free_ctx(ctx);
     sleepq_remove(ctx);
     resume_waitq_all(&ctx->waitq);
     array_fini(&ctx->waitq);
@@ -593,6 +603,38 @@ _getcontext(ucontext_t *ucp)
 #define _getcontext getcontext
 #endif
 
+static void
+push_free_ctx(mrkthr_ctx_t *ctx)
+{
+    mrkthr_ctx_t **pctx = NULL;
+    if ((pctx = array_incr(&free_ctxes)) == NULL) {
+        FAIL("array_incr");
+    } else {
+        *pctx = ctx;
+    }
+
+}
+
+static mrkthr_ctx_t *
+pop_free_ctx(void)
+{
+    mrkthr_ctx_t *ctx = NULL;
+    mrkthr_ctx_t **pctx = NULL;
+    array_iter_t ait;
+
+    if ((pctx = array_last(&free_ctxes, &ait)) != NULL) {
+        ctx = *pctx;
+        if (array_decr(&free_ctxes) != 0) {
+            FAIL("array_decr");
+        }
+    } else {
+        if ((ctx = list_incr(&ctxes)) == NULL) {
+            FAIL("list_incr");
+        }
+    }
+    return ctx;
+}
+
 /**
  * Return a new mrkthr_ctx_t instance. The new instance doesn't have to
  * be freed, and should be treated as an opaque object. It's internally
@@ -608,20 +650,11 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
 
 
     assert(mflags & CO_FLAG_INITIALIZED);
+    ctx = pop_free_ctx();
 
-    for (ctx = list_first(&ctxes, &it);
-         ctx != NULL;
-         ctx = list_next(&ctxes, &it)) {
-        if (ctx->co.id == -1) {
-            break;
-        }
-    }
-    if (ctx == NULL) {
-        if ((ctx = list_incr_iter(&ctxes, &it)) == NULL) {
-            FAIL("list_incr");
-        }
-    }
-
+    assert(ctx!= NULL);
+    assert(ctx->co.id == -1);
+    
     /* Thread id is actually an index into the ctxes list */
     ctx->co.id = it.iter;
 
@@ -861,6 +894,8 @@ resume(mrkthr_ctx_t *ctx)
         /* This is an error (currently no reason is known, though) */
         resume_waitq_all(&ctx->waitq);
         co_fini(&ctx->co);
+        /* not sure if we can push it here ... */
+        push_free_ctx(ctx);
         TRRET(RESUME + 1);
     }
 
@@ -891,6 +926,7 @@ resume(mrkthr_ctx_t *ctx)
         //mrkthr_dump(ctx, NULL);
         resume_waitq_all(&ctx->waitq);
         co_fini(&ctx->co);
+        push_free_ctx(ctx);
         //TRRET(RESUME + 2);
         return RESUME + 2;
 

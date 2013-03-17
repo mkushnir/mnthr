@@ -1,9 +1,9 @@
 import sys
 import coro
 
-nthreads = 20000
-niter = 1
-nrecur = 0
+nthreads = 100000
+niter = 10
+nrecur = 5
 total = 0.
 ntotal = 0
 wt = 100
