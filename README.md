@@ -20,6 +20,12 @@ Features:
 
 *   relatively good performance and scalability.
 
+Limitations:
+
+*   unlike ironport/shrapnel, cannot scale on 32-bit platforms because of
+    virtual address space limit.
+
+
 Dependencies: [mkushnir/mrkcommon](https://github.com/mkushnir/mrkcommon).
 
 The porject is still in very early stage.
