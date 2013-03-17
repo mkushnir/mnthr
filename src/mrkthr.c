@@ -176,7 +176,6 @@ wallclock_init(void)
         TRRET(WALLCLOCK_INIT + 1);
     }
     nsec_zero = ts.tv_nsec + ts.tv_sec * 1000000000;
-    //CTRACE("nsec_zero=%ld", nsec_zero/1000000000);
     return 0;
 }
 
@@ -193,6 +192,19 @@ mrkthr_get_now_precise(void)
 {
     update_now();
     return nsec_now;
+}
+
+uint64_t
+mrkthr_get_now_ticks(void)
+{
+    return tsc_now;
+}
+
+uint64_t
+mrkthr_get_now_ticks_precise(void)
+{
+    update_now();
+    return tsc_now;
 }
 
 UNUSED static void
@@ -910,7 +922,6 @@ resume(mrkthr_ctx_t *ctx)
     me = ctx;
 
     res = swapcontext(&main_uc, &me->co.uc);
-    //CTRACE("swapcontext returned %d (yield was called?)", res);
 
     if (errno == EINTR) {
         perror("resume(), ignoring ...");
@@ -1468,7 +1479,6 @@ mrkthr_get_rbuflen(int fd)
         /* wait for an event */
         me->co.state = CO_STATE_EVENT_READ;
         res = yield();
-        //CTRACE("yield returned %d", res);
         if (res != 0) {
             return -1;
         }
@@ -1477,8 +1487,6 @@ mrkthr_get_rbuflen(int fd)
             return (ssize_t)(kev->data);
         }
     }
-//    CTRACE("after---");
-//    KEVENT_DUMP(kev);
     return -1;
 }
 
@@ -1500,16 +1508,15 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     }
     *buf = tmp;
 
-    //CTRACE("o=%ld n=%ld", *offset, navail);
-
     if (navail == 0) {
         /* EOF ? */
         TRRET(MRKTHR_ACCEPT_ALL + 2);
     }
+
     while (nread < navail) {
         tmp = *buf + (*offset + nread);
         tmp->addrlen = sizeof(union _mrkthr_addr);
-        //CTRACE("nread=%ld", nread);
+
         if ((tmp->fd = accept(fd, &tmp->addr.sa, &tmp->addrlen)) == -1) {
             //perror("accept");
             break;
@@ -1525,7 +1532,6 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     }
 
     *offset += nread;
-    //CTRACE("Returning %ld", *offset);
 
     return 0;
 }
@@ -1552,12 +1558,11 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
     }
     *buf = tmp;
 
-    //CTRACE("o=%ld n=%ld", *offset, navail);
-
     if (navail == 0) {
         /* EOF ? */
         TRRET(MRKTHR_READ_ALL + 2);
     }
+
     if ((nread = read(fd, *buf + *offset, navail)) == -1) {
         perror("read");
         TRRET(MRKTHR_READ_ALL + 3);
@@ -1620,7 +1625,7 @@ mrkthr_get_wbuflen(int fd)
         /* wait for an event */
         me->co.state = CO_STATE_EVENT_WRITE;
         res = yield();
-        //CTRACE("yield returned %d", res);
+
         if (res != 0) {
             return -1;
         }
@@ -1628,8 +1633,6 @@ mrkthr_get_wbuflen(int fd)
         if ((kev = result_event(fd, EVFILT_WRITE)) != NULL) {
             return (ssize_t)(kev->data);
         }
-        //TRACE("after---");
-        //KEVENT_DUMP(kev);
     }
     return -1;
 }
@@ -1645,24 +1648,19 @@ mrkthr_write_all(int fd, const char *buf, size_t buflen)
     off_t remaining = buflen;
 
     assert(me != NULL);
-    //CTRACE("About ro write");
-    //D16(buf, buflen);
 
     while (remaining > 0) {
         if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
             TRRET(MRKTHR_WRITE_ALL + 1);
         }
-        //CTRACE("navail=%ld", navail);
 
         if ((nwritten = write(fd, buf + buflen - remaining,
                               MIN(navail, remaining))) == -1) {
 
             TRRET(MRKTHR_WRITE_ALL + 2);
         }
-        //CTRACE("remaining=%ld nwritten=%ld", remaining, nwritten);
         remaining -= nwritten;
     }
-    //CTRACE("Wrote all, exiting.");
     return 0;
 }
 

@@ -7,11 +7,9 @@
 #include "mrkcommon/util.h"
 #include "unittest.h"
 
-static int read_pipe[2];
-static int write_pipe[2];
+//static int read_pipe[2];
+//static int write_pipe[2];
 
-UNUSED static mrkthr_ctx_t *cli;
-UNUSED static mrkthr_ctx_t *srv;
 
 static mrkthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
@@ -38,7 +36,7 @@ r(int n)
 {
     //const mrkthr_ctx_t *me = mrkthr_me();
     int dummy = 1;
-    uint64_t now1, now2;
+    UNUSED uint64_t now1, now2;
     //UNUSED const mrkthr_ctx_t *me = mrkthr_me();
 
     //CTRACE("&me=%p", &me);
@@ -48,12 +46,12 @@ r(int n)
             ++dummy;
             //CTRACE(">>>");
             //mrkthr_sleep(100);
-            now1 = mrkthr_get_now();
+            //now1 = mrkthr_get_now_precise();
             mrkthr_sleep(0);
             //CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
             //mrkthr_ctx_dump(me);
-            now2 = mrkthr_get_now();
+            //now2 = mrkthr_get_now_precise();
             //printf("."); fflush(stdout);
             //printf("%ld\n", (now2 - now1) / 1000);
             //CTRACE("iter=%d %ld", nn, (now2 - now1) / 1000);
@@ -69,9 +67,9 @@ baz(UNUSED int argc, UNUSED void *argv[])
     uint64_t n1, n2;
     uint64_t t;
 
-    n1 = mrkthr_get_now();
+    n1 = mrkthr_get_now_precise();
     r(0);
-    n2 = mrkthr_get_now();
+    n2 = mrkthr_get_now_precise();
     t = n2 - n1;
     ++ntotal;
     total += t;
@@ -91,7 +89,7 @@ bar(UNUSED int argc, UNUSED void *argv[])
         //mrkthr_ctx_dump(ctx);
         mrkthr_set_resume(ctx);
     }
-    printf("All resumed\n");
+    fprintf(stderr, "All started\n");
     while (!_shutdown) {
         mrkthr_sleep(wt);
         if (!ntotal) {
@@ -167,10 +165,10 @@ qwe(UNUSED int argc, void *argv[])
 static int
 shut_me_down(UNUSED int argc, UNUSED void *argv[])
 {
-    close(read_pipe[0]);
-    close(read_pipe[1]);
-    close(write_pipe[0]);
-    close(write_pipe[1]);
+    //close(read_pipe[0]);
+    //close(read_pipe[1]);
+    //close(write_pipe[0]);
+    //close(write_pipe[1]);
     _shutdown = 1;
     return 0;
 }
@@ -182,6 +180,8 @@ test0(void)
     struct sigaction act = {
         .sa_flags = SA_SIGINFO,
     };
+    mrkthr_ctx_t *cli;
+    //mrkthr_ctx_t *srv;
 
     sigemptyset(&(act.sa_mask));
 
@@ -196,22 +196,22 @@ test0(void)
 
 
     //CTRACE();
-    if (pipe(read_pipe) != 0) {
-        FAIL("pipe");
-    }
+    //if (pipe(read_pipe) != 0) {
+    //    FAIL("pipe");
+    //}
 
     //CTRACE();
-    if (pipe(write_pipe) != 0) {
-        FAIL("pipe");
-    }
+    //if (pipe(write_pipe) != 0) {
+    //    FAIL("pipe");
+    //}
 
     //CTRACE();
 
-//    srv = mrkthr_new("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
-//    mrkthr_set_resume(srv);
-//
-//    cli = mrkthr_new("asd", asd, 2, write_pipe[0], read_pipe[1]);
-//    mrkthr_set_resume(cli);
+    //srv = mrkthr_new("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
+    //mrkthr_set_resume(srv);
+
+    //cli = mrkthr_new("asd", asd, 2, write_pipe[0], read_pipe[1]);
+    //mrkthr_set_resume(cli);
 
     cli = mrkthr_new("bar", bar, 0);
     mrkthr_set_resume(cli);

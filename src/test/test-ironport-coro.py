@@ -13,9 +13,9 @@ def r(n):
         for i in xrange(niter):
             #coro.sleep_relative(1)
             #print 123
-            now1 = coro.get_usec()
+            #now1 = coro.get_usec()
             coro.sleep_relative(0.0)
-            now2 = coro.get_usec()
+            #now2 = coro.get_usec()
             #sys.stdout.write('.')
             #sys.stdout.flush()
             #print(now2-now1)
@@ -41,12 +41,14 @@ def baz():
     #print >>sys.stderr, "total", n2-n1
 
 def bar():
+    global wt
     oldtotal = total
     for i in xrange(nthreads):
         coro.spawn(baz)
     print "All started"
+    wt /= 1000.
     while True:
-        coro.sleep_relative(wt/1000.)
+        coro.sleep_relative(wt)
         if not ntotal:
             continue
         print "total", total / ntotal

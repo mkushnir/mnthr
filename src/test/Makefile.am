@@ -9,7 +9,7 @@ dist_HEADERS = unittest.h
 
 BUILT_SOURCES = ../diag.c ../diag.h
 
-#CFLAGS = -Wall -Wextra -Werror -std=c99 -I.. -g -O0 -ftrapv -fcatch-undefined-behavior -I$(HOME)/include
+#CFLAGS = -Wall -Wextra -Werror -std=c99 -I.. -g -O0 -ftrapv -fcatch-undefined-behavior -I$(includedir)
 CFLAGS = -Wall -Wextra -Werror -std=c99 -I.. -O3 -DNDEBUG -I$(includedir)
 LDFLAGS += -L$(libdir) -lmrkcommon
 

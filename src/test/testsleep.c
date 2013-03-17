@@ -7,17 +7,17 @@ static int
 ff (UNUSED int id, UNUSED void *argv[])
 {
     uint64_t before, after;
+    uint64_t before_nsec, after_nsec;
     int n = (int)(argv[0]);
 
-    before = mrkthr_get_now();
-    //CTRACE("before=%ld", before);
-    //CTRACE("sleeping for %d", n * 500);
+    before = mrkthr_get_now_ticks_precise();
+    before_nsec = mrkthr_get_now_precise();
     if (mrkthr_sleep(n * 1000) != 0) {
         return(1);
     }
-    after = mrkthr_get_now();
-    //CTRACE("after=%ld", after);
-    CTRACE("sleep=%ld (%Lf)", after-before, mrkthr_ticks2sec(after-before));
+    after = mrkthr_get_now_ticks_precise();
+    after_nsec = mrkthr_get_now_precise();
+    CTRACE("sleep=%Lf/%Lf", mrkthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
     return(0);
 }
 

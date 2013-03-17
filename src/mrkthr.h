@@ -67,4 +67,6 @@ int mrkthr_cond_fini(mrkthr_cond_t *);
 
 uint64_t mrkthr_get_now(void);
 uint64_t mrkthr_get_now_precise(void);
+uint64_t mrkthr_get_now_ticks(void);
+uint64_t mrkthr_get_now_ticks_precise(void);
 #endif
