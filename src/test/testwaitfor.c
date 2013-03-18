@@ -26,9 +26,9 @@ f (UNUSED int argc, UNUSED void *argv[])
 {
     int res;
 
-    res = mrkthr_wait_for(1000, ff, 2, 123, 234);
+    res = mrkthr_wait_for(1000, "one", ff, 2, 123, 234);
     TRACE("res=%d", res);
-    res = mrkthr_wait_for(1000, fff, 2, 123, 234);
+    res = mrkthr_wait_for(1000, "two", fff, 2, 123, 234);
     TRACE("res=%d", res);
     return(0);
 }

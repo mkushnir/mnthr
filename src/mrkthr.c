@@ -83,6 +83,14 @@
 
 #include "diag.h"
 #include "mrkcommon/dumpm.h"
+/* Turn off TRACE from dumpm.h */
+#if 0
+#ifdef TRACE
+#   undef TRACE
+#endif
+#define TRACE(s, ...)
+#endif
+
 #include "mrkcommon/array.h"
 #include "mrkcommon/list.h"
 #include "kevent_util.h"
@@ -822,7 +830,7 @@ yield(void)
 }
 
 static int
-_mrkthr_sleep(uint64_t msec)
+__sleep(uint64_t msec)
 {
     if (msec == mrkthr_SLEEP_FOREVER) {
         me->expire_ticks = mrkthr_SLEEP_FOREVER;
@@ -846,7 +854,7 @@ mrkthr_sleep(uint64_t msec)
 {
     assert(me != NULL);
     me->co.state = CO_STATE_EVENT_SLEEP;
-    return _mrkthr_sleep(msec);
+    return __sleep(msec);
 }
 
 long double
@@ -882,6 +890,27 @@ append_to_waitq(array_t *waitq)
 
     *t = me;
 }
+
+static void
+remove_from_waitq(array_t *waitq)
+{
+    mrkthr_ctx_t **t;
+    array_iter_t it;
+
+    assert(me != NULL);
+
+    for (t = array_first(waitq, &it);
+         t != NULL;
+         t = array_next(waitq, &it)) {
+
+        if (*t == me) {
+            *t = MAP_FAILED;
+            break;
+        }
+    }
+}
+
+
 
 /**
  * Sleep until the target ctx has exited.
@@ -1755,14 +1784,16 @@ mrkthr_cond_fini(mrkthr_cond_t *cond)
 }
 
 int
-mrkthr_wait_for(uint64_t msec, cofunc f, int argc, ...)
+mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
 {
     va_list ap;
     int res;
     mrkthr_ctx_t *ctx;
 
+    assert(me != NULL);
+
     va_start(ap, argc);
-    ctx = mrkthr_vnew(NULL, f, argc, ap);
+    ctx = mrkthr_vnew(name, f, argc, ap);
     va_end(ap);
 
     if (ctx == NULL) {
@@ -1771,16 +1802,16 @@ mrkthr_wait_for(uint64_t msec, cofunc f, int argc, ...)
 
     append_to_waitq(&ctx->waitq);
     mrkthr_set_resume(ctx);
-
-    assert(me != NULL);
     me->co.state = CO_STATE_EVENT_WAITFOR;
-    res = _mrkthr_sleep(msec);
+    res = __sleep(msec);
 
     if (me->co.yield_state == CO_STATE_EVENT_WAITFOR) {
         ctx->co.rc = CO_RC_TIMEDOUT;
         res = CO_RC_TIMEDOUT;
     }
-    sleepq_remove(ctx);
+
+    remove_from_waitq(&ctx->waitq);
+    mrkthr_ctx_fini(ctx); 
 
     return res;
 }

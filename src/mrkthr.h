@@ -70,6 +70,6 @@ uint64_t mrkthr_get_now_precise(void);
 uint64_t mrkthr_get_now_ticks(void);
 uint64_t mrkthr_get_now_ticks_precise(void);
 
-int mrkthr_wait_for(uint64_t, cofunc, int, ...);
+int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
 #endif
