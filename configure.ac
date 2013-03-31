@@ -6,10 +6,6 @@ then
     CPP="clang -E"
 fi
 
-LD_LIBRARY_PATH=$HOME/lib
-LDFLAGS=-L$HOME/lib
-CFLAGS=-I$HOME/include
-
 AC_PREREQ
 
 AC_PROG_CC
