@@ -683,7 +683,7 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
 
     assert(ctx!= NULL);
     assert(ctx->co.id == -1);
-    
+
     /* Thread id is actually an index into the ctxes list */
     ctx->co.id = it.iter;
 
@@ -1811,7 +1811,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     }
 
     remove_from_waitq(&ctx->waitq);
-    mrkthr_ctx_fini(ctx); 
+    mrkthr_ctx_fini(ctx);
 
     return res;
 }
