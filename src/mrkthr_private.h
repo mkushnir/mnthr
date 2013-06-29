@@ -15,7 +15,7 @@
 #include "mrkcommon/rbt.h"
 #include "mrkcommon/util.h"
 
-#define SSIZE (PAGE_SIZE * 1024)
+#define STACKSIZE (PAGE_SIZE * 1024)
 
 struct _mrkthr_ctx;
 

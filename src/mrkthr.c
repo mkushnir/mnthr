@@ -104,7 +104,7 @@ typedef int (*writer_t) (int, int, int);
 static int mflags;
 
 static ucontext_t main_uc;
-static char main_stack[SSIZE];
+static char main_stack[STACKSIZE];
 
 static int q0 = -1;
 static array_t kevents0;
@@ -608,7 +608,7 @@ static int
 mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
 {
     if (ctx->co.stack != MAP_FAILED) {
-        munmap(ctx->co.stack, SSIZE);
+        munmap(ctx->co.stack, STACKSIZE);
         ctx->co.stack = MAP_FAILED;
     }
     ctx->co.uc.uc_link = NULL;
@@ -694,7 +694,7 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
     }
 
     if (ctx->co.stack == MAP_FAILED) {
-        if ((ctx->co.stack = mmap(NULL, SSIZE, PROT_READ|PROT_WRITE,
+        if ((ctx->co.stack = mmap(NULL, STACKSIZE, PROT_READ|PROT_WRITE,
                                   MAP_ANON, -1, 0)) == MAP_FAILED) {
             TRRETNULL(MRKTHR_CTX_NEW + 1);
         }
@@ -702,7 +702,7 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
             FAIL("mprotect");
         }
         ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;
-        ctx->co.uc.uc_stack.ss_size = SSIZE;
+        ctx->co.uc.uc_stack.ss_size = STACKSIZE;
     }
 
     ctx->co.uc.uc_link = &main_uc;
