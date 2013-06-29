@@ -12,7 +12,7 @@ lib_LTLIBRARIES = libmrkthr.la
 
 nobase_include_HEADERS = mrkthr.h
 
-libmrkthr_la_SOURCES = mrkthr.c kevent_util.c
+libmrkthr_la_SOURCES = mrkthr.c kevent_util.c bytestream_helper.c
 nodist_libmrkthr_la_SOURCES = diag.c
 
 if DEBUG

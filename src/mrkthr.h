@@ -7,6 +7,7 @@
 #include "mrkcommon/array.h"
 #include "mrkcommon/dumpm.h"
 #include "mrkcommon/util.h"
+#include "mrkcommon/bytestream.h"
 
 
 #define CTRACE(s, ...) TRACE("[% 4d] " s, mrkthr_id(), ##__VA_ARGS__)
@@ -72,4 +73,6 @@ uint64_t mrkthr_get_now_ticks_precise(void);
 
 int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
+ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
+ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);
 #endif

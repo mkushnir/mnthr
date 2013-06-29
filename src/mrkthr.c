@@ -1667,6 +1667,43 @@ mrkthr_read_allb(int fd, char *buf, ssize_t sz)
     return nread;
 }
 
+/**
+ * Perform a single recvfrom from fd into buf.
+ * Return the number of bytes received or -1 in case of error.
+ */
+ssize_t
+mrkthr_recvfrom_allb(int fd,
+                     void * restrict buf,
+                     ssize_t sz,
+                     int flags,
+                     struct sockaddr * restrict from,
+                     socklen_t * restrict fromlen)
+{
+    ssize_t navail;
+    ssize_t nrecv;
+
+    assert(me != NULL);
+
+    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
+        return -1;
+    }
+
+    sz = MIN(navail, sz);
+
+    if ((nrecv = recvfrom(fd, buf, (size_t)sz, flags, from, fromlen)) == -1) {
+        perror("recvfrom");
+        return -1;
+    }
+
+    if (nrecv < sz) {
+        TRACE("nrecv=%ld sz=%ld", nrecv, sz);
+        if (nrecv == 0) {
+            return -1;
+        }
+    }
+    return nrecv;
+}
+
 ssize_t
 mrkthr_get_wbuflen(int fd)
 {
@@ -1693,14 +1730,14 @@ mrkthr_get_wbuflen(int fd)
 }
 
 /**
- * Write buflen bytes from buf into ctx->fd.
+ * Write len bytes from buf into fd.
  */
 int
-mrkthr_write_all(int fd, const char *buf, size_t buflen)
+mrkthr_write_all(int fd, const char *buf, size_t len)
 {
     ssize_t navail;
     ssize_t nwritten;
-    off_t remaining = buflen;
+    off_t remaining = len;
 
     assert(me != NULL);
 
@@ -1709,10 +1746,43 @@ mrkthr_write_all(int fd, const char *buf, size_t buflen)
             TRRET(MRKTHR_WRITE_ALL + 1);
         }
 
-        if ((nwritten = write(fd, buf + buflen - remaining,
+        if ((nwritten = write(fd, buf + len - remaining,
                               MIN(navail, remaining))) == -1) {
 
             TRRET(MRKTHR_WRITE_ALL + 2);
+        }
+        remaining -= nwritten;
+    }
+    return 0;
+}
+
+/**
+ * Write len bytes from buf into fd.
+ */
+int
+mrkthr_sendto_all(int fd,
+                  const void *buf,
+                  size_t len,
+                  int flags,
+                  const struct sockaddr *to,
+                  socklen_t tolen)
+{
+    ssize_t navail;
+    ssize_t nwritten;
+    size_t remaining = len;
+
+    assert(me != NULL);
+
+    while (remaining > 0) {
+        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MRKTHR_SENDTO_ALL + 1);
+        }
+
+        if ((nwritten = sendto(fd, ((const char *)buf) + len - remaining,
+                               MIN((size_t)navail, remaining),
+                               flags, to, tolen)) == -1) {
+
+            TRRET(MRKTHR_SENDTO_ALL + 2);
         }
         remaining -= nwritten;
     }
