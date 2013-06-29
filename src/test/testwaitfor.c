@@ -3,22 +3,36 @@
 #include "mrkthr.h"
 #include "unittest.h"
 
-static int
+UNUSED static int
 fff(UNUSED int argc, UNUSED void *argv[])
 {
-    TRACE("argc=%d", argc);
+    CTRACE("argc=%d", argc);
     mrkthr_sleep(200);
-    TRACE("returning");
+    CTRACE("returning");
+    return 1;
+}
+
+UNUSED static int
+ff(UNUSED int argc, UNUSED void *argv[])
+{
+    CTRACE("argc=%d", argc);
+    mrkthr_sleep(2000);
+    CTRACE("returning");
     return 1;
 }
 
 static int
-ff(UNUSED int argc, UNUSED void *argv[])
+r (UNUSED int argc, UNUSED void *argv[])
 {
-    TRACE("argc=%d", argc);
-    mrkthr_sleep(2000);
-    TRACE("returning");
-    return 1;
+    char buf[1024];
+    ssize_t nread;
+
+    memset(buf, sizeof(buf), 0);
+
+    nread = mrkthr_read_allb(0, buf, sizeof(buf));
+    CTRACE("nread=%ld", nread);
+    CTRACE("buf='%s'", buf);
+    return 0;
 }
 
 static int
@@ -27,9 +41,13 @@ f (UNUSED int argc, UNUSED void *argv[])
     int res;
 
     res = mrkthr_wait_for(1000, "one", ff, 2, 123, 234);
-    TRACE("res=%d", res);
+    CTRACE("res=%d", res);
     res = mrkthr_wait_for(1000, "two", fff, 2, 123, 234);
-    TRACE("res=%d", res);
+    CTRACE("res=%d", res);
+    mrkthr_sleep(3000);
+    CTRACE(FGREEN("Now type something, waiting for 5 secs ..."));
+    res = mrkthr_wait_for(5000, "three", r, 0);
+    CTRACE("res=%d", res);
     return(0);
 }
 

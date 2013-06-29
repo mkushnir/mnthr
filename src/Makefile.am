@@ -14,7 +14,15 @@ nobase_include_HEADERS = mrkthr.h
 
 libmrkthr_la_SOURCES = mrkthr.c kevent_util.c
 nodist_libmrkthr_la_SOURCES = diag.c
-libmrkthr_la_CFLAGS = -Wall -Wextra -Werror -g -std=c99 -O3 -I$(includedir)
+
+if DEBUG
+DEBUG_FLAGS = -g -O0 -ftrapv -fcatch-undefined-behavior
+else
+DEBUG_FLAGS = -DNDEBUG -O3
+endif
+
+libmrkthr_la_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir)
+
 libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon
 
 SUBDIRS = . test

@@ -4,10 +4,8 @@
 #include "unittest.h"
 
 static int
-f (int id, UNUSED void *argv[])
+f (UNUSED int argc, UNUSED void *argv[])
 {
-    CTRACE("id=%d", id);
-
     while (1) {
         mrkthr_sleep(100);
         CTRACE("now=%ld", mrkthr_get_now()/1000000000);

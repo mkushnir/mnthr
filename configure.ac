@@ -38,6 +38,14 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_MMAP
 
+AC_PRESERVE_HELP_ORDER
+
+AC_ARG_ENABLE(debug,
+              AC_HELP_STRING([--enable-debug],
+                             [Enable debug build (default=no)]),
+              [AM_CONDITIONAL([DEBUG], [enable_debug=yes])],
+              [AM_CONDITIONAL([DEBUG], [test "$enable_debug" = "yes"])])
+
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 
 AC_OUTPUT

@@ -9,29 +9,31 @@ dist_HEADERS = unittest.h
 
 BUILT_SOURCES = ../diag.c ../diag.h
 
-#CFLAGS = -Wall -Wextra -Werror -std=c99 -I.. -g -O0 -ftrapv -fcatch-undefined-behavior -I$(includedir)
-CFLAGS = -Wall -Wextra -Werror -std=c99 -I.. -O3 -DNDEBUG -I$(includedir)
-LDFLAGS += -L$(libdir) -lmrkcommon
+if DEBUG
+DEBUG_FLAGS = -g -O0 -ftrapv -fcatch-undefined-behavior
+else
+DEBUG_FLAGS = -DNDEBUG -O3
+endif
 
 nodist_testco_SOURCES = ../diag.c
 testco_SOURCES = ../mrkthr.c ../kevent_util.c testco.c
-testco_CFLAGS =
-testco_LDFLAGS =
+testco_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I.. -I$(includedir)
+testco_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testsleep_SOURCES = ../diag.c
 testsleep_SOURCES = ../mrkthr.c ../kevent_util.c testsleep.c
-testsleep_CFLAGS =
-testsleep_LDFLAGS =
+testsleep_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I.. -I$(includedir)
+testsleep_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testclock_SOURCES = ../diag.c
 testclock_SOURCES = ../mrkthr.c ../kevent_util.c testclock.c
-testclock_CFLAGS =
-testclock_LDFLAGS =
+testclock_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I.. -I$(includedir)
+testclock_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testwaitfor_SOURCES = ../diag.c
 testwaitfor_SOURCES = ../mrkthr.c ../kevent_util.c testwaitfor.c
-testwaitfor_CFLAGS =
-testwaitfor_LDFLAGS =
+testwaitfor_CFLAGS = $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I.. -I$(includedir)
+testwaitfor_LDFLAGS = -L$(libdir) -lmrkcommon
 
 ../diag.c ../diag.h: ../diag.txt
 	sh ../gen-diag

@@ -84,11 +84,11 @@
 #include "diag.h"
 #include "mrkcommon/dumpm.h"
 /* Turn off TRACE from dumpm.h */
-#if 0
-#ifdef TRACE
-#   undef TRACE
-#endif
-#define TRACE(s, ...)
+#ifdef NDEBUG
+#   ifdef TRACE
+#      undef TRACE
+#   endif
+#   define TRACE(s, ...)
 #endif
 
 #include "mrkcommon/array.h"
@@ -110,6 +110,7 @@ static int q0 = -1;
 static array_t kevents0;
 static array_t kevents1;
 
+static int co_id = 0;
 static list_t ctxes;
 static mrkthr_ctx_t *me;
 static array_t free_ctxes;
@@ -674,7 +675,6 @@ static mrkthr_ctx_t *
 mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
 {
     int i;
-    list_iter_t it;
     mrkthr_ctx_t *ctx = NULL;
 
 
@@ -685,7 +685,7 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
     assert(ctx->co.id == -1);
 
     /* Thread id is actually an index into the ctxes list */
-    ctx->co.id = it.iter;
+    ctx->co.id = co_id++;
 
     if (name != NULL) {
         strncpy(ctx->co.name, name, sizeof(ctx->co.name));
