@@ -1,5 +1,9 @@
 #include "mrkcommon/util.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define _R(_d, _i) _d[_i].rnd
 #define _RD(_d, _i) _d[_R(_d, _i)]
 #define RDATA(_i) _RD(data, _i)
@@ -42,4 +46,8 @@
     }
 
 #define SHUFFLE _SHUFFLE(data, i)
+
+#ifdef __cplusplus
+}
+#endif
 

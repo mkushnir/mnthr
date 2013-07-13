@@ -9,6 +9,10 @@
 #include "mrkcommon/util.h"
 #include "mrkcommon/bytestream.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #define CTRACE(s, ...) TRACE("[% 4d] " s, mrkthr_id(), ##__VA_ARGS__)
 
@@ -75,4 +79,9 @@ int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
 ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
 ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

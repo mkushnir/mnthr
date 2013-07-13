@@ -6,6 +6,11 @@
 #include <sys/time.h>
 
 #include "mrkcommon/dumpm.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int kevent_dump(void *);
 #define KEVENT_DUMP(kev) kevent_dump((kev))
 
@@ -18,4 +23,9 @@ void kevent_copy(struct kevent *, struct kevent *);
 /* misc */
 int kev_write(struct kevent *, unsigned char *, ssize_t);
 int kev_read(struct kevent *, unsigned char *, ssize_t);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

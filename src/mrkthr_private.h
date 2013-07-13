@@ -15,6 +15,10 @@
 #include "mrkcommon/rbt.h"
 #include "mrkcommon/util.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define STACKSIZE (PAGE_SIZE * 1024)
 
 struct _mrkthr_ctx;
@@ -102,6 +106,10 @@ struct _mrkthr_profile {
     uint64_t max;
     long double avg;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #include "mrkthr.h"
 #endif
