@@ -12,7 +12,7 @@
  * The lowest page of the stack is then protected with the PROT_NONE flag.
  * TODO: Take care of different stack layouts.
  *
- * Basic thread locking primitive, mrkthr_event_t event.
+ * Basic thread locking primitive, mrkthr_signal_t.
  *
  * Basic time information. Internally the rdtsc() implementation for
  * x86-64 architecture is used to synchronize the notion of the
@@ -758,7 +758,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx, UNUSED void *udata)
            ctx->co.state == CO_STATE_WRITE ? "WRITE" :
            ctx->co.state == CO_STATE_SLEEP ? "SLEEP" :
            ctx->co.state == CO_STATE_SET_RESUME ? "SET_RESUME" :
-           ctx->co.state == CO_STATE_EVENT_ACQUIRE ? "EVENT_ACQUIRE" :
+           ctx->co.state == CO_STATE_SIGNAL_SUBSCRIBE ? "SNGNAL_SUBSCRIBE" :
            ctx->co.state == CO_STATE_JOINWAITQ ? "JOINWAITQ" :
            ctx->co.state == CO_STATE_WAITFOR ? "WAITFOR" :
            "",
@@ -1827,37 +1827,35 @@ mrkthr_sendto_all(int fd,
  * Event Primitive.
  */
 int
-mrkthr_event_init(mrkthr_event_t *event, mrkthr_ctx_t *ctx)
+mrkthr_signal_init(mrkthr_signal_t *signal, mrkthr_ctx_t *ctx)
 {
-    event->owner = ctx;
+    signal->owner = ctx;
     return 0;
 }
 
 int
-mrkthr_event_acquire(UNUSED mrkthr_event_t *event)
+mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 {
-    assert(event->owner == me);
+    assert(signal->owner == me);
 
     //CTRACE("holding on ...");
-    me->co.state = CO_STATE_EVENT_ACQUIRE;
+    me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     return yield();
 }
 
 void
-mrkthr_event_release(mrkthr_event_t *event)
+mrkthr_signal_send(mrkthr_signal_t *signal)
 {
-    //CTRACE("event->owner=%p", event->owner);
-    if (event->owner != NULL) {
+    //CTRACE("signal->owner=%p", signal->owner);
+    if (signal->owner != NULL) {
 
-        if (event->owner->co.state & CO_STATES_RESUMABLE_EXTERNALLY) {
-            /*
-             * We are overriding externally resumable states only
-             */
-            set_resume(event->owner);
+        if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {
+            set_resume(signal->owner);
             return;
+
         } else {
             CTRACE("Attempt to release event for a thread in %08x state",
-                   event->owner->co.state);
+                   signal->owner->co.state);
         }
     }
     //CTRACE("Not resuming orphan event. See you next time.");

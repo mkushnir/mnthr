@@ -30,9 +30,9 @@ typedef struct _mrkthr_socket {
     socklen_t addrlen;
 } mrkthr_socket_t;
 
-typedef struct _mrkthr_event {
+typedef struct _mrkthr_signal {
     struct _mrkthr_ctx *owner;
-} mrkthr_event_t;
+} mrkthr_signal_t;
 
 typedef struct _mrkthr_cond {
     array_t waitq;
@@ -63,9 +63,9 @@ ssize_t mrkthr_get_wbuflen(int);
 int mrkthr_write_all(int, const char *, size_t);
 int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
-int mrkthr_event_init(mrkthr_event_t *, mrkthr_ctx_t *);
-int mrkthr_event_acquire(mrkthr_event_t *);
-void mrkthr_event_release(mrkthr_event_t *);
+int mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
+int mrkthr_signal_subscribe(mrkthr_signal_t *);
+void mrkthr_signal_send(mrkthr_signal_t *);
 
 int mrkthr_cond_init(mrkthr_cond_t *);
 int mrkthr_cond_wait(mrkthr_cond_t *);
