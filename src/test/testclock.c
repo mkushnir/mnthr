@@ -29,7 +29,7 @@ test0 (void)
         perror("mrkthr_new");
         return;
     }
-    mrkthr_set_resume(t);
+    mrkthr_run(t);
 
     res = mrkthr_loop();
 

@@ -27,7 +27,7 @@ sigterm_handler(int sig, siginfo_t *info, UNUSED ucontext_t *uap)
     TRACE("sig=%d si_signo=%d si_errno=%d si_si_code=%d",
           sig, info->si_signo, info->si_errno, info->si_code);
 
-    mrkthr_set_resume(shutdown_timer_ctx);
+    mrkthr_run(shutdown_timer_ctx);
 
 }
 
@@ -87,7 +87,7 @@ bar(UNUSED int argc, UNUSED void *argv[])
     while (n-- && !_shutdown) {
         ctx = mrkthr_new("baz", baz, 0);
         //mrkthr_ctx_dump(ctx);
-        mrkthr_set_resume(ctx);
+        mrkthr_run(ctx);
     }
     fprintf(stderr, "All started\n");
     while (!_shutdown) {
@@ -208,13 +208,13 @@ test0(void)
     //CTRACE();
 
     //srv = mrkthr_new("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
-    //mrkthr_set_resume(srv);
+    //mrkthr_run(srv);
 
     //cli = mrkthr_new("asd", asd, 2, write_pipe[0], read_pipe[1]);
-    //mrkthr_set_resume(cli);
+    //mrkthr_run(cli);
 
     cli = mrkthr_new("bar", bar, 0);
-    mrkthr_set_resume(cli);
+    mrkthr_run(cli);
 
     res = mrkthr_loop();
 

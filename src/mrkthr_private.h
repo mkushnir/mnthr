@@ -44,15 +44,31 @@ struct _mrkthr_ctx {
         void **argv;
 #       define CO_STATE_DORMANT 0x01
 #       define CO_STATE_RESUMED 0x02
-#       define CO_STATE_EVENT_READ 0x04
-#       define CO_STATE_EVENT_WRITE 0x08
-#       define CO_STATE_EVENT_SLEEP 0x10
-#       define CO_STATE_EVENT_ACQUIRE 0x20
-#       define CO_STATE_EVENT_RESUME 0x40
-#       define CO_STATE_EVENT_JOINWAITQ 0x80
-#       define CO_STATE_EVENT_INTERRUPT 0x100
-#       define CO_STATE_EVENT_WAITFOR 0x200
-#       define CO_STATE_RESUMABLE (CO_STATE_EVENT_READ | CO_STATE_EVENT_WRITE | CO_STATE_EVENT_SLEEP | CO_STATE_EVENT_ACQUIRE | CO_STATE_EVENT_RESUME | CO_STATE_EVENT_JOINWAITQ | CO_STATE_EVENT_INTERRUPT | CO_STATE_EVENT_WAITFOR)
+#       define CO_STATE_READ 0x04
+#       define CO_STATE_WRITE 0x08
+#       define CO_STATE_SLEEP 0x10
+#       define CO_STATE_SET_RESUME 0x20
+#       define CO_STATE_EVENT_ACQUIRE 0x40
+#       define CO_STATE_JOINWAITQ 0x80
+#       define CO_STATE_WAITFOR 0x100
+#       define CO_STATE_RESUMABLE (CO_STATE_READ | \
+                                   CO_STATE_WRITE | \
+                                   CO_STATE_SLEEP | \
+                                   CO_STATE_SET_RESUME | \
+                                   CO_STATE_EVENT_ACQUIRE | \
+                                   CO_STATE_JOINWAITQ | \
+                                   CO_STATE_WAITFOR)
+#       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP | \
+                                               CO_STATE_SET_RESUME | \
+                                               CO_STATE_EVENT_ACQUIRE | \
+                                               CO_STATE_JOINWAITQ | \
+                                               CO_STATE_WAITFOR)
+#       define CO_EVENTS_YIELDABLE_INTERNALLY (CO_STATE_READ | \
+                                               CO_STATE_WRITE | \
+                                               CO_STATE_SLEEP | \
+                                               CO_STATE_EVENT_ACQUIRE | \
+                                               CO_STATE_JOINWAITQ | \
+                                               CO_STATE_WAITFOR)
         unsigned int state;
         unsigned int yield_state;
 #       define CO_RC_USER_INTERRUPTED 0x01

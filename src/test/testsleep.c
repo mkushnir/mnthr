@@ -33,7 +33,7 @@ f (int id, UNUSED void *argv[])
         if ((t = mrkthr_new(NULL, ff, 1, i)) == NULL) {
             return i + 100;
         }
-        mrkthr_set_resume(t);
+        mrkthr_run(t);
     }
 
     return(0);
@@ -54,7 +54,7 @@ test0 (void)
         perror("mrkthr_new");
         return;
     }
-    mrkthr_set_resume(t);
+    mrkthr_run(t);
 
     res = mrkthr_loop();
 

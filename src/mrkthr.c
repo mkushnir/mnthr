@@ -144,6 +144,7 @@ static void resume_waitq_all(array_t *);
 static int discard_event(int, int);
 static void push_free_ctx(mrkthr_ctx_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
+static void set_resume(mrkthr_ctx_t *);
 
 #ifdef USE_RBT
 RB_PROTOTYPE_STATIC(sleepq, _mrkthr_ctx, sleepq_link, sleepq_cmp);
@@ -753,14 +754,13 @@ mrkthr_dump(const mrkthr_ctx_t *ctx, UNUSED void *udata)
            ctx->co.f,
            ctx->co.state == CO_STATE_DORMANT ? "DORMANT" :
            ctx->co.state == CO_STATE_RESUMED ? "RESUMED" :
-           ctx->co.state == CO_STATE_EVENT_READ ? "EVENT_READ" :
-           ctx->co.state == CO_STATE_EVENT_WRITE ? "EVENT_WRITE" :
-           ctx->co.state == CO_STATE_EVENT_SLEEP ? "EVENT_SLEEP" :
+           ctx->co.state == CO_STATE_READ ? "READ" :
+           ctx->co.state == CO_STATE_WRITE ? "WRITE" :
+           ctx->co.state == CO_STATE_SLEEP ? "SLEEP" :
+           ctx->co.state == CO_STATE_SET_RESUME ? "SET_RESUME" :
            ctx->co.state == CO_STATE_EVENT_ACQUIRE ? "EVENT_ACQUIRE" :
-           ctx->co.state == CO_STATE_EVENT_JOINWAITQ ? "EVENT_JOINWAITQ" :
-           ctx->co.state == CO_STATE_EVENT_RESUME ? "EVENT_RESUME" :
-           ctx->co.state == CO_STATE_EVENT_INTERRUPT ? "EVENT_INTERRUPT" :
-           ctx->co.state == CO_STATE_EVENT_WAITFOR ? "EVENT_WAITFOR" :
+           ctx->co.state == CO_STATE_JOINWAITQ ? "JOINWAITQ" :
+           ctx->co.state == CO_STATE_WAITFOR ? "WAITFOR" :
            "",
            ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
            ctx->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
@@ -853,7 +853,7 @@ int
 mrkthr_sleep(uint64_t msec)
 {
     assert(me != NULL);
-    me->co.state = CO_STATE_EVENT_SLEEP;
+    me->co.state = CO_STATE_SLEEP;
     return __sleep(msec);
 }
 
@@ -919,7 +919,7 @@ static int
 join_waitq(array_t *waitq)
 {
     append_to_waitq(waitq);
-    me->co.state = CO_STATE_EVENT_JOINWAITQ;
+    me->co.state = CO_STATE_JOINWAITQ;
     return yield();
 }
 
@@ -934,7 +934,7 @@ resume_waitq_all(array_t *waitq)
          t = array_next(waitq, &it)) {
 
         if (*t != MAP_FAILED) {
-            mrkthr_set_resume(*t);
+            set_resume(*t);
             *t = MAP_FAILED;
         }
     }
@@ -1013,7 +1013,16 @@ resume(mrkthr_ctx_t *ctx)
 }
 
 void
-mrkthr_set_resume(mrkthr_ctx_t *ctx)
+mrkthr_run(mrkthr_ctx_t *ctx)
+{
+    assert(ctx != me);
+    assert(ctx->co.state == CO_STATE_DORMANT);
+
+    set_resume(ctx);
+}
+
+static void
+set_resume(mrkthr_ctx_t *ctx)
 {
     assert(ctx != me);
 
@@ -1026,7 +1035,7 @@ mrkthr_set_resume(mrkthr_ctx_t *ctx)
         return;
     }
 
-    ctx->co.state = CO_STATE_EVENT_RESUME;
+    ctx->co.state = CO_STATE_SET_RESUME;
     ctx->expire_ticks = 0;
     sleepq_enqueue(ctx);
 }
@@ -1048,9 +1057,11 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
         return;
     }
 
+    /*
+     * We are ignoring all event management rules here.
+     */
     ctx->co.rc = CO_RC_USER_INTERRUPTED;
     ctx->expire_ticks = 0;
-    //ctx->expire_ticks = tsc_now;
     sleepq_enqueue(ctx);
 }
 
@@ -1235,6 +1246,19 @@ process_sleep_resume_list(void)
 
                 sleepq_bucket_remove(&ctx->sleepq_bucket, tmp);
 
+                if (!(ctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
+                    /*
+                     * We cannot resume events here that can only be
+                     * resumed from within other places of mrkthr_loop().
+                     *
+                     * All other events not included here are
+                     * CO_STATE_READ and CO_STATE_WRITE. This
+                     * should never occur.
+                     */
+                    TRACE(FRED("Have to deliver a %08x event "
+                               "that was not scheduled for!"), ctx->co.state);
+                }
+
                 if (resume(tmp) != 0) {
                     //TRACE("Could not resume co %d, discarding ...",
                     //      ctx->co.id);
@@ -1418,6 +1442,11 @@ mrkthr_loop(void)
 
                             if (ctx->co.f != NULL) {
 
+                                if (ctx->co.state != CO_STATE_READ) {
+                                    TRACE(FRED("Delivering a read event "
+                                               "that was not scheduled for!"));
+                                }
+
                                 if (resume(ctx) != 0) {
                                     //TRACE("Could not resume co %d "
                                     //      "for read FD %08lx, discarding ...",
@@ -1435,6 +1464,11 @@ mrkthr_loop(void)
                         case EVFILT_WRITE:
 
                             if (ctx->co.f != NULL) {
+
+                                if (ctx->co.state != CO_STATE_WRITE) {
+                                    TRACE(FRED("Delivering a write event "
+                                               "that was not scheduled for!"));
+                                }
 
                                 if (resume(ctx) != 0) {
                                     //TRACE("Could not resume co %d "
@@ -1532,7 +1566,7 @@ mrkthr_get_rbuflen(int fd)
         EV_SET(kev, fd, EVFILT_READ, EV_ADD|EV_ONESHOT, 0, 0, me);
 
         /* wait for an event */
-        me->co.state = CO_STATE_EVENT_READ;
+        me->co.state = CO_STATE_READ;
         res = yield();
         if (res != 0) {
             return -1;
@@ -1715,7 +1749,7 @@ mrkthr_get_wbuflen(int fd)
         EV_SET(kev, fd, EVFILT_WRITE, EV_ADD|EV_ONESHOT, 0, 0, me);
 
         /* wait for an event */
-        me->co.state = CO_STATE_EVENT_WRITE;
+        me->co.state = CO_STATE_WRITE;
         res = yield();
 
         if (res != 0) {
@@ -1814,8 +1848,17 @@ mrkthr_event_release(mrkthr_event_t *event)
 {
     //CTRACE("event->owner=%p", event->owner);
     if (event->owner != NULL) {
-        mrkthr_set_resume(event->owner);
-        return;
+
+        if (event->owner->co.state & CO_STATES_RESUMABLE_EXTERNALLY) {
+            /*
+             * We are overriding externally resumable states only
+             */
+            set_resume(event->owner);
+            return;
+        } else {
+            CTRACE("Attempt to release event for a thread in %08x state",
+                   event->owner->co.state);
+        }
     }
     //CTRACE("Not resuming orphan event. See you next time.");
 }
@@ -1871,11 +1914,11 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     }
 
     append_to_waitq(&ctx->waitq);
-    mrkthr_set_resume(ctx);
-    me->co.state = CO_STATE_EVENT_WAITFOR;
+    set_resume(ctx);
+    me->co.state = CO_STATE_WAITFOR;
     res = __sleep(msec);
 
-    if (me->co.yield_state == CO_STATE_EVENT_WAITFOR) {
+    if (me->co.yield_state == CO_STATE_WAITFOR) {
         ctx->co.rc = CO_RC_TIMEDOUT;
         res = CO_RC_TIMEDOUT;
     }

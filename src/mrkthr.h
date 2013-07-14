@@ -51,15 +51,17 @@ int mrkthr_id(void);
 int mrkthr_sleep(uint64_t);
 long double mrkthr_ticks2sec(uint64_t);
 int mrkthr_join(mrkthr_ctx_t *);
-void mrkthr_set_resume(mrkthr_ctx_t *);
+void mrkthr_run(mrkthr_ctx_t *);
 void mrkthr_set_interrupt(mrkthr_ctx_t *);
 
 ssize_t mrkthr_get_rbuflen(int);
 int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
 int mrkthr_read_all(int, char **, off_t *);
 ssize_t mrkthr_read_allb(int, char *, ssize_t);
+ssize_t mrkthr_recvfrom_allb(int, void * restrict, ssize_t, int, struct sockaddr * restrict, socklen_t * restrict);
 ssize_t mrkthr_get_wbuflen(int);
 int mrkthr_write_all(int, const char *, size_t);
+int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
 int mrkthr_event_init(mrkthr_event_t *, mrkthr_ctx_t *);
 int mrkthr_event_acquire(mrkthr_event_t *);
