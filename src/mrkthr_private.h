@@ -77,7 +77,7 @@ struct _mrkthr_ctx {
      * ULONG_MAX if forever. 0 - resume now.
      */
      uint64_t expire_ticks;
-#   define mrkthr_SLEEP_FOREVER (ULONG_MAX)
+#   define MRKTHR_SLEEP_FOREVER (ULONG_MAX)
 
     /*
      * Sleep list bucket.

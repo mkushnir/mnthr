@@ -101,7 +101,7 @@
 typedef int (*writer_t) (int, int, int);
 
 #define CO_FLAG_INITIALIZED 0x01
-static int mflags;
+static int mflags = 0;
 
 static ucontext_t main_uc;
 static char main_stack[STACKSIZE];
@@ -300,7 +300,7 @@ UNUSED static int
 dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)node->value;
-    mrkthr_dump(ctx, NULL);
+    mrkthr_dump(ctx);
     return 0;
 }
 #endif
@@ -314,13 +314,13 @@ dump_sleepq()
     mrkthr_ctx_t *sle;
 
     RB_FOREACH(sle, sleepq, &the_sleepq) {
-        mrkthr_dump(sle, NULL);
+        mrkthr_dump(sle);
         if (sle->sleepq_bucket.head != NULL) {
             mrkthr_ctx_t *slbe;
             for (slbe = sle->sleepq_bucket.head;
                  slbe != NULL;
                  slbe = slbe->sleepq_bucket_entry.next) {
-                mrkthr_dump(slbe, NULL);
+                mrkthr_dump(slbe);
             }
         }
     }
@@ -438,7 +438,7 @@ sleepq_enqueue(mrkthr_ctx_t *ctx)
     mrkthr_ctx_t *tmp;
 
     //CTRACE(FGREEN("SL enqueing"));
-    //mrkthr_dump(ctx, NULL);
+    //mrkthr_dump(ctx);
 
 #ifdef USE_RBT
     if ((tmp = RB_INSERT(sleepq, &the_sleepq, ctx)) != NULL) {
@@ -450,7 +450,7 @@ sleepq_enqueue(mrkthr_ctx_t *ctx)
     if (tmp != NULL) {
 #endif
         //TRACE("while enqueing, found bucket:");
-        //mrkthr_dump(tmp, NULL);
+        //mrkthr_dump(tmp);
 
         if (tmp->sleepq_bucket.tail == NULL) {
             tmp->sleepq_bucket.head = ctx;
@@ -459,7 +459,7 @@ sleepq_enqueue(mrkthr_ctx_t *ctx)
             ctx->sleepq_bucket_entry.next = NULL;
         } else {
             //TRACE("tmp=%p", tmp);
-            //mrkthr_dump(tmp, NULL);
+            //mrkthr_dump(tmp);
             //D8(tmp->sleepq_bucket.tail, 1024);
             //TRACE("tmp->sleepq_bucket.tail=%p", tmp->sleepq_bucket.tail);
             tmp->sleepq_bucket.tail->sleepq_bucket_entry.next = ctx;
@@ -469,7 +469,7 @@ sleepq_enqueue(mrkthr_ctx_t *ctx)
         }
 
         //TRACE("After adding to the bucket:");
-        //mrkthr_dump(tmp, NULL);
+        //mrkthr_dump(tmp);
     }
 #ifndef USE_RBT
     else {
@@ -485,6 +485,10 @@ int
 mrkthr_init(void)
 {
     size_t sz;
+
+    if (mflags & CO_FLAG_INITIALIZED) {
+        return 0;
+    }
 
     if (array_init(&free_ctxes, sizeof(mrkthr_ctx_t *), 0,
                   NULL, NULL) != 0) {
@@ -522,8 +526,6 @@ mrkthr_init(void)
 #else
     trie_init(&the_sleepq);
 #endif
-    mflags |= CO_FLAG_INITIALIZED;
-
     sz = sizeof(tsc_freq);
     if (sysctlbyname("machdep.tsc_freq", &tsc_freq, &sz, NULL, 0) != 0) {
         FAIL("sysctlbyname");
@@ -533,19 +535,27 @@ mrkthr_init(void)
         FAIL("wallclock_init");
     }
 
+    mflags |= CO_FLAG_INITIALIZED;
+
     return 0;
 }
 
 int
 mrkthr_fini(void)
 {
+    if (!(mflags & CO_FLAG_INITIALIZED)) {
+        return 0;
+    }
+
     me = NULL;
-    mflags &= ~CO_FLAG_INITIALIZED;
     array_fini(&kevents0);
     array_fini(&kevents1);
     list_fini(&ctxes);
     array_fini(&free_ctxes);
     close(q0);
+
+    mflags &= ~CO_FLAG_INITIALIZED;
+
     return 0;
 }
 
@@ -742,7 +752,7 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
 }
 
 int
-mrkthr_dump(const mrkthr_ctx_t *ctx, UNUSED void *udata)
+mrkthr_dump(const mrkthr_ctx_t *ctx)
 {
     ucontext_t uc;
     mrkthr_ctx_t *tmp;
@@ -775,7 +785,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx, UNUSED void *udata)
         for (tmp = ctx->sleepq_bucket.head;
              tmp != NULL;
              tmp = tmp->sleepq_bucket_entry.next) {
-            mrkthr_dump(tmp, NULL);
+            mrkthr_dump(tmp);
         }
     }
     return 0;
@@ -798,7 +808,7 @@ mrkthr_set_name(mrkthr_ctx_t *ctx,
 /*
  * mrkthr management
  */
-const mrkthr_ctx_t *
+mrkthr_ctx_t *
 mrkthr_me(void)
 {
     return me;
@@ -819,7 +829,7 @@ yield(void)
     int res;
 
     //CTRACE("yielding from ...");
-    //mrkthr_dump(me, NULL);
+    //mrkthr_dump(me);
     res = swapcontext(&me->co.uc, &main_uc);
     if(res != 0) {
         CTRACE("swapcontext() error");
@@ -832,8 +842,8 @@ yield(void)
 static int
 __sleep(uint64_t msec)
 {
-    if (msec == mrkthr_SLEEP_FOREVER) {
-        me->expire_ticks = mrkthr_SLEEP_FOREVER;
+    if (msec == MRKTHR_SLEEP_FOREVER) {
+        me->expire_ticks = MRKTHR_SLEEP_FOREVER;
     } else {
         if (msec == 0) {
             me->expire_ticks = 0;
@@ -957,7 +967,7 @@ resume(mrkthr_ctx_t *ctx)
     int res;
 
     //CTRACE("resuming ...");
-    //mrkthr_dump(ctx, NULL);
+    //mrkthr_dump(ctx);
 
     /*
      * Can only be the result of yield or start, ie, the state cannot be
@@ -996,7 +1006,7 @@ resume(mrkthr_ctx_t *ctx)
          * This is the case of the exited (dead) thread.
          */
         CTRACE("Assuming dead ...");
-        mrkthr_dump(ctx, NULL);
+        mrkthr_dump(ctx);
         resume_waitq_all(&ctx->waitq);
         co_fini(&ctx->co);
         push_free_ctx(ctx);
@@ -1005,7 +1015,7 @@ resume(mrkthr_ctx_t *ctx)
 
     } else {
         CTRACE("Unknown case:");
-        mrkthr_dump(ctx, NULL);
+        mrkthr_dump(ctx);
         FAIL("resume");
     }
 
@@ -1026,12 +1036,12 @@ set_resume(mrkthr_ctx_t *ctx)
 {
     assert(ctx != me);
 
-    //mrkthr_dump(ctx, NULL);
+    //mrkthr_dump(ctx);
 
     //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
         CTRACE("Will not resume this ctx:");
-        mrkthr_dump(ctx, NULL);
+        mrkthr_dump(ctx);
         return;
     }
 
@@ -1048,12 +1058,12 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
 {
     assert(ctx != me);
 
-    //mrkthr_dump(ctx, NULL);
+    //mrkthr_dump(ctx);
 
     //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
         CTRACE("Will not interrupt this ctx:");
-        mrkthr_dump(ctx, NULL);
+        mrkthr_dump(ctx);
         return;
     }
 
@@ -1221,7 +1231,7 @@ process_sleep_resume_list(void)
         update_now();
 
         //CTRACE(FBBLUE("Processing: delta=%ld (%Lf)"), ctx->expire_ticks - tsc_now, mrkthr_ticks2sec(tsc_now - ctx->expire_ticks));
-        //mrkthr_dump(ctx, NULL);
+        //mrkthr_dump(ctx);
 
         if (ctx->expire_ticks < tsc_now) {
 
@@ -1242,7 +1252,7 @@ process_sleep_resume_list(void)
                 mrkthr_ctx_t *tmp = ctx->sleepq_bucket.head;
 
                 //CTRACE(FBGREEN("Resuming expired thread (bucket)"));
-                //mrkthr_dump(tmp, NULL);
+                //mrkthr_dump(tmp);
 
                 sleepq_bucket_remove(&ctx->sleepq_bucket, tmp);
 
@@ -1267,7 +1277,7 @@ process_sleep_resume_list(void)
 
             /* Finally process bucket owner */
             //CTRACE(FBGREEN("Resuming expired bucket owner"));
-            //mrkthr_dump(ctx, NULL);
+            //mrkthr_dump(ctx);
 
             if (resume(ctx) != 0) {
                 //TRACE("Could not resume co %d, discarding ...",
@@ -1349,7 +1359,7 @@ mrkthr_loop(void)
         //          tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
         //      tmout != NULL ? tmout->tv_sec : -1,
         //      tmout != NULL ? tmout->tv_nsec : -1);
-        //array_traverse(&kevents0, (array_traverser_t)mrkthr_dump, NULL);
+        //array_traverse(&kevents0, (array_traverser_t)mrkthr_dump);
 
         /* how many discarded items are to the end of the kevnts0? */
         nempty = 0;
@@ -1428,7 +1438,7 @@ mrkthr_loop(void)
                     }
 
                     //CTRACE("Processing:");
-                    //mrkthr_dump(ctx, NULL);
+                    //mrkthr_dump(ctx);
 
 
                     if (ctx != NULL) {
@@ -1834,6 +1844,13 @@ mrkthr_signal_init(mrkthr_signal_t *signal, mrkthr_ctx_t *ctx)
 }
 
 int
+mrkthr_signal_fini(mrkthr_signal_t *signal)
+{
+    signal->owner = NULL;
+    return 0;
+}
+
+int
 mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 {
     assert(signal->owner == me);
@@ -1854,7 +1871,8 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
             return;
 
         } else {
-            CTRACE("Attempt to release event for a thread in %08x state",
+            CTRACE("Attempt to release event for thread %d in %08x state",
+                   signal->owner->co.id,
                    signal->owner->co.state);
         }
     }

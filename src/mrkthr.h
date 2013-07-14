@@ -43,10 +43,10 @@ int mrkthr_fini(void);
 int mrkthr_loop(void);
 int wallclock_init(void);
 
-int mrkthr_dump(const mrkthr_ctx_t *, void *);
+int mrkthr_dump(const mrkthr_ctx_t *);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
-const mrkthr_ctx_t *mrkthr_me(void);
+mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
 int mrkthr_sleep(uint64_t);
 long double mrkthr_ticks2sec(uint64_t);
@@ -64,6 +64,7 @@ int mrkthr_write_all(int, const char *, size_t);
 int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
 int mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
+int mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_subscribe(mrkthr_signal_t *);
 void mrkthr_signal_send(mrkthr_signal_t *);
 
