@@ -65,6 +65,7 @@ int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, s
 
 int mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
 int mrkthr_signal_fini(mrkthr_signal_t *);
+int mrkthr_signal_has_owner(mrkthr_signal_t *);
 int mrkthr_signal_subscribe(mrkthr_signal_t *);
 void mrkthr_signal_send(mrkthr_signal_t *);
 

@@ -1851,6 +1851,12 @@ mrkthr_signal_fini(mrkthr_signal_t *signal)
 }
 
 int
+mrkthr_signal_has_owner(mrkthr_signal_t *signal)
+{
+    return signal->owner != NULL;
+}
+
+int
 mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 {
     assert(signal->owner == me);
@@ -1876,7 +1882,7 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
                    signal->owner->co.state);
         }
     }
-    //CTRACE("Not resuming orphan event. See you next time.");
+    //CTRACE("Not resuming orphan signal. See you next time.");
 }
 
 /**
