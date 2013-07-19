@@ -82,7 +82,7 @@
 #include <time.h>
 
 #include "diag.h"
-#include "mrkcommon/dumpm.h"
+#include <mrkcommon/dumpm.h>
 /* Turn off TRACE from dumpm.h */
 #ifdef NDEBUG
 #   ifdef TRACE
@@ -90,17 +90,20 @@
 #   endif
 #   define TRACE(s, ...)
 #endif
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr);
 
-#include "mrkcommon/array.h"
-#include "mrkcommon/list.h"
-#include "kevent_util.h"
+#include <mrkcommon/array.h>
+#include <mrkcommon/list.h>
+#include <kevent_util.h>
 /* Experimental trie use */
-#include "mrkcommon/trie.h"
+#include <mrkcommon/trie.h>
 #include "mrkthr_private.h"
 
 typedef int (*writer_t) (int, int, int);
 
 #define CO_FLAG_INITIALIZED 0x01
+#define CO_FLAG_SHUTDOWN 0x02
 static int mflags = 0;
 
 static ucontext_t main_uc;
@@ -399,13 +402,27 @@ sleepq_handle_remove(mrkthr_ctx_t *sle, mrkthr_ctx_t *ctx)
         }
 
     } else {
-        assert(sle == ctx);
+        if (sle != ctx) {
+            //CTRACE("sle:");
+            //mrkthr_dump(sle);
+            //CTRACE("ctx:");
+            //mrkthr_dump(ctx);
+            /*
+             * There is a special case when "finalized" ctxes are being
+             * remvoed from the sleepq. In these cases, their expire ticks
+             * are all zeros.
+             */
+            if (sle->expire_ticks != 0 || ctx->expire_ticks != 0) {
+                assert(0);
+            }
+        }
+        //assert(sle == ctx);
 #ifdef USE_RBT
         RB_REMOVE(sleepq, &the_sleepq, sle);
 #else
         node = trie_find_exact(&the_sleepq, sle->expire_ticks);
         node->value = NULL;
-        trie_node_remove(node);
+        trie_remove_node(&the_sleepq, node);
 #endif
     }
 }
@@ -490,6 +507,8 @@ mrkthr_init(void)
         return 0;
     }
 
+    MEMDEBUG_REGISTER(mrkthr);
+
     if (array_init(&free_ctxes, sizeof(mrkthr_ctx_t *), 0,
                   NULL, NULL) != 0) {
         FAIL("array_init");
@@ -557,6 +576,46 @@ mrkthr_fini(void)
     mflags &= ~CO_FLAG_INITIALIZED;
 
     return 0;
+}
+
+void
+mrkthr_shutdown(void)
+{
+    mflags |= CO_FLAG_SHUTDOWN;
+}
+
+size_t
+mrkthr_compact_sleepq(size_t threshold)
+{
+    size_t volume = 0;
+#ifndef USE_RBT
+
+    volume = trie_get_volume(&the_sleepq);
+    if (volume > threshold) {
+        trie_cleanup(&the_sleepq);
+    }
+#endif
+    return volume;
+}
+
+size_t
+mrkthr_get_sleepq_length(void)
+{
+#ifndef USE_RBT
+    return trie_get_nelems(&the_sleepq);
+#else
+    return 0;
+#endif
+}
+
+size_t
+mrkthr_get_sleepq_volume(void)
+{
+#ifndef USE_RBT
+    return trie_get_volume(&the_sleepq);
+#else
+    return 0;
+#endif
 }
 
 /*
@@ -1239,7 +1298,7 @@ process_sleep_resume_list(void)
 #ifdef USE_RBT
             RB_REMOVE(sleepq, &the_sleepq, ctx);
 #else
-            trie_node_remove(node);
+            trie_remove_node(&the_sleepq, node);
             node = NULL;
 #endif
 
@@ -1315,7 +1374,7 @@ mrkthr_loop(void)
 
     update_now();
 
-    while (1) {
+    while (!(mflags & CO_FLAG_SHUTDOWN)) {
         //sleep(1);
 
         //TRACE(FRED("Processing sleep/resume lists ..."));
@@ -1359,7 +1418,7 @@ mrkthr_loop(void)
         //          tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
         //      tmout != NULL ? tmout->tv_sec : -1,
         //      tmout != NULL ? tmout->tv_nsec : -1);
-        //array_traverse(&kevents0, (array_traverser_t)mrkthr_dump);
+        //array_traverse(&kevents0, (array_traverser_t)mrkthr_dump, NULL);
 
         /* how many discarded items are to the end of the kevnts0? */
         nempty = 0;
