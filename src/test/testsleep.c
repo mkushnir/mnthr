@@ -8,7 +8,7 @@ ff (UNUSED int id, UNUSED void *argv[])
 {
     uint64_t before, after;
     uint64_t before_nsec, after_nsec;
-    int n = (int)(argv[0]);
+    int n = (int)(intptr_t)(argv[0]);
 
     before = mrkthr_get_now_ticks_precise();
     before_nsec = mrkthr_get_now_precise();
