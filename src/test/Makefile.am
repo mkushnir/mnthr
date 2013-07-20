@@ -10,7 +10,7 @@ dist_HEADERS = unittest.h
 BUILT_SOURCES = ../diag.c ../diag.h
 
 if DEBUG
-DEBUG_FLAGS = -g -O0 $(CLANG_DEBUG)
+DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
 else
 DEBUG_FLAGS = -DNDEBUG -O3
 endif

@@ -16,7 +16,7 @@ libmrkthr_la_SOURCES = mrkthr.c kevent_util.c bytestream_helper.c
 nodist_libmrkthr_la_SOURCES = diag.c
 
 if DEBUG
-DEBUG_FLAGS = -g -O0 $(CLANG_DEBUG)
+DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
 else
 DEBUG_FLAGS = -DNDEBUG -O3
 endif
