@@ -5,7 +5,6 @@
 #include <sys/event.h>
 #include <sys/limits.h> /* ULONG_MAX*/
 #include <sys/socket.h>
-#include <sys/tree.h>
 #include <sys/types.h>
 
 #include <netinet/in.h>
@@ -91,9 +90,6 @@ struct _mrkthr_ctx {
      * a "bucket owner", and can subsequently hold other instances under
      * the same key. This design resembles a multimap.
      */
-#ifdef USE_RBT
-    RB_ENTRY(_mrkthr_ctx) sleepq_link;
-#endif
     struct _mrkthr_ctx_list sleepq_bucket;
     struct _mrkthr_ctx_list_entry sleepq_bucket_entry;
 

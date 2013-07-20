@@ -70,7 +70,6 @@
 #include <sys/stdint.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
-#include <sys/tree.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -122,20 +121,11 @@ static array_t free_ctxes;
  * Sleep list holds threads that are waiting for resume
  * in the future. It's prioritized by the thread's expire_ticks.
  */
-#ifdef USE_RBT
-RB_HEAD(sleepq, _mrkthr_ctx);
-static struct sleepq the_sleepq = RB_INITIALIZER();
-#else
 static trie_t the_sleepq;
-#endif
 
 static uint64_t tsc_freq;
 static uint64_t tsc_zero, tsc_now;
 static uint64_t nsec_zero, nsec_now;
-
-#ifdef USE_RBT
-static int64_t sleepq_cmp(struct _mrkthr_ctx *, struct _mrkthr_ctx *);
-#endif
 
 static int mrkthr_ctx_init(mrkthr_ctx_t *);
 static int mrkthr_ctx_fini(mrkthr_ctx_t *);
@@ -148,15 +138,6 @@ static int discard_event(int, int);
 static void push_free_ctx(mrkthr_ctx_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
 static void set_resume(mrkthr_ctx_t *);
-
-#ifdef USE_RBT
-RB_PROTOTYPE_STATIC(sleepq, _mrkthr_ctx, sleepq_link, sleepq_cmp);
-static int64_t
-sleepq_cmp(struct _mrkthr_ctx *a, struct _mrkthr_ctx *b)
-{
-    return (int64_t)(b->expire_ticks) - (int64_t)(a->expire_ticks);
-}
-#endif
 
 static inline uint64_t
 rdtsc(void)
@@ -298,7 +279,6 @@ dump_ucontext (ucontext_t *uc)
     );
 }
 
-#ifndef USE_RBT
 UNUSED static int
 dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
 {
@@ -306,35 +286,14 @@ dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
     mrkthr_dump(ctx);
     return 0;
 }
-#endif
 
 UNUSED static void
 dump_sleepq()
 {
-#ifndef USE_RBT
     trie_traverse(&the_sleepq, dump_sleepq_node, NULL);
-#else
-    mrkthr_ctx_t *sle;
-
-    RB_FOREACH(sle, sleepq, &the_sleepq) {
-        mrkthr_dump(sle);
-        if (sle->sleepq_bucket.head != NULL) {
-            mrkthr_ctx_t *slbe;
-            for (slbe = sle->sleepq_bucket.head;
-                 slbe != NULL;
-                 slbe = slbe->sleepq_bucket_entry.next) {
-                mrkthr_dump(slbe);
-            }
-        }
-    }
-#endif
 }
 
 /* Sleep list */
-
-#ifdef USE_RBT
-RB_GENERATE_STATIC(sleepq, _mrkthr_ctx, sleepq_link, sleepq_cmp);
-#endif
 
 static void
 sleepq_bucket_remove(struct _mrkthr_ctx_list *bucket, mrkthr_ctx_t *ctx)
@@ -364,9 +323,8 @@ sleepq_bucket_remove(struct _mrkthr_ctx_list *bucket, mrkthr_ctx_t *ctx)
 static void
 sleepq_handle_remove(mrkthr_ctx_t *sle, mrkthr_ctx_t *ctx)
 {
-#ifndef USE_RBT
     trie_node_t *node;
-#endif
+
     /*
      * ctx is either the sle itself, or it is
      * in the sle.sleepq_bucket.
@@ -387,14 +345,9 @@ sleepq_handle_remove(mrkthr_ctx_t *sle, mrkthr_ctx_t *ctx)
             sle->sleepq_bucket.head = NULL;
             sle->sleepq_bucket.tail = NULL;
 
-#ifdef USE_RBT
-            RB_REMOVE(sleepq, &the_sleepq, sle);
-            RB_INSERT(sleepq, &the_sleepq, new_bucket_owner);
-#else
             node = trie_find_exact(&the_sleepq, sle->expire_ticks);
             assert(node != NULL && node->value == sle);
             node->value = new_bucket_owner;
-#endif
 
         } else {
             /* we are removing from the bucket */
@@ -417,31 +370,21 @@ sleepq_handle_remove(mrkthr_ctx_t *sle, mrkthr_ctx_t *ctx)
             }
         }
         //assert(sle == ctx);
-#ifdef USE_RBT
-        RB_REMOVE(sleepq, &the_sleepq, sle);
-#else
         node = trie_find_exact(&the_sleepq, sle->expire_ticks);
         node->value = NULL;
         trie_remove_node(&the_sleepq, node);
-#endif
     }
 }
 
 static void
 sleepq_remove(mrkthr_ctx_t *ctx)
 {
-#ifndef USE_RBT
     trie_node_t *node;
-#endif
     mrkthr_ctx_t *sle;
 
-#ifdef USE_RBT
-    if ((sle = RB_FIND(sleepq, &the_sleepq, ctx)) != NULL) {
-#else
     if ((node = trie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
         sle = (mrkthr_ctx_t *)(node->value);
         assert(sle != NULL);
-#endif
         sleepq_handle_remove(sle, ctx);
     }
 }
@@ -449,23 +392,17 @@ sleepq_remove(mrkthr_ctx_t *ctx)
 static void
 sleepq_enqueue(mrkthr_ctx_t *ctx)
 {
-#ifndef USE_RBT
     trie_node_t *node;
-#endif
     mrkthr_ctx_t *tmp;
 
     //CTRACE(FGREEN("SL enqueing"));
     //mrkthr_dump(ctx);
 
-#ifdef USE_RBT
-    if ((tmp = RB_INSERT(sleepq, &the_sleepq, ctx)) != NULL) {
-#else
     if ((node = trie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("trie_add_node");
     }
     tmp = (mrkthr_ctx_t *)(node->value);
     if (tmp != NULL) {
-#endif
         //TRACE("while enqueing, found bucket:");
         //mrkthr_dump(tmp);
 
@@ -487,12 +424,9 @@ sleepq_enqueue(mrkthr_ctx_t *ctx)
 
         //TRACE("After adding to the bucket:");
         //mrkthr_dump(tmp);
-    }
-#ifndef USE_RBT
-    else {
+    } else {
         node->value = ctx;
     }
-#endif
 }
 
 /*
@@ -540,11 +474,7 @@ mrkthr_init(void)
     main_uc.uc_stack.ss_sp = main_stack;
     main_uc.uc_stack.ss_size = sizeof(main_stack);
     me = NULL;
-#ifdef USE_RBT
-    RB_INIT(&the_sleepq);
-#else
     trie_init(&the_sleepq);
-#endif
     sz = sizeof(tsc_freq);
     if (sysctlbyname("machdep.tsc_freq", &tsc_freq, &sz, NULL, 0) != 0) {
         FAIL("sysctlbyname");
@@ -588,34 +518,24 @@ size_t
 mrkthr_compact_sleepq(size_t threshold)
 {
     size_t volume = 0;
-#ifndef USE_RBT
 
     volume = trie_get_volume(&the_sleepq);
     if (volume > threshold) {
         trie_cleanup(&the_sleepq);
     }
-#endif
     return volume;
 }
 
 size_t
 mrkthr_get_sleepq_length(void)
 {
-#ifndef USE_RBT
     return trie_get_nelems(&the_sleepq);
-#else
-    return 0;
-#endif
 }
 
 size_t
 mrkthr_get_sleepq_volume(void)
 {
-#ifndef USE_RBT
     return trie_get_volume(&the_sleepq);
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -1264,25 +1184,17 @@ new_event(int fd, int filter, int *idx)
 static void
 process_sleep_resume_list(void)
 {
-#ifndef USE_RBT
     trie_node_t *node;
-#endif
     mrkthr_ctx_t *ctx;
 
     /* schedule expired mrkthrs */
 
-#ifdef USE_RBT
-    for (ctx = RB_MIN(sleepq, &the_sleepq);
-         ctx != NULL;
-         ctx = RB_MIN(sleepq, &the_sleepq)) {
-#else
     for (node = TRIE_MIN(&the_sleepq);
          node != NULL;
          node = TRIE_MIN(&the_sleepq)) {
 
         ctx = (mrkthr_ctx_t *)(node->value);
         assert(ctx != NULL);
-#endif
 
         //TRACE("Dump sleepq");
         //dump_sleepq();
@@ -1295,12 +1207,8 @@ process_sleep_resume_list(void)
         if (ctx->expire_ticks < tsc_now) {
 
             /* dequeue it as early as here */
-#ifdef USE_RBT
-            RB_REMOVE(sleepq, &the_sleepq, ctx);
-#else
             trie_remove_node(&the_sleepq, node);
             node = NULL;
-#endif
 
             /*
              * Process bucket, must do it *BEFORE* we process
@@ -1366,9 +1274,7 @@ mrkthr_loop(void)
     //lldiv_t div;
     long double secs, isecs, nsecs;
     int nempty, nkev;
-#ifndef USE_RBT
     trie_node_t *node;
-#endif
     mrkthr_ctx_t *ctx = NULL;
     array_iter_t it;
 
@@ -1383,13 +1289,9 @@ mrkthr_loop(void)
         process_sleep_resume_list();
 
         /* get the first to wake sleeping mrkthr */
-#ifdef USE_RBT
-        if ((ctx = RB_MIN(sleepq, &the_sleepq)) != NULL) {
-#else
         if ((node = TRIE_MIN(&the_sleepq)) != NULL) {
             ctx = node->value;
             assert(ctx != NULL);
-#endif
             //assert(ctx != NULL);
 
             if (ctx->expire_ticks > tsc_now) {
