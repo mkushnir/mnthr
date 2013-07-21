@@ -89,6 +89,8 @@ struct _mrkthr_ctx {
      * the mrkthr_ctx_t structure. Any member of the sleep list can be
      * a "bucket owner", and can subsequently hold other instances under
      * the same key. This design resembles a multimap.
+     *
+     * UPD: This design can be improved by using <mrkcommon/dtqueue.h>
      */
     struct _mrkthr_ctx_list sleepq_bucket;
     struct _mrkthr_ctx_list_entry sleepq_bucket_entry;

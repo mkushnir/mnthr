@@ -67,6 +67,7 @@
 #include <sys/types.h>
 #include <sys/param.h> /* PAGE_SIZE */
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/stdint.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
@@ -925,6 +926,25 @@ resume_waitq_all(array_t *waitq)
         if (*t != MAP_FAILED) {
             set_resume(*t);
             *t = MAP_FAILED;
+        }
+    }
+}
+
+
+static void
+resume_waitq_one(array_t *waitq)
+{
+    mrkthr_ctx_t **t;
+    array_iter_t it;
+
+    for (t = array_first(waitq, &it);
+         t != NULL;
+         t = array_next(waitq, &it)) {
+
+        if (*t != MAP_FAILED) {
+            set_resume(*t);
+            *t = MAP_FAILED;
+            break;
         }
     }
 }
@@ -1869,6 +1889,12 @@ void
 mrkthr_cond_signal_all(mrkthr_cond_t *cond)
 {
     resume_waitq_all(&cond->waitq);
+}
+
+void
+mrkthr_cond_signal_one(mrkthr_cond_t *cond)
+{
+    resume_waitq_one(&cond->waitq);
 }
 
 int

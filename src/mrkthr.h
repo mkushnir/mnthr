@@ -76,6 +76,7 @@ void mrkthr_signal_send(mrkthr_signal_t *);
 int mrkthr_cond_init(mrkthr_cond_t *);
 int mrkthr_cond_wait(mrkthr_cond_t *);
 void mrkthr_cond_signal_all(mrkthr_cond_t *);
+void mrkthr_cond_signal_one(mrkthr_cond_t *);
 int mrkthr_cond_fini(mrkthr_cond_t *);
 
 uint64_t mrkthr_get_now(void);
