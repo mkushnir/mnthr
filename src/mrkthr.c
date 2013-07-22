@@ -502,6 +502,7 @@ mrkthr_fini(void)
     array_fini(&kevents1);
     list_fini(&ctxes);
     array_fini(&free_ctxes);
+    trie_fini(&the_sleepq);
     close(q0);
 
     mflags &= ~CO_FLAG_INITIALIZED;
@@ -1858,9 +1859,9 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
             return;
 
         } else {
-            CTRACE("Attempt to release event for thread %d in %08x state",
+            CTRACE("Attempt to release event for thread %d in %s state",
                    signal->owner->co.id,
-                   signal->owner->co.state);
+                   CO_STATE_STR(signal->owner->co.state));
         }
     }
     //CTRACE("Not resuming orphan signal. See you next time.");
@@ -1929,7 +1930,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
 
     if (me->co.yield_state == CO_STATE_WAITFOR) {
         ctx->co.rc = CO_RC_TIMEDOUT;
-        res = CO_RC_TIMEDOUT;
+        res = MRKTHR_WAIT_TIMEOUT;
     }
 
     remove_from_waitq(&ctx->waitq);
