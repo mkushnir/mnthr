@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <ucontext.h>
 
-#include "mrkcommon/array.h"
+#include "mrkcommon/dtqueue.h"
 #include "mrkcommon/rbt.h"
 #include "mrkcommon/util.h"
 
@@ -31,6 +31,9 @@ struct _mrkthr_ctx_list_entry {
     struct _mrkthr_ctx *prev;
     struct _mrkthr_ctx *next;
 };
+
+typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
+#define MRKTHR_WAITQ_T_DEFINED
 
 struct _mrkthr_ctx {
     struct _co {
@@ -104,10 +107,26 @@ struct _mrkthr_ctx {
      *
      * UPD: This design can be improved by using <mrkcommon/dtqueue.h>
      */
-    struct _mrkthr_ctx_list sleepq_bucket;
-    struct _mrkthr_ctx_list_entry sleepq_bucket_entry;
+    mrkthr_waitq_t sleepq_bucket;
 
-    array_t waitq;
+    DTQUEUE_ENTRY(_mrkthr_ctx, sleepq_link);
+
+    /*
+     * Wait queue this ctx is a host of.
+     */
+    mrkthr_waitq_t waitq;
+
+    /*
+     * Membership of this ctx in an other wait queue.
+     */
+    DTQUEUE_ENTRY(_mrkthr_ctx, waitq_link);
+    mrkthr_waitq_t *hosting_waitq;
+
+    /*
+     * Membership of this ctx in free_ctxes.
+     */
+    STQUEUE_ENTRY(_mrkthr_ctx, free_link);
+
     /*
      * event lookup in kevents0,
      * specifically for mrkthr_clear_event()

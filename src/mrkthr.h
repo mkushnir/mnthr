@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "mrkcommon/array.h"
+#include "mrkcommon/dtqueue.h"
 #include "mrkcommon/dumpm.h"
 #include "mrkcommon/util.h"
 #include "mrkcommon/bytestream.h"
@@ -18,6 +18,11 @@ extern "C" {
 
 typedef int (*cofunc)(int, void *[]);
 typedef struct _mrkthr_ctx mrkthr_ctx_t;
+
+#ifndef MRKTHR_WAITQ_T_DEFINED
+typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
+#define MRKTHR_WAITQ_T_DEFINED
+#endif
 
 union _mrkthr_addr {
     struct sockaddr sa;
@@ -35,7 +40,7 @@ typedef struct _mrkthr_signal {
 } mrkthr_signal_t;
 
 typedef struct _mrkthr_cond {
-    array_t waitq;
+    mrkthr_waitq_t waitq;
 } mrkthr_cond_t;
 
 int mrkthr_init(void);

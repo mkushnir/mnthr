@@ -29,10 +29,12 @@ f (int id, UNUSED void *argv[])
 
     CTRACE("id=%d", id);
 
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < 5; ++i) {
         if ((t = mrkthr_new(NULL, ff, 1, i)) == NULL) {
-            return i + 100;
+            break;
         }
+        //TRACE("t=%p", t);
+        //mrkthr_dump(t);
         mrkthr_run(t);
     }
 
