@@ -62,7 +62,7 @@ struct _mrkthr_ctx {
                                                CO_STATE_SIGNAL_SUBSCRIBE | \
                                                CO_STATE_JOINWAITQ | \
                                                CO_STATE_WAITFOR)
-#       define CO_STATE_STR(st) \
+#       define CO_STATE_STR(st) ( \
             (st) == CO_STATE_DORMANT ? "DORMANT" : \
             (st) == CO_STATE_RESUMED ? "RESUMED" : \
             (st) == CO_STATE_READ ? "READ" : \
@@ -71,8 +71,8 @@ struct _mrkthr_ctx {
             (st) == CO_STATE_SET_RESUME ? "SET_RESUME" : \
             (st) == CO_STATE_SIGNAL_SUBSCRIBE ? "SIGNAL_SUBSCRIBE" : \
             (st) == CO_STATE_JOINWAITQ ? "JOINWAITQ" : \
-            (st) -- CO_STATE_WAITFOR ? "WAITFOR" : \
-            "<unknown>"
+            (st) == CO_STATE_WAITFOR ? "WAITFOR" : \
+            "<unknown>")
 
         unsigned int state;
         unsigned int yield_state;
