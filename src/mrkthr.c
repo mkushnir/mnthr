@@ -355,17 +355,13 @@ sleepq_remove(mrkthr_ctx_t *ctx)
             //assert(sle == ctx);
             if (sle != ctx) {
                 /*
-                 * A special case of a dead thread that was not happened
-                 * to be in the sleepq. Otherwise, if the thread is
-                 * resumable, we are in trouble.
+                 * Here we have found ctx is not in the bucket.
+                 * Just ignore it.
                  */
-                if (ctx->co.state & CO_STATE_RESUMABLE) {
-                    CTRACE("sle:");
-                    mrkthr_dump(sle);
-                    CTRACE("ctx:");
-                    mrkthr_dump(ctx);
-                    assert(0);
-                }
+                //CTRACE("sle:");
+                //mrkthr_dump(sle);
+                //CTRACE("ctx:");
+                //mrkthr_dump(ctx);
             } else {
                 trn->value = NULL;
                 trie_remove_node(&the_sleepq, trn);
