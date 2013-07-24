@@ -85,9 +85,8 @@ bar(UNUSED int argc, UNUSED void *argv[])
     long double oldtotal = total;
 
     while (n-- && !_shutdown) {
-        ctx = mrkthr_new("baz", baz, 0);
+        ctx = mrkthr_spawn("baz", baz, 0);
         //mrkthr_ctx_dump(ctx);
-        mrkthr_run(ctx);
     }
     fprintf(stderr, "All started\n");
     while (!_shutdown) {
@@ -207,14 +206,11 @@ test0(void)
 
     //CTRACE();
 
-    //srv = mrkthr_new("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
-    //mrkthr_run(srv);
+    //srv = mrkthr_spawn("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
 
-    //cli = mrkthr_new("asd", asd, 2, write_pipe[0], read_pipe[1]);
-    //mrkthr_run(cli);
+    //cli = mrkthr_spawn("asd", asd, 2, write_pipe[0], read_pipe[1]);
 
-    cli = mrkthr_new("bar", bar, 0);
-    mrkthr_run(cli);
+    cli = mrkthr_spawn("bar", bar, 0);
 
     res = mrkthr_loop();
 

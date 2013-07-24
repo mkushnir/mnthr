@@ -25,40 +25,25 @@ static int
 f (int id, UNUSED void *argv[])
 {
     int i;
-    mrkthr_ctx_t *t;
 
     CTRACE("id=%d", id);
-
     for (i = 0; i < 5; ++i) {
-        if ((t = mrkthr_new(NULL, ff, 1, i)) == NULL) {
-            break;
-        }
-        //TRACE("t=%p", t);
-        //mrkthr_dump(t);
-        mrkthr_run(t);
+        mrkthr_spawn(NULL, ff, 1, i);
     }
-
     return(0);
 }
 
 static void
 test0 (void)
 {
-    int res;
-    mrkthr_ctx_t *t;
-
     if (mrkthr_init() != 0) {
         perror("mrkthr_init");
         return;
     }
 
-    if ((t = mrkthr_new("qweqwe", f, 0)) == NULL) {
-        perror("mrkthr_new");
-        return;
-    }
-    mrkthr_run(t);
+    mrkthr_spawn("qweqwe", f, 0);
 
-    res = mrkthr_loop();
+    mrkthr_loop();
 
     if (mrkthr_fini() != 0) {
         perror("mrkthr_fini");

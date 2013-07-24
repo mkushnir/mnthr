@@ -54,21 +54,12 @@ f (UNUSED int argc, UNUSED void *argv[])
 static void
 test0 (void)
 {
-    int res;
-    mrkthr_ctx_t *t;
-
     if (mrkthr_init() != 0) {
         perror("mrkthr_init");
         return;
     }
-
-    if ((t = mrkthr_new("qweqwe", f, 0)) == NULL) {
-        perror("mrkthr_new");
-        return;
-    }
-    mrkthr_run(t);
-
-    res = mrkthr_loop();
+    mrkthr_spawn("qweqwe", f, 0);
+    mrkthr_loop();
 
     //TRACE("res=%d", res);
 
