@@ -92,7 +92,7 @@ uint64_t mrkthr_get_now_precise(void);
 uint64_t mrkthr_get_now_ticks(void);
 uint64_t mrkthr_get_now_ticks_precise(void);
 
-#define MRKTHR_WAIT_TIMEOUT 1
+#define MRKTHR_WAIT_TIMEOUT (-1)
 int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
 ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
