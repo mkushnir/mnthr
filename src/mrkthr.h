@@ -51,6 +51,7 @@ void mrkthr_shutdown(void);
 size_t mrkthr_compact_sleepq(size_t);
 size_t mrkthr_get_sleepq_length(void);
 size_t mrkthr_get_sleepq_volume(void);
+void mrkthr_dump_all_ctxes(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);

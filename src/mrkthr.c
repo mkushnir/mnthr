@@ -505,6 +505,23 @@ mrkthr_get_sleepq_volume(void)
     return trie_get_volume(&the_sleepq);
 }
 
+static int
+dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
+{
+    if ((ctx)->co.id != -1) {
+        mrkthr_dump(ctx);
+    }
+    return 0;
+}
+
+void
+mrkthr_dump_all_ctxes(void)
+{
+    CTRACE("all ctxes:");
+    list_traverse(&ctxes, (list_traverser_t)dump_ctx_traverser, NULL);
+    CTRACE("end of all ctxes");
+}
+
 /*
  * mrkthr_ctx management
  */
