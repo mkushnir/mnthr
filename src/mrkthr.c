@@ -288,12 +288,14 @@ UNUSED static int
 dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)node->value;
-    mrkthr_dump(ctx);
+    if (ctx != NULL) {
+        mrkthr_dump(ctx);
+    }
     return 0;
 }
 
-UNUSED static void
-dump_sleepq()
+void
+mrkthr_dump_sleepq(void)
 {
     trie_traverse(&the_sleepq, dump_sleepq_node, NULL);
 }
@@ -829,6 +831,9 @@ yield(void)
 static int
 __sleep(uint64_t msec)
 {
+    /* first remove an old reference (if any) */
+    sleepq_remove(me);
+
     if (msec == MRKTHR_SLEEP_FOREVER) {
         me->expire_ticks = MRKTHR_SLEEP_FOREVER;
     } else {
@@ -1853,7 +1858,8 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
             return;
 
         } else {
-            CTRACE("Attempt to release event for thread %d in %s state",
+            CTRACE("Attempt to send signal for thread %d in %s "
+                   "state (ignored)",
                    signal->owner->co.id,
                    CO_STATE_STR(signal->owner->co.state));
         }
