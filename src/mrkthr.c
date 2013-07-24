@@ -1002,6 +1002,24 @@ mrkthr_run(mrkthr_ctx_t *ctx)
     set_resume(ctx);
 }
 
+mrkthr_ctx_t *
+mrkthr_spawn(const char *name, cofunc f, int argc, ...)
+{
+    va_list ap;
+    mrkthr_ctx_t *ctx = NULL;
+
+    va_start(ap, argc);
+    ctx = mrkthr_vnew(name, f, argc, ap);
+    va_end(ap);
+    if (ctx == NULL) {
+        FAIL("mrkthr_vnew");
+    }
+    mrkthr_run(ctx);
+    return ctx;
+}
+
+
+
 static void
 set_resume(mrkthr_ctx_t *ctx)
 {
