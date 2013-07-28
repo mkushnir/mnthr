@@ -51,19 +51,22 @@ struct _mrkthr_ctx {
 #       define CO_STATE_SLEEP 0x10
 #       define CO_STATE_SET_RESUME 0x20
 #       define CO_STATE_SIGNAL_SUBSCRIBE 0x40
-#       define CO_STATE_JOINWAITQ 0x80
-#       define CO_STATE_WAITFOR 0x100
+#       define CO_STATE_JOIN 0x80
+#       define CO_STATE_CONDWAIT 0x100
+#       define CO_STATE_WAITFOR 0x200
 #       define CO_STATE_RESUMABLE (CO_STATE_READ | \
                                    CO_STATE_WRITE | \
                                    CO_STATE_SLEEP | \
                                    CO_STATE_SET_RESUME | \
                                    CO_STATE_SIGNAL_SUBSCRIBE | \
-                                   CO_STATE_JOINWAITQ | \
+                                   CO_STATE_JOIN | \
+                                   CO_STATE_CONDWAIT | \
                                    CO_STATE_WAITFOR)
 #       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP | \
                                                CO_STATE_SET_RESUME | \
                                                CO_STATE_SIGNAL_SUBSCRIBE | \
-                                               CO_STATE_JOINWAITQ | \
+                                               CO_STATE_JOIN | \
+                                               CO_STATE_CONDWAIT | \
                                                CO_STATE_WAITFOR)
 #       define CO_STATE_STR(st) ( \
             (st) == CO_STATE_DORMANT ? "DORMANT" : \
@@ -73,7 +76,8 @@ struct _mrkthr_ctx {
             (st) == CO_STATE_SLEEP ? "SLEEP" : \
             (st) == CO_STATE_SET_RESUME ? "SET_RESUME" : \
             (st) == CO_STATE_SIGNAL_SUBSCRIBE ? "SIGNAL_SUBSCRIBE" : \
-            (st) == CO_STATE_JOINWAITQ ? "JOINWAITQ" : \
+            (st) == CO_STATE_JOIN ? "JOIN" : \
+            (st) == CO_STATE_CONDWAIT ? "CONDWAIT" : \
             (st) == CO_STATE_WAITFOR ? "WAITFOR" : \
             "<unknown>")
 

@@ -285,10 +285,15 @@ dump_ucontext (ucontext_t *uc)
 }
 
 UNUSED static int
-dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
+dump_sleepq_node(trie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
-    mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)node->value;
+    mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
+        if (key != ctx->expire_ticks) {
+            //CTRACE(FRED("trn=%p key=%016lx"), trn, key);
+        } else {
+            //CTRACE("trn=%p key=%016lx", trn, key);
+        }
         mrkthr_dump(ctx);
     }
     return 0;
@@ -297,7 +302,9 @@ dump_sleepq_node(trie_node_t *node, UNUSED void *udata)
 void
 mrkthr_dump_sleepq(void)
 {
+    CTRACE("sleepq:");
     trie_traverse(&the_sleepq, dump_sleepq_node, NULL);
+    CTRACE("end of sleepq");
 }
 
 /* Sleep list */
@@ -306,6 +313,12 @@ static void
 sleepq_remove(mrkthr_ctx_t *ctx)
 {
     trie_node_t *trn;
+
+    //CTRACE(FBLUE("SL removing"));
+    //mrkthr_dump(ctx);
+    //CTRACE(FBLUE("SL before removing:"));
+    //mrkthr_dump_sleepq();
+    //CTRACE(FBLUE("---"));
 
     if ((trn = trie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
         mrkthr_ctx_t *sle, *bucket_host_pretendent;
@@ -334,19 +347,23 @@ sleepq_remove(mrkthr_ctx_t *ctx)
              */
 
             if (sle == ctx) {
-                /* we are going to remove a sleepq bucket host */
+                /* we are going to remove a bucket host */
 
                 DTQUEUE_DEQUEUE(&sle->sleepq_bucket, sleepq_link);
 
                 bucket_host_pretendent->sleepq_bucket = sle->sleepq_bucket;
 
                 DTQUEUE_FINI(&sle->sleepq_bucket);
+                DTQUEUE_ENTRY_FINI(sleepq_link, sle);
 
                 trn->value = bucket_host_pretendent;
 
             } else {
                 /* we are removing from the bucket */
                 if (!DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx)) {
+                    //CTRACE(FYELLOW("removing from bucket"));
+                    //mrkthr_dump(ctx);
+                    //CTRACE("-----");
                     DTQUEUE_REMOVE(&sle->sleepq_bucket, sleepq_link, ctx);
                 }
             }
@@ -360,14 +377,20 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                  */
                 //CTRACE("sle:");
                 //mrkthr_dump(sle);
-                //CTRACE("ctx:");
+                //CTRACE("ctx: %p/%p", DTQUEUE_PREV(sleepq_link, ctx), DTQUEUE_NEXT(sleepq_link, ctx));
                 //mrkthr_dump(ctx);
+                //mrkthr_dump_sleepq();
+                assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
+                assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
             } else {
                 trn->value = NULL;
                 trie_remove_node(&the_sleepq, trn);
             }
         }
     }
+    //CTRACE(FBLUE("SL after removing:"));
+    //mrkthr_dump_sleepq();
+    //CTRACE(FBLUE("---"));
 }
 
 static void
@@ -394,6 +417,9 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     } else {
         trn->value = ctx;
     }
+    //CTRACE(FGREEN("SL after inserting:"));
+    //mrkthr_dump_sleepq();
+    //CTRACE(FGREEN("---"));
 }
 
 /*
@@ -540,6 +566,7 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
     ctx->co.argc = 0;
     ctx->co.argv = NULL;
     ctx->co.state = CO_STATE_DORMANT;
+    ctx->co.yield_state = CO_STATE_DORMANT;
     ctx->co.rc = 0;
 
     /* the rest of ctx */
@@ -584,6 +611,7 @@ co_fini_other(struct _co *co)
         co->argv = NULL;
     }
     co->state = CO_STATE_DORMANT;
+    co->yield_state = CO_STATE_DORMANT;
     co->rc = 0;
 }
 
@@ -594,6 +622,11 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     /*
      * XXX not cleaning ucontext for future use.
      */
+
+    /* remove me from sleepq */
+    //DTQUEUE_FINI(&ctx->sleepq_bucket);
+    //DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
+    ctx->expire_ticks = 0;
 
     co_fini_other(&ctx->co);
 
@@ -607,8 +640,6 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
         ctx->hosting_waitq = NULL;
         DTQUEUE_ENTRY_FINI(waitq_link, ctx);
     }
-
-    /* remove from sleepq */
 
     ctx->_idx0 = -1;
 }
@@ -677,6 +708,7 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
     assert(ctx!= NULL);
     if (ctx->co.id != -1) {
         mrkthr_dump(ctx);
+        CTRACE("This happened during thread %s creation", name);
     }
     assert(ctx->co.id == -1);
 
@@ -742,21 +774,13 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     ucontext_t uc;
     mrkthr_ctx_t *tmp;
 
-    CTRACE("mrkthr_ctx: co.name='%s' co.id=%d co.f=%p co.state=%s "
-           "co.rc=%s expire_ticks=%016lx",
+    CTRACE("mrkthr_ctx@%p '%s' id=%d f=%p st=%s yst=%s rc=%s exp=%016lx",
+           ctx,
            ctx->co.name,
            ctx->co.id,
            ctx->co.f,
-           ctx->co.state == CO_STATE_DORMANT ? "DORMANT" :
-           ctx->co.state == CO_STATE_RESUMED ? "RESUMED" :
-           ctx->co.state == CO_STATE_READ ? "READ" :
-           ctx->co.state == CO_STATE_WRITE ? "WRITE" :
-           ctx->co.state == CO_STATE_SLEEP ? "SLEEP" :
-           ctx->co.state == CO_STATE_SET_RESUME ? "SET_RESUME" :
-           ctx->co.state == CO_STATE_SIGNAL_SUBSCRIBE ? "SNGNAL_SUBSCRIBE" :
-           ctx->co.state == CO_STATE_JOINWAITQ ? "JOINWAITQ" :
-           ctx->co.state == CO_STATE_WAITFOR ? "WAITFOR" :
-           "",
+           CO_STATE_STR(ctx->co.state),
+           CO_STATE_STR(ctx->co.yield_state),
            ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
            ctx->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
            "OK",
@@ -766,11 +790,23 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     uc = ctx->co.uc;
     //dump_ucontext(&uc);
     if (DTQUEUE_HEAD(&ctx->sleepq_bucket) != NULL) {
-        TRACE("Bucket:");
+        CTRACE("Bucket:");
         for (tmp = DTQUEUE_HEAD(&ctx->sleepq_bucket);
              tmp != NULL;
              tmp = DTQUEUE_NEXT(sleepq_link, tmp)) {
-            mrkthr_dump(tmp);
+
+            CTRACE(" mrkthr_ctx@%p '%s' id=%d f=%p st=%s yst=%s rc=%s exp=%016lx",
+                   tmp,
+                   tmp->co.name,
+                   tmp->co.id,
+                   tmp->co.f,
+                   CO_STATE_STR(tmp->co.state),
+                   CO_STATE_STR(tmp->co.yield_state),
+                   tmp->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
+                   tmp->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
+                   "OK",
+                   tmp->expire_ticks
+            );
         }
     }
     return 0;
@@ -851,6 +887,7 @@ int
 mrkthr_sleep(uint64_t msec)
 {
     assert(me != NULL);
+    /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
     return __sleep(msec);
 }
@@ -891,9 +928,21 @@ static int
 join_waitq(mrkthr_waitq_t *waitq)
 {
     append_me_to_waitq(waitq);
-    me->co.state = CO_STATE_JOINWAITQ;
     return yield();
 }
+
+
+int
+mrkthr_join(mrkthr_ctx_t *ctx)
+{
+    if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
+        /* dormant thread, or an attempt to join self ? */
+        return CO_RC_JOIN_INVALID;
+    }
+    me->co.state = CO_STATE_JOIN;
+    return join_waitq(&ctx->waitq);
+}
+
 
 static void
 resume_waitq_all(mrkthr_waitq_t *waitq)
@@ -903,6 +952,7 @@ resume_waitq_all(mrkthr_waitq_t *waitq)
     while ((t = DTQUEUE_HEAD(waitq)) != NULL) {
         assert(t->hosting_waitq = waitq);
         DTQUEUE_DEQUEUE(waitq, waitq_link);
+        DTQUEUE_ENTRY_FINI(waitq_link, t);
         t->hosting_waitq = NULL;
         set_resume(t);
     }
@@ -917,21 +967,12 @@ resume_waitq_one(mrkthr_waitq_t *waitq)
     if ((t = DTQUEUE_HEAD(waitq)) != NULL) {
         assert(t->hosting_waitq = waitq);
         DTQUEUE_DEQUEUE(waitq, waitq_link);
+        DTQUEUE_ENTRY_FINI(waitq_link, t);
         t->hosting_waitq = NULL;
         set_resume(t);
     }
 }
 
-
-int
-mrkthr_join(mrkthr_ctx_t *ctx)
-{
-    if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
-        /* dormant thread, or an attempt to join self ? */
-        return CO_RC_JOIN_INVALID;
-    }
-    return join_waitq(&ctx->waitq);
-}
 
 static int
 resume(mrkthr_ctx_t *ctx)
@@ -1035,6 +1076,9 @@ set_resume(mrkthr_ctx_t *ctx)
         return;
     }
 
+    /* first remove an old reference (if any) */
+    sleepq_remove(ctx);
+
     ctx->co.state = CO_STATE_SET_RESUME;
     ctx->expire_ticks = 0;
     sleepq_insert(ctx);
@@ -1056,6 +1100,9 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
         mrkthr_dump(ctx);
         return;
     }
+
+    /* first remove an old reference (if any) */
+    sleepq_remove(ctx);
 
     /*
      * We are ignoring all event management rules here.
@@ -1220,47 +1267,50 @@ sift_sleepq(void)
         if (ctx->expire_ticks < tsc_now) {
             mrkthr_ctx_t *bctx;
 
-            /* remove it as early as here */
-            trie_remove_node(&the_sleepq, trn);
-            trn = NULL;
+            /* first let the bucket run */
 
-            /*
-             * Process bucket, must do it *BEFORE* we process
-             * the bucket owner
-             */
+            if (!DTQUEUE_EMPTY(&ctx->sleepq_bucket)) {
 
-            while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
+                while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
 
-                //CTRACE(FBGREEN("Resuming expired thread (bucket)"));
-                //mrkthr_dump(bctx);
+                    //CTRACE(FBGREEN("Resuming expired thread (bucket)"));
+                    //mrkthr_dump(bctx);
 
-                DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
+                    DTQUEUE_DEQUEUE_FAST(&ctx->sleepq_bucket, sleepq_link);
+                    DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
 
-                if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
-                    /*
-                     * We cannot resume events here that can only be
-                     * resumed from within other places of mrkthr_loop().
-                     *
-                     * All other events not included here are
-                     * CO_STATE_READ and CO_STATE_WRITE. This
-                     * should never occur.
-                     */
-                    TRACE(FRED("Have to deliver a %s event "
-                               "to co.id=%d that was not scheduled for!"),
-                               CO_STATE_STR(bctx->co.state),
-                               bctx->co.id);
-                    mrkthr_dump(bctx);
+                    if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
+                        /*
+                         * We cannot resume events here that can only be
+                         * resumed from within other places of mrkthr_loop().
+                         *
+                         * All other events not included here are
+                         * CO_STATE_READ and CO_STATE_WRITE. This
+                         * should never occur.
+                         */
+                        TRACE(FRED("Have to deliver a %s event "
+                                   "to co.id=%d that was not scheduled for!"),
+                                   CO_STATE_STR(bctx->co.state),
+                                   bctx->co.id);
+                        mrkthr_dump(bctx);
+                    }
+
+                    if (resume(bctx) != 0) {
+                        //TRACE("Could not resume co %d, discarding ...",
+                        //      ctx->co.id);
+                    }
                 }
 
-                if (resume(bctx) != 0) {
-                    //TRACE("Could not resume co %d, discarding ...",
-                    //      ctx->co.id);
-                }
+                DTQUEUE_FINI(&ctx->sleepq_bucket);
             }
 
             /* Finally process bucket owner */
+
             //CTRACE(FBGREEN("Resuming expired bucket owner"));
             //mrkthr_dump(ctx);
+
+            trie_remove_node(&the_sleepq, trn);
+            trn = NULL;
 
             if (resume(ctx) != 0) {
                 //TRACE("Could not resume co %d, discarding ...",
@@ -1601,7 +1651,7 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     }
 
     if (nread < navail) {
-        TRACE("nread=%ld navail=%ld", nread, navail);
+        //TRACE("nread=%ld navail=%ld", nread, navail);
         if (nread == 0) {
             TRRET(MRKTHR_ACCEPT_ALL + 4);
         }
@@ -1645,7 +1695,7 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
     }
 
     if (nread < navail) {
-        TRACE("nread=%ld navail=%ld", nread, navail);
+        //TRACE("nread=%ld navail=%ld", nread, navail);
         if (nread == 0) {
             TRRET(MRKTHR_READ_ALL + 4);
         }
@@ -1680,7 +1730,7 @@ mrkthr_read_allb(int fd, char *buf, ssize_t sz)
     }
 
     if (nread < sz) {
-        TRACE("nread=%ld sz=%ld", nread, sz);
+        //TRACE("nread=%ld sz=%ld", nread, sz);
         if (nread == 0) {
             return -1;
         }
@@ -1717,7 +1767,7 @@ mrkthr_recvfrom_allb(int fd,
     }
 
     if (nrecv < sz) {
-        TRACE("nrecv=%ld sz=%ld", nrecv, sz);
+        //TRACE("nrecv=%ld sz=%ld", nrecv, sz);
         if (nrecv == 0) {
             return -1;
         }
@@ -1854,10 +1904,10 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
             return;
 
         } else {
-            CTRACE("Attempt to send signal for thread %d in %s "
-                   "state (ignored)",
-                   signal->owner->co.id,
-                   CO_STATE_STR(signal->owner->co.state));
+            //CTRACE("Attempt to send signal for thread %d in %s "
+            //       "state (ignored)",
+            //       signal->owner->co.id,
+            //       CO_STATE_STR(signal->owner->co.state));
         }
     }
     //CTRACE("Not resuming orphan signal. See you next time.");
@@ -1876,6 +1926,7 @@ mrkthr_cond_init(mrkthr_cond_t *cond)
 int
 mrkthr_cond_wait(mrkthr_cond_t *cond)
 {
+    me->co.state = CO_STATE_CONDWAIT;
     return join_waitq(&cond->waitq);
 }
 
@@ -1916,20 +1967,65 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
         FAIL("mrkthr_wait_for");
     }
 
+    me->co.state = CO_STATE_WAITFOR;
+
+    /* XXX put myself into both ctx->waitq and sleepq(WAITFOR) */
     append_me_to_waitq(&ctx->waitq);
     set_resume(ctx);
-    me->co.state = CO_STATE_WAITFOR;
+
+    //CTRACE("before sleep:");
+    //mrkthr_dump_sleepq();
+
     res = __sleep(msec);
 
-    if (me->co.yield_state == CO_STATE_WAITFOR) {
+    /* now remove me from both queues */
+
+    //CTRACE("after sleep:");
+    //mrkthr_dump_sleepq();
+
+    if (ctx->co.state == CO_STATE_DORMANT) {
+        /* I had been sleeping, but by their exit I was resumed ... */
+
+        //CTRACE("removing me:");
+        //mrkthr_dump(me);
+
+        sleepq_remove(me);
+
+    } else {
+        /* it's timeout, we have to interrupt it */
+        assert(ctx->co.state & CO_STATE_RESUMABLE);
+
         ctx->co.rc = CO_RC_TIMEDOUT;
+
+        remove_me_from_waitq(&ctx->waitq);
+        mrkthr_set_interrupt(ctx);
+
         res = MRKTHR_WAIT_TIMEOUT;
     }
 
-    remove_me_from_waitq(&ctx->waitq);
-    sleepq_remove(ctx);
-    mrkthr_ctx_finalize(ctx);
-    push_free_ctx(ctx);
+#if 0
+    if (me->co.yield_state == CO_STATE_WAITFOR) {
+        /* ctx is in one of resumable states */
+
+        assert(ctx->co.state & CO_STATE_RESUMABLE);
+
+        ctx->co.rc = CO_RC_TIMEDOUT;
+        sleepq_remove(ctx);
+        remove_me_from_waitq(&ctx->waitq);
+        res = MRKTHR_WAIT_TIMEOUT;
+
+    } else {
+        /* I'm still sleeping */
+
+        if (ctx->co.state != CO_STATE_DORMANT) {
+            mrkthr_dump(ctx);
+        }
+        assert(ctx->co.state == CO_STATE_DORMANT);
+
+        sleepq_remove(me);
+        mrkthr_dump(ctx);
+    }
+#endif
 
     return res;
 }
