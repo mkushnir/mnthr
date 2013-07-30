@@ -28,7 +28,7 @@ Limitations:
 
 Dependencies: [mkushnir/mrkcommon](https://github.com/mkushnir/mrkcommon).
 
-The porject is gradually getting more mature.
+The porject is gradually getting mature.
 
 TODO
 ====
