@@ -566,7 +566,6 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
     ctx->co.argc = 0;
     ctx->co.argv = NULL;
     ctx->co.state = CO_STATE_DORMANT;
-    ctx->co.yield_state = CO_STATE_DORMANT;
     ctx->co.rc = 0;
 
     /* the rest of ctx */
@@ -611,7 +610,6 @@ co_fini_other(struct _co *co)
         co->argv = NULL;
     }
     co->state = CO_STATE_DORMANT;
-    co->yield_state = CO_STATE_DORMANT;
     co->rc = 0;
 }
 
@@ -774,13 +772,12 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     ucontext_t uc;
     mrkthr_ctx_t *tmp;
 
-    CTRACE("mrkthr_ctx@%p '%s' id=%d f=%p st=%s yst=%s rc=%s exp=%016lx",
+    CTRACE("mrkthr_ctx@%p '%s' id=%d f=%p st=%s rc=%s exp=%016lx",
            ctx,
            ctx->co.name,
            ctx->co.id,
            ctx->co.f,
            CO_STATE_STR(ctx->co.state),
-           CO_STATE_STR(ctx->co.yield_state),
            ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
            ctx->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
            "OK",
@@ -795,13 +792,12 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
              tmp != NULL;
              tmp = DTQUEUE_NEXT(sleepq_link, tmp)) {
 
-            CTRACE(" mrkthr_ctx@%p '%s' id=%d f=%p st=%s yst=%s rc=%s exp=%016lx",
+            CTRACE(" mrkthr_ctx@%p '%s' id=%d f=%p st=%s rc=%s exp=%016lx",
                    tmp,
                    tmp->co.name,
                    tmp->co.id,
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
-                   CO_STATE_STR(tmp->co.yield_state),
                    tmp->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
                    tmp->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
                    "OK",
@@ -995,7 +991,6 @@ resume(mrkthr_ctx_t *ctx)
         TRRET(RESUME + 1);
     }
 
-    ctx->co.yield_state = ctx->co.state;
     ctx->co.state = CO_STATE_RESUMED;
 
     me = ctx;
@@ -1121,7 +1116,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
 /**
  * Remove an event from the kevents array.
  */
-static int
+static void
 clear_event(int fd, int filter, int idx)
 {
     struct kevent *kev;
@@ -1136,7 +1131,7 @@ clear_event(int fd, int filter, int idx)
         //CTRACE("FAST");
         //KEVENT_DUMP(kev);
         kevent_init(kev);
-        return 0;
+        return;
     }
 
     for (kev = array_first(&kevents0, &it);
@@ -1148,12 +1143,12 @@ clear_event(int fd, int filter, int idx)
             //KEVENT_DUMP(kev);
             kevent_init(kev);
             /* early return, assume fd/filter is unique in the kevents0 */
-            return 0;
+            return;
         }
     }
     //CTRACE("NOTFOUND");
     //KEVENT_DUMP(kev);
-    return 0;
+    return;
 }
 
 /**
@@ -2002,30 +1997,6 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
 
         res = MRKTHR_WAIT_TIMEOUT;
     }
-
-#if 0
-    if (me->co.yield_state == CO_STATE_WAITFOR) {
-        /* ctx is in one of resumable states */
-
-        assert(ctx->co.state & CO_STATE_RESUMABLE);
-
-        ctx->co.rc = CO_RC_TIMEDOUT;
-        sleepq_remove(ctx);
-        remove_me_from_waitq(&ctx->waitq);
-        res = MRKTHR_WAIT_TIMEOUT;
-
-    } else {
-        /* I'm still sleeping */
-
-        if (ctx->co.state != CO_STATE_DORMANT) {
-            mrkthr_dump(ctx);
-        }
-        assert(ctx->co.state == CO_STATE_DORMANT);
-
-        sleepq_remove(me);
-        mrkthr_dump(ctx);
-    }
-#endif
 
     return res;
 }

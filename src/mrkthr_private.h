@@ -82,7 +82,6 @@ struct _mrkthr_ctx {
             "<unknown>")
 
         unsigned int state;
-        unsigned int yield_state;
 #       define CO_RC_USER_INTERRUPTED 0x01
 #       define CO_RC_TIMEDOUT 0x02
         unsigned char rc;

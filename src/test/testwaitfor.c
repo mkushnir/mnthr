@@ -31,7 +31,9 @@ r (UNUSED int argc, UNUSED void *argv[])
 
     nread = mrkthr_read_allb(0, buf, sizeof(buf));
     CTRACE("nread=%ld", nread);
-    CTRACE("buf='%s'", buf);
+    if (nread > 0) {
+        CTRACE("buf='%s'", buf);
+    }
     return 0;
 }
 
