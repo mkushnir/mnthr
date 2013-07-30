@@ -14,9 +14,9 @@ Features:
 *   x86 _rdtsc_-based internal clock, calibrated by _gettimeofday(2)_ and
     the _machdep.tsc\_freq_ sysctl;
 
-*   basic thread synchronization primitives: event, condition variable.
+*   basic thread synchronization primitives: signal, condition variable.
 
-*   wrappers over _read(2)_, _write(2)_, _accept(2)_ syscalls.
+*   wrappers over _read(2)_, _write(2)_, _accept(2)_, _sendto(2)_, _recvfrom(2)_ syscalls.
 
 *   relatively good performance and scalability.
 
