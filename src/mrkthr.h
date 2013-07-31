@@ -24,6 +24,9 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 #define MRKTHR_WAITQ_T_DEFINED
 #endif
 
+#define MRKTHR_WAIT_TIMEOUT (-1)
+#define MRKTHR_JOIN_FAILURE (-2)
+
 union _mrkthr_addr {
     struct sockaddr sa;
     struct sockaddr_in sa4;
@@ -55,6 +58,7 @@ void mrkthr_dump_all_ctxes(void);
 void mrkthr_dump_sleepq(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
+const char *mrkthr_strerror(int);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
 mrkthr_ctx_t *mrkthr_spawn(const char *name, cofunc f, int argc, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
@@ -92,7 +96,6 @@ uint64_t mrkthr_get_now_precise(void);
 uint64_t mrkthr_get_now_ticks(void);
 uint64_t mrkthr_get_now_ticks_precise(void);
 
-#define MRKTHR_WAIT_TIMEOUT (-1)
 int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
 ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);

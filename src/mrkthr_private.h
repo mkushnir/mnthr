@@ -84,9 +84,8 @@ struct _mrkthr_ctx {
         unsigned int state;
 #       define CO_RC_USER_INTERRUPTED 0x01
 #       define CO_RC_TIMEDOUT 0x02
+#       define CO_RC_SIMULTANEOUS 0x03
         unsigned char rc;
-        /* not really in rc */
-#       define CO_RC_JOIN_INVALID 0x02
     } co;
 
     /*

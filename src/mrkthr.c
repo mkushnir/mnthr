@@ -307,6 +307,12 @@ mrkthr_dump_sleepq(void)
     CTRACE("end of sleepq");
 }
 
+const char *
+mrkthr_strerror(int e)
+{
+    return diag_str(e);
+}
+
 /* Sleep list */
 
 static void
@@ -933,7 +939,7 @@ mrkthr_join(mrkthr_ctx_t *ctx)
 {
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
-        return CO_RC_JOIN_INVALID;
+        return MRKTHR_JOIN_FAILURE;
     }
     me->co.state = CO_STATE_JOIN;
     return join_waitq(&ctx->waitq);
@@ -1589,6 +1595,19 @@ mrkthr_get_rbuflen(int fd)
 
     while (1) {
         kev = new_event(fd, EVFILT_READ, &me->_idx0);
+
+        /*
+         * check if there is another thread waiting for the same event.
+         */
+        if (kev->udata != NULL) {
+            /*
+             * in this case we are not allowed to wait for this event,
+             * sorry.
+             */
+            me->co.rc = CO_RC_SIMULTANEOUS;
+            return -1;
+        }
+
         /*
          * XXX  Think of s/ONESHOT/CLEAR/. Now it looks like we cannot put
          * EV_CLEAR here, otherwise we are at risk of firing a read event
@@ -1778,6 +1797,19 @@ mrkthr_get_wbuflen(int fd)
 
     while (1) {
         kev = new_event(fd, EVFILT_WRITE, &me->_idx0);
+
+        /*
+         * check if there is another thread waiting for the same event.
+         */
+        if (kev->udata != NULL) {
+            /*
+             * in this case we are not allowed to wait for this event,
+             * sorry.
+             */
+            me->co.rc = CO_RC_SIMULTANEOUS;
+            return -1;
+        }
+
         EV_SET(kev, fd, EVFILT_WRITE, EV_ADD|EV_ONESHOT, 0, 0, me);
 
         /* wait for an event */
