@@ -1890,18 +1890,16 @@ mrkthr_sendto_all(int fd,
 /**
  * Event Primitive.
  */
-int
+void
 mrkthr_signal_init(mrkthr_signal_t *signal, mrkthr_ctx_t *ctx)
 {
     signal->owner = ctx;
-    return 0;
 }
 
-int
+void
 mrkthr_signal_fini(mrkthr_signal_t *signal)
 {
     signal->owner = NULL;
-    return 0;
 }
 
 int
@@ -1943,11 +1941,10 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
 /**
  * Condition Variable Primitive.
  */
-int
+void
 mrkthr_cond_init(mrkthr_cond_t *cond)
 {
     DTQUEUE_INIT(&cond->waitq);
-    return 0;
 }
 
 int
@@ -1969,14 +1966,142 @@ mrkthr_cond_signal_one(mrkthr_cond_t *cond)
     resume_waitq_one(&cond->waitq);
 }
 
-int
+void
 mrkthr_cond_fini(mrkthr_cond_t *cond)
 {
     mrkthr_cond_signal_all(cond);
     DTQUEUE_FINI(&cond->waitq);
-    return 0;
 }
 
+/**
+ * Semaphore Primitive.
+ */
+void
+mrkthr_sema_init(mrkthr_sema_t *sema, int n)
+{
+    mrkthr_cond_init(&sema->cond);
+    sema->n = n;
+    sema->i = n;
+}
+
+int
+mrkthr_sema_acquire(mrkthr_sema_t *sema)
+{
+    int res = 0;
+
+    if (sema->i > 0) {
+        --(sema->i);
+
+    } else {
+        if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
+            return res;
+        }
+
+        assert((sema->i > 0) && (sema->i <= sema->n));
+        --(sema->i);
+    }
+
+    return res;
+}
+
+void
+mrkthr_sema_release(mrkthr_sema_t *sema)
+{
+    assert((sema->i >= 0) && (sema->i < sema->n));
+    mrkthr_cond_signal_one(&sema->cond);
+    ++(sema->i);
+}
+
+
+void
+mrkthr_sema_fini(mrkthr_sema_t *sema)
+{
+    mrkthr_cond_fini(&sema->cond);
+    sema->n = -1;
+    sema->i = -1;
+}
+
+/**
+ * Readers-writer Lock Primitive.
+ */
+void
+mrkthr_rwlock_init(mrkthr_rwlock_t *lock)
+{
+    mrkthr_cond_init(&lock->cond);
+    lock->fwriter = 0;
+    lock->nreaders = 0;
+}
+
+int
+mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
+{
+    int res = 0;
+
+    if (lock->fwriter) {
+        if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
+            return res;
+        }
+    }
+
+    assert(!lock->fwriter);
+
+    ++(lock->nreaders);
+
+    return res;
+}
+
+void
+mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
+{
+    assert(!lock->fwriter);
+
+    --(lock->nreaders);
+    if (lock->nreaders == 0) {
+        mrkthr_cond_signal_one(&lock->cond);
+    }
+}
+
+int
+mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
+{
+    int res = 0;
+
+    if (lock->fwriter || (lock->nreaders > 0)) {
+
+        if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
+            return res;
+        }
+    }
+
+    assert(!(lock->fwriter || (lock->nreaders > 0)));
+
+    lock->fwriter = 1;
+
+    return res;
+}
+
+void
+mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
+{
+    assert(lock->fwriter && (lock->nreaders == 0));
+
+    lock->fwriter = 0;
+    mrkthr_cond_signal_all(&lock->cond);
+}
+
+void
+mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
+{
+    lock->fwriter = 0;
+    lock->nreaders = 0;
+    mrkthr_cond_fini(&lock->cond);
+}
+
+
+/**
+ * Wait for another thread, and time it out if not completed within the
+ * specified inverval of time.
+ */
 int
 mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
 {

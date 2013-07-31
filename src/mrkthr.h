@@ -46,6 +46,18 @@ typedef struct _mrkthr_cond {
     mrkthr_waitq_t waitq;
 } mrkthr_cond_t;
 
+typedef struct _mrkthr_sema {
+    mrkthr_cond_t cond;
+    int n;
+    int i;
+} mrkthr_sema_t;
+
+typedef struct _mrkthr_rwlock {
+    mrkthr_cond_t cond;
+    int fwriter:1;
+    unsigned nreaders;
+} mrkthr_rwlock_t;
+
 int mrkthr_init(void);
 int mrkthr_fini(void);
 int mrkthr_loop(void);
@@ -79,17 +91,30 @@ ssize_t mrkthr_get_wbuflen(int);
 int mrkthr_write_all(int, const char *, size_t);
 int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
-int mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
-int mrkthr_signal_fini(mrkthr_signal_t *);
+void mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
+void mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_has_owner(mrkthr_signal_t *);
 int mrkthr_signal_subscribe(mrkthr_signal_t *);
 void mrkthr_signal_send(mrkthr_signal_t *);
 
-int mrkthr_cond_init(mrkthr_cond_t *);
+void mrkthr_cond_init(mrkthr_cond_t *);
 int mrkthr_cond_wait(mrkthr_cond_t *);
 void mrkthr_cond_signal_all(mrkthr_cond_t *);
 void mrkthr_cond_signal_one(mrkthr_cond_t *);
-int mrkthr_cond_fini(mrkthr_cond_t *);
+void mrkthr_cond_fini(mrkthr_cond_t *);
+
+void mrkthr_sema_init(mrkthr_sema_t *, int);
+int mrkthr_sema_acquire(mrkthr_sema_t *);
+void mrkthr_sema_release(mrkthr_sema_t *);
+void mrkthr_sema_fini(mrkthr_sema_t *);
+
+void mrkthr_rwlock_init(mrkthr_rwlock_t *);
+int mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *);
+void mrkthr_rwlock_release_read(mrkthr_rwlock_t *);
+int mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *);
+void mrkthr_rwlock_release_write(mrkthr_rwlock_t *);
+void mrkthr_rwlock_fini(mrkthr_rwlock_t *);
+
 
 uint64_t mrkthr_get_now(void);
 uint64_t mrkthr_get_now_precise(void);
