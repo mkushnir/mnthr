@@ -143,6 +143,8 @@ static int discard_event(int, int);
 static void push_free_ctx(mrkthr_ctx_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
 static void set_resume(mrkthr_ctx_t *);
+static void clear_event(int, int, int);
+static struct kevent *get_event(int);
 
 static inline uint64_t
 rdtsc(void)
@@ -356,6 +358,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 /* we are going to remove a bucket host */
 
                 DTQUEUE_DEQUEUE(&sle->sleepq_bucket, sleepq_link);
+                DTQUEUE_ENTRY_FINI(sleepq_link, bucket_host_pretendent);
 
                 bucket_host_pretendent->sleepq_bucket = sle->sleepq_bucket;
 
@@ -371,6 +374,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                     //mrkthr_dump(ctx);
                     //CTRACE("-----");
                     DTQUEUE_REMOVE(&sle->sleepq_bucket, sleepq_link, ctx);
+                    DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
                 }
             }
 
@@ -386,8 +390,9 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 //CTRACE("ctx: %p/%p", DTQUEUE_PREV(sleepq_link, ctx), DTQUEUE_NEXT(sleepq_link, ctx));
                 //mrkthr_dump(ctx);
                 //mrkthr_dump_sleepq();
-                assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
-                assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
+
+                //assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
+                //assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
             } else {
                 trn->value = NULL;
                 trie_remove_node(&the_sleepq, trn);
@@ -682,6 +687,7 @@ pop_free_ctx(void)
 
     if ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
         STQUEUE_DEQUEUE(&free_list, free_link);
+        STQUEUE_ENTRY_FINI(free_link, ctx);
         //CTRACE("pop_free_ctx 0");
     } else {
         if ((ctx = list_incr(&ctxes)) == NULL) {
@@ -784,9 +790,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
            ctx->co.id,
            ctx->co.f,
            CO_STATE_STR(ctx->co.state),
-           ctx->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
-           ctx->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
-           "OK",
+           CO_RC_STR(ctx->co.rc),
            ctx->expire_ticks
     );
 
@@ -804,9 +808,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
                    tmp->co.id,
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
-                   tmp->co.rc == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :
-                   tmp->co.rc == CO_RC_TIMEDOUT ? "TIMEDOUT" :
-                   "OK",
+                   CO_RC_STR(tmp->co.rc),
                    tmp->expire_ticks
             );
         }
@@ -918,6 +920,7 @@ remove_me_from_waitq(mrkthr_waitq_t *waitq)
     assert(me != NULL);
     assert(me->hosting_waitq = waitq);
     DTQUEUE_REMOVE(waitq, waitq_link, me);
+    DTQUEUE_ENTRY_FINI(waitq_link, me);
     me->hosting_waitq = NULL;
 }
 
@@ -1105,10 +1108,22 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     /* first remove an old reference (if any) */
     sleepq_remove(ctx);
 
+    /* clear event */
+    if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
+        if (ctx->_idx0 != -1) {
+            struct kevent *kev;
+
+            kev = get_event(ctx->_idx0);
+            assert(kev != NULL);
+            clear_event(kev->ident, kev->filter, ctx->_idx0);
+        }
+    }
+
     /*
      * We are ignoring all event management rules here.
      */
     ctx->co.rc = CO_RC_USER_INTERRUPTED;
+    ctx->co.state = CO_STATE_SET_INTERRUPT;
     ctx->expire_ticks = 0;
     sleepq_insert(ctx);
 }
@@ -1239,6 +1254,15 @@ new_event(int fd, int filter, int *idx)
 
     return kev1;
 }
+
+static struct kevent *
+get_event(int idx)
+{
+    struct kevent *kev;
+    kev = array_get(&kevents0, idx);
+    return kev;
+}
+
 
 static void
 sift_sleepq(void)
