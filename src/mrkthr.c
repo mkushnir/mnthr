@@ -1043,6 +1043,16 @@ void
 mrkthr_run(mrkthr_ctx_t *ctx)
 {
     assert(ctx != me);
+#ifndef NDEBUG
+    if (ctx->co.state != CO_STATE_DORMANT) {
+        CTRACE("precondition failed. Non-dormant ctx is %p", ctx);
+        if (ctx != NULL) {
+            D8(ctx, sizeof(mrkthr_ctx_t));
+            CTRACE("now trying to dump it ...");
+            mrkthr_dump(ctx);
+        }
+    }
+#endif
     assert(ctx->co.state == CO_STATE_DORMANT);
 
     set_resume(ctx);
@@ -1094,11 +1104,20 @@ set_resume(mrkthr_ctx_t *ctx)
 void
 mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
 {
+#ifndef NDEBUG
+    if (ctx == me) {
+        CTRACE("precondition failed. self-interrupting ctx is %p", ctx);
+        if (ctx != NULL) {
+            D8(ctx, sizeof(mrkthr_ctx_t));
+            CTRACE("now trying to dump it ...");
+            mrkthr_dump(ctx);
+        }
+    }
+#endif
     assert(ctx != me);
 
     //mrkthr_dump(ctx);
 
-    //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
         CTRACE("Will not interrupt this ctx:");
         mrkthr_dump(ctx);
@@ -1126,6 +1145,12 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     ctx->co.state = CO_STATE_SET_INTERRUPT;
     ctx->expire_ticks = 0;
     sleepq_insert(ctx);
+}
+
+int
+mrkthr_is_dead(mrkthr_ctx_t *ctx)
+{
+    return ctx->co.id == -1;
 }
 
 /**
@@ -2174,6 +2199,12 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
         ctx->co.rc = CO_RC_TIMEDOUT;
 
         remove_me_from_waitq(&ctx->waitq);
+#ifndef NDEBUG
+        if (ctx == me) {
+            CTRACE("self-interrupting from within mrkthr_wait_for:");
+            mrkthr_dump(ctx);
+        }
+#endif
         mrkthr_set_interrupt(ctx);
 
         res = MRKTHR_WAIT_TIMEOUT;
