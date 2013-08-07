@@ -81,6 +81,7 @@ long double mrkthr_ticks2sec(uint64_t);
 int mrkthr_join(mrkthr_ctx_t *);
 void mrkthr_run(mrkthr_ctx_t *);
 void mrkthr_set_interrupt(mrkthr_ctx_t *);
+int mrkthr_set_interrupt_and_join(mrkthr_ctx_t *);
 int mrkthr_is_dead(mrkthr_ctx_t *);
 
 ssize_t mrkthr_get_rbuflen(int);

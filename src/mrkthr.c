@@ -531,7 +531,7 @@ mrkthr_compact_sleepq(size_t threshold)
 size_t
 mrkthr_get_sleepq_length(void)
 {
-    return trie_get_nelems(&the_sleepq);
+    return trie_get_nvals(&the_sleepq);
 }
 
 size_t
@@ -1146,6 +1146,19 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     ctx->expire_ticks = 0;
     sleepq_insert(ctx);
 }
+
+int
+mrkthr_set_interrupt_and_join(mrkthr_ctx_t *ctx)
+{
+    mrkthr_set_interrupt(ctx);
+    if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
+        /* dormant thread, or an attempt to join self ? */
+        return MRKTHR_JOIN_FAILURE;
+    }
+    me->co.state = CO_STATE_JOIN_INTERRUPTED;
+    return join_waitq(&ctx->waitq);
+}
+
 
 int
 mrkthr_is_dead(mrkthr_ctx_t *ctx)

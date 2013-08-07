@@ -53,8 +53,9 @@ struct _mrkthr_ctx {
 #       define CO_STATE_SET_INTERRUPT 0x40
 #       define CO_STATE_SIGNAL_SUBSCRIBE 0x80
 #       define CO_STATE_JOIN 0x100
-#       define CO_STATE_CONDWAIT 0x200
-#       define CO_STATE_WAITFOR 0x400
+#       define CO_STATE_JOIN_INTERRUPTED 0x200
+#       define CO_STATE_CONDWAIT 0x400
+#       define CO_STATE_WAITFOR 0x800
 #       define CO_STATE_RESUMABLE (CO_STATE_READ | \
                                    CO_STATE_WRITE | \
                                    CO_STATE_SLEEP | \
@@ -62,6 +63,7 @@ struct _mrkthr_ctx {
                                    CO_STATE_SET_INTERRUPT | \
                                    CO_STATE_SIGNAL_SUBSCRIBE | \
                                    CO_STATE_JOIN | \
+                                   CO_STATE_JOIN_INTERRUPTED | \
                                    CO_STATE_CONDWAIT | \
                                    CO_STATE_WAITFOR)
 #       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP | \
@@ -69,6 +71,7 @@ struct _mrkthr_ctx {
                                                CO_STATE_SET_INTERRUPT | \
                                                CO_STATE_SIGNAL_SUBSCRIBE | \
                                                CO_STATE_JOIN | \
+                                               CO_STATE_JOIN_INTERRUPTED | \
                                                CO_STATE_CONDWAIT | \
                                                CO_STATE_WAITFOR)
 #       define CO_STATE_STR(st) ( \
@@ -81,6 +84,7 @@ struct _mrkthr_ctx {
             (st) == CO_STATE_SET_INTERRUPT ? "SET_INTERRUPT" : \
             (st) == CO_STATE_SIGNAL_SUBSCRIBE ? "SIGNAL_SUBSCRIBE" : \
             (st) == CO_STATE_JOIN ? "JOIN" : \
+            (st) == CO_STATE_JOIN_INTERRUPTED ? "JOIN_INTERRUPTED" : \
             (st) == CO_STATE_CONDWAIT ? "CONDWAIT" : \
             (st) == CO_STATE_WAITFOR ? "WAITFOR" : \
             "<unknown>")
