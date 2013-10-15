@@ -310,7 +310,7 @@ mrkthr_dump_sleepq(void)
 }
 
 const char *
-mrkthr_strerror(int e)
+mrkthr_diag_str(int e)
 {
     return diag_str(e);
 }

@@ -70,7 +70,7 @@ void mrkthr_dump_all_ctxes(void);
 void mrkthr_dump_sleepq(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
-const char *mrkthr_strerror(int);
+const char *mrkthr_diag_str(int);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
 mrkthr_ctx_t *mrkthr_spawn(const char *name, cofunc f, int argc, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
