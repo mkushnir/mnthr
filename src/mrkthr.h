@@ -3,6 +3,8 @@
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "mrkcommon/dtqueue.h"
 #include "mrkcommon/dumpm.h"
@@ -13,8 +15,17 @@
 extern "C" {
 #endif
 
+const char *mrkthr_diag_str(int);
 
-#define CTRACE(s, ...) TRACE("[% 4d] " s, mrkthr_id(), ##__VA_ARGS__)
+#define CTRACE(s, ...) \
+    do {\
+        struct timeval ts; \
+        gettimeofday(&ts, NULL); \
+        struct tm *t = localtime(&ts.tv_sec); \
+        char ss[64]; \
+        strftime(ss, sizeof(ss), "%Y-%m-%d %H:%M:%S", t); \
+        TRACE("%s.%06lu [% 4d] " s, ss, ts.tv_usec, mrkthr_id(), ##__VA_ARGS__); \
+    } while (0)
 
 typedef int (*cofunc)(int, void *[]);
 typedef struct _mrkthr_ctx mrkthr_ctx_t;
@@ -26,6 +37,11 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 
 #define MRKTHR_WAIT_TIMEOUT (-1)
 #define MRKTHR_JOIN_FAILURE (-2)
+#define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL (-3)
+#define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL (-4)
+
+/* These calls will block the current thread */
+#define MRKTHR_ASYNC
 
 union _mrkthr_addr {
     struct sockaddr sa;
@@ -70,50 +86,55 @@ void mrkthr_dump_all_ctxes(void);
 void mrkthr_dump_sleepq(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
-const char *mrkthr_diag_str(int);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
 mrkthr_ctx_t *mrkthr_spawn(const char *name, cofunc f, int argc, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
-int mrkthr_sleep(uint64_t);
+void mrkthr_set_retval(int);
+MRKTHR_ASYNC int mrkthr_sleep(uint64_t);
+MRKTHR_ASYNC int mrkthr_sleep_ticks(uint64_t);
 long double mrkthr_ticks2sec(uint64_t);
-int mrkthr_join(mrkthr_ctx_t *);
+long double mrkthr_ticksdiff2sec(int64_t);
+uint64_t mrkthr_msec2ticks(uint64_t);
+MRKTHR_ASYNC int mrkthr_join(mrkthr_ctx_t *);
 void mrkthr_run(mrkthr_ctx_t *);
 void mrkthr_set_interrupt(mrkthr_ctx_t *);
-int mrkthr_set_interrupt_and_join(mrkthr_ctx_t *);
+MRKTHR_ASYNC int mrkthr_set_interrupt_and_join(mrkthr_ctx_t *);
 int mrkthr_is_dead(mrkthr_ctx_t *);
 
-ssize_t mrkthr_get_rbuflen(int);
-int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
-int mrkthr_read_all(int, char **, off_t *);
-ssize_t mrkthr_read_allb(int, char *, ssize_t);
-ssize_t mrkthr_recvfrom_allb(int, void * restrict, ssize_t, int, struct sockaddr * restrict, socklen_t * restrict);
-ssize_t mrkthr_get_wbuflen(int);
-int mrkthr_write_all(int, const char *, size_t);
-int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+MRKTHR_ASYNC ssize_t mrkthr_get_rbuflen(int);
+MRKTHR_ASYNC int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
+MRKTHR_ASYNC int mrkthr_read_all(int, char **, off_t *);
+MRKTHR_ASYNC ssize_t mrkthr_read_allb(int, char *, ssize_t);
+MRKTHR_ASYNC ssize_t mrkthr_recvfrom_allb(int, void * restrict, ssize_t, int, struct sockaddr * restrict, socklen_t * restrict);
+MRKTHR_ASYNC ssize_t mrkthr_get_wbuflen(int);
+MRKTHR_ASYNC int mrkthr_write_all(int, const char *, size_t);
+MRKTHR_ASYNC int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
 void mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
 void mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_has_owner(mrkthr_signal_t *);
-int mrkthr_signal_subscribe(mrkthr_signal_t *);
+MRKTHR_ASYNC int mrkthr_signal_subscribe(mrkthr_signal_t *);
 void mrkthr_signal_send(mrkthr_signal_t *);
 
 void mrkthr_cond_init(mrkthr_cond_t *);
-int mrkthr_cond_wait(mrkthr_cond_t *);
+MRKTHR_ASYNC int mrkthr_cond_wait(mrkthr_cond_t *);
 void mrkthr_cond_signal_all(mrkthr_cond_t *);
 void mrkthr_cond_signal_one(mrkthr_cond_t *);
 void mrkthr_cond_fini(mrkthr_cond_t *);
 
 void mrkthr_sema_init(mrkthr_sema_t *, int);
-int mrkthr_sema_acquire(mrkthr_sema_t *);
+MRKTHR_ASYNC int mrkthr_sema_acquire(mrkthr_sema_t *);
 void mrkthr_sema_release(mrkthr_sema_t *);
 void mrkthr_sema_fini(mrkthr_sema_t *);
 
 void mrkthr_rwlock_init(mrkthr_rwlock_t *);
-int mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *);
+MRKTHR_ASYNC int mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *);
+MRKTHR_ASYNC int mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *);
 void mrkthr_rwlock_release_read(mrkthr_rwlock_t *);
-int mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *);
+MRKTHR_ASYNC int mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *);
+MRKTHR_ASYNC int mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *);
 void mrkthr_rwlock_release_write(mrkthr_rwlock_t *);
 void mrkthr_rwlock_fini(mrkthr_rwlock_t *);
 
@@ -123,10 +144,10 @@ uint64_t mrkthr_get_now_precise(void);
 uint64_t mrkthr_get_now_ticks(void);
 uint64_t mrkthr_get_now_ticks_precise(void);
 
-int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
+MRKTHR_ASYNC int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
-ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
-ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);
+MRKTHR_ASYNC ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
+MRKTHR_ASYNC ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);
 
 #ifdef __cplusplus
 }

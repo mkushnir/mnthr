@@ -56,16 +56,7 @@ struct _mrkthr_ctx {
 #       define CO_STATE_JOIN_INTERRUPTED 0x200
 #       define CO_STATE_CONDWAIT 0x400
 #       define CO_STATE_WAITFOR 0x800
-#       define CO_STATE_RESUMABLE (CO_STATE_READ | \
-                                   CO_STATE_WRITE | \
-                                   CO_STATE_SLEEP | \
-                                   CO_STATE_SET_RESUME | \
-                                   CO_STATE_SET_INTERRUPT | \
-                                   CO_STATE_SIGNAL_SUBSCRIBE | \
-                                   CO_STATE_JOIN | \
-                                   CO_STATE_JOIN_INTERRUPTED | \
-                                   CO_STATE_CONDWAIT | \
-                                   CO_STATE_WAITFOR)
+
 #       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP | \
                                                CO_STATE_SET_RESUME | \
                                                CO_STATE_SET_INTERRUPT | \
@@ -74,6 +65,11 @@ struct _mrkthr_ctx {
                                                CO_STATE_JOIN_INTERRUPTED | \
                                                CO_STATE_CONDWAIT | \
                                                CO_STATE_WAITFOR)
+
+#       define CO_STATE_RESUMABLE (CO_STATE_READ | \
+                                   CO_STATE_WRITE | \
+                                   CO_STATES_RESUMABLE_EXTERNALLY)
+
 #       define CO_STATE_STR(st) ( \
             (st) == CO_STATE_DORMANT ? "DORMANT" : \
             (st) == CO_STATE_RESUMED ? "RESUMED" : \
@@ -142,6 +138,11 @@ struct _mrkthr_ctx {
      * Membership of this ctx in free_ctxes.
      */
     STQUEUE_ENTRY(_mrkthr_ctx, free_link);
+
+    /*
+     * Membership of this ctx in runq.
+     */
+    STQUEUE_ENTRY(_mrkthr_ctx, runq_link);
 
     /*
      * event lookup in kevents0,

@@ -80,6 +80,30 @@ AC_ARG_ENABLE(debug,
               [AM_CONDITIONAL([DEBUG], [enable_debug=yes])],
               [AM_CONDITIONAL([DEBUG], [test "$enable_debug" = "yes"])])
 
+AC_ARG_ENABLE(rdtsc,
+              AC_HELP_STRING([--with-rdtsc],
+                             [Use RDTSC (default=no)]),
+              [AM_CONDITIONAL([RDTSC], [with_rdtsc=yes])],
+              [AM_CONDITIONAL([RDTSC], [test "$with_rdtsc" = "yes"])])
+
+if test "$with_rdtsc" = "yes"
+then
+    AC_LANG(C)
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/types.h>
+static inline uint64_t
+rdtsc(void)
+{
+  uint64_t res;
+  __asm __volatile ("rdtscp; shl \$32,%%rdx; or %%rdx,%%rax"
+                    : "=a"(res)
+                    :
+                    : "%rcx", "%rdx"
+                   );
+  return res;
+} ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSCP... yes)], AC_MSG_FAILURE([rdtscp instruction is not supported by your CPU]))
+fi
+
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 
 AC_OUTPUT

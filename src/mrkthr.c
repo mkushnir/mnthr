@@ -83,24 +83,19 @@
 
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
-/* Turn off TRACE from dumpm.h */
-#ifdef NDEBUG
-#   ifdef TRACE
-#      undef TRACE
-#   endif
-#   define TRACE(s, ...)
-#endif
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr);
+//#define TRACE_VERBOSE
 
 #include <mrkcommon/array.h>
 #include <mrkcommon/list.h>
-#include "mrkcommon/dtqueue.h"
-#include "mrkcommon/stqueue.h"
+#include <mrkcommon/dtqueue.h>
+#include <mrkcommon/stqueue.h>
 #include <kevent_util.h>
 /* Experimental trie use */
 #include <mrkcommon/trie.h>
 #include "mrkthr_private.h"
+
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr);
 
 typedef int (*writer_t) (int, int, int);
 
@@ -127,9 +122,18 @@ static STQUEUE(_mrkthr_ctx, free_list);
  */
 static trie_t the_sleepq;
 
-static uint64_t tsc_freq;
-static uint64_t tsc_zero, tsc_now;
+#ifdef USE_TSC
+static uint64_t timecounter_freq;
+#else
+#   define timecounter_freq (1000000000)
+#endif
+
 static uint64_t nsec_zero, nsec_now;
+#ifdef USE_TSC
+static uint64_t timecounter_zero, timecounter_now;
+#else
+#   define timecounter_now nsec_now
+#endif
 
 static int mrkthr_ctx_init(mrkthr_ctx_t *);
 static int mrkthr_ctx_fini(mrkthr_ctx_t *);
@@ -149,19 +153,32 @@ static struct kevent *get_event(int);
 static inline uint64_t
 rdtsc(void)
 {
-  uint32_t lo, hi;
+  uint64_t res;
 
-  __asm __volatile ("rdtsc" : "=a"(lo), "=d"(hi));
-  return (uint64_t) hi << 32 | lo;
+  __asm __volatile ("rdtscp; shl $32,%%rdx; or %%rdx,%%rax"
+                    : "=a"(res)
+                    :
+                    : "%rcx", "%rdx"
+                   );
+  return res;
 }
 
 static void
-update_now_tsc(void)
+update_now(void)
 {
-    tsc_now = rdtsc();
+#ifdef USE_TSC
+    timecounter_now = rdtsc();
     /* do it here so that get_now() returns precomputed value */
-    nsec_now = nsec_zero + (uint64_t)(((long double)(tsc_now - tsc_zero)) /
-        ((long double)(tsc_freq)) * 1000000000.);
+    nsec_now = nsec_zero + (uint64_t)(((long double)(timecounter_now - timecounter_zero)) /
+        ((long double)(timecounter_freq)) * 1000000000.);
+#else
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_REALTIME_PRECISE, &ts) != 0) {
+        FAIL("clock_gettime");
+    }
+    nsec_now = ts.tv_nsec + ts.tv_sec * 1000000000;
+#endif
 }
 
 /**
@@ -174,7 +191,9 @@ wallclock_init(void)
 {
     struct timespec ts;
 
-    tsc_zero = rdtsc();
+#ifdef USE_TSC
+    timecounter_zero = rdtsc();
+#endif
 
     if (clock_gettime(CLOCK_REALTIME_PRECISE, &ts) != 0) {
         TRRET(WALLCLOCK_INIT + 1);
@@ -182,8 +201,6 @@ wallclock_init(void)
     nsec_zero = ts.tv_nsec + ts.tv_sec * 1000000000;
     return 0;
 }
-
-#define update_now update_now_tsc
 
 uint64_t
 mrkthr_get_now(void)
@@ -201,14 +218,14 @@ mrkthr_get_now_precise(void)
 uint64_t
 mrkthr_get_now_ticks(void)
 {
-    return tsc_now;
+    return timecounter_now;
 }
 
 uint64_t
 mrkthr_get_now_ticks_precise(void)
 {
     update_now();
-    return tsc_now;
+    return timecounter_now;
 }
 
 UNUSED static void
@@ -309,12 +326,6 @@ mrkthr_dump_sleepq(void)
     CTRACE("end of sleepq");
 }
 
-const char *
-mrkthr_diag_str(int e)
-{
-    return diag_str(e);
-}
-
 /* Sleep list */
 
 static void
@@ -374,7 +385,6 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                     //mrkthr_dump(ctx);
                     //CTRACE("-----");
                     DTQUEUE_REMOVE(&sle->sleepq_bucket, sleepq_link, ctx);
-                    DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
                 }
             }
 
@@ -398,6 +408,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 trie_remove_node(&the_sleepq, trn);
             }
         }
+    } else {
     }
     //CTRACE(FBLUE("SL after removing:"));
     //mrkthr_dump_sleepq();
@@ -439,7 +450,7 @@ sleepq_insert(mrkthr_ctx_t *ctx)
 int
 mrkthr_init(void)
 {
-    size_t sz;
+    UNUSED size_t sz;
 
     if (mflags & CO_FLAG_INITIALIZED) {
         return 0;
@@ -476,10 +487,12 @@ mrkthr_init(void)
     main_uc.uc_stack.ss_size = sizeof(main_stack);
     me = NULL;
     trie_init(&the_sleepq);
-    sz = sizeof(tsc_freq);
-    if (sysctlbyname("machdep.tsc_freq", &tsc_freq, &sz, NULL, 0) != 0) {
+#ifdef USE_TSC
+    sz = sizeof(timecounter_freq);
+    if (sysctlbyname("machdep.tsc_freq", &timecounter_freq, &sz, NULL, 0) != 0) {
         FAIL("sysctlbyname");
     }
+#endif
 
     if (wallclock_init() != 0) {
         FAIL("wallclock_init");
@@ -590,6 +603,7 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
     ctx->hosting_waitq = NULL;
 
     STQUEUE_ENTRY_INIT(free_link, ctx);
+    STQUEUE_ENTRY_INIT(runq_link, ctx);
     ctx->_idx0 = -1;
 
     return 0;
@@ -647,7 +661,6 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     if (ctx->hosting_waitq != NULL) {
         DTQUEUE_REMOVE(ctx->hosting_waitq, waitq_link, ctx);
         ctx->hosting_waitq = NULL;
-        DTQUEUE_ENTRY_FINI(waitq_link, ctx);
     }
 
     ctx->_idx0 = -1;
@@ -848,6 +861,14 @@ mrkthr_id(void)
     return -1;
 }
 
+void
+mrkthr_set_retval(int rv)
+{
+    assert(me != NULL);
+    me->co.rc = rv;
+}
+
+
 static int
 yield(void)
 {
@@ -874,13 +895,38 @@ __sleep(uint64_t msec)
         me->expire_ticks = MRKTHR_SLEEP_FOREVER;
     } else {
         if (msec == 0) {
-            me->expire_ticks = 0;
+            me->expire_ticks = 1;
         } else {
-            me->expire_ticks = tsc_now + (uint64_t)(((long double)msec / 1000.) * tsc_freq);
+#ifdef USE_TSC
+            me->expire_ticks = timecounter_now + (uint64_t)(((long double)msec / 1000.) * timecounter_freq);
+#else
+            me->expire_ticks = timecounter_now + msec * 1000000;
+#endif
         }
     }
 
     //CTRACE("msec=%ld expire_ticks=%ld", msec, me->expire_ticks);
+
+    sleepq_insert(me);
+
+    return yield();
+}
+
+static int
+__sleepticks(uint64_t ticks)
+{
+    /* first remove an old reference (if any) */
+    sleepq_remove(me);
+
+    if (ticks == MRKTHR_SLEEP_FOREVER) {
+        me->expire_ticks = MRKTHR_SLEEP_FOREVER;
+    } else {
+        if (ticks == 0) {
+            me->expire_ticks = 1;
+        } else {
+            me->expire_ticks = timecounter_now + ticks;
+        }
+    }
 
     sleepq_insert(me);
 
@@ -896,19 +942,43 @@ mrkthr_sleep(uint64_t msec)
     return __sleep(msec);
 }
 
+int
+mrkthr_sleep_ticks(uint64_t ticks)
+{
+    assert(me != NULL);
+    /* put into sleepq(SLEEP) */
+    me->co.state = CO_STATE_SLEEP;
+    return __sleepticks(ticks);
+}
+
 long double
 mrkthr_ticks2sec(uint64_t ticks)
 {
-    return (long double)ticks / (long double)tsc_freq;
+    return (long double)ticks / (long double)timecounter_freq;
 }
 
+long double
+mrkthr_ticksdiff2sec(int64_t ticks)
+{
+    return (long double)ticks / (long double)timecounter_freq;
+}
+
+uint64_t
+mrkthr_msec2ticks(uint64_t msec)
+{
+#ifdef USE_TSC
+    return ((long double)msec / 1000. * (long double)timecounter_freq);
+#else
+    return msec * 1000000;
+#endif
+}
 
 static void
 append_me_to_waitq(mrkthr_waitq_t *waitq)
 {
     assert(me != NULL);
     if (me->hosting_waitq != NULL) {
-        DTQUEUE_REMOVE(me->hosting_waitq, waitq_link, me);
+        DTQUEUE_REMOVE_DIRTY(me->hosting_waitq, waitq_link, me);
     }
     DTQUEUE_ENQUEUE(waitq, waitq_link, me);
     me->hosting_waitq = waitq;
@@ -920,7 +990,6 @@ remove_me_from_waitq(mrkthr_waitq_t *waitq)
     assert(me != NULL);
     assert(me->hosting_waitq = waitq);
     DTQUEUE_REMOVE(waitq, waitq_link, me);
-    DTQUEUE_ENTRY_FINI(waitq_link, me);
     me->hosting_waitq = NULL;
 }
 
@@ -1094,7 +1163,7 @@ set_resume(mrkthr_ctx_t *ctx)
     sleepq_remove(ctx);
 
     ctx->co.state = CO_STATE_SET_RESUME;
-    ctx->expire_ticks = 0;
+    ctx->expire_ticks = 1;
     sleepq_insert(ctx);
 }
 
@@ -1143,7 +1212,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
      */
     ctx->co.rc = CO_RC_USER_INTERRUPTED;
     ctx->co.state = CO_STATE_SET_INTERRUPT;
-    ctx->expire_ticks = 0;
+    ctx->expire_ticks = 1;
     sleepq_insert(ctx);
 }
 
@@ -1305,10 +1374,23 @@ get_event(int idx)
 static void
 sift_sleepq(void)
 {
+    STQUEUE(_mrkthr_ctx, runq);
     trie_node_t *trn;
     mrkthr_ctx_t *ctx;
 
-    /* schedule expired mrkthrs */
+    /* run expired threads */
+
+    STQUEUE_INIT(&runq);
+
+    update_now();
+
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("Processing: delta=%ld (%Lf)"),
+           (int64_t)(ctx->expire_ticks) - (int64_t)timecounter_now,
+           mrkthr_ticksdiff2sec(
+           (int64_t)(ctx->expire_ticks) - (int64_t)timecounter_now));
+    mrkthr_dump(ctx);
+#endif
 
     for (trn = TRIE_MIN(&the_sleepq);
          trn != NULL;
@@ -1317,71 +1399,83 @@ sift_sleepq(void)
         ctx = (mrkthr_ctx_t *)(trn->value);
         assert(ctx != NULL);
 
-        //TRACE("Dump sleepq");
-        //dump_sleepq();
-
-        update_now();
-
-        //CTRACE(FBBLUE("Processing: delta=%ld (%Lf)"),
-        //       ctx->expire_ticks - tsc_now,
-        //       mrkthr_ticks2sec(tsc_now - ctx->expire_ticks));
-        //mrkthr_dump(ctx);
-
-        if (ctx->expire_ticks < tsc_now) {
-            mrkthr_ctx_t *bctx;
-
-            /* first let the bucket run */
-
-            if (!DTQUEUE_EMPTY(&ctx->sleepq_bucket)) {
-
-                while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
-
-                    //CTRACE(FBGREEN("Resuming expired thread (bucket)"));
-                    //mrkthr_dump(bctx);
-
-                    DTQUEUE_DEQUEUE_FAST(&ctx->sleepq_bucket, sleepq_link);
-                    DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
-
-                    if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
-                        /*
-                         * We cannot resume events here that can only be
-                         * resumed from within other places of mrkthr_loop().
-                         *
-                         * All other events not included here are
-                         * CO_STATE_READ and CO_STATE_WRITE. This
-                         * should never occur.
-                         */
-                        TRACE(FRED("Have to deliver a %s event "
-                                   "to co.id=%d that was not scheduled for!"),
-                                   CO_STATE_STR(bctx->co.state),
-                                   bctx->co.id);
-                        mrkthr_dump(bctx);
-                    }
-
-                    if (resume(bctx) != 0) {
-                        //TRACE("Could not resume co %d, discarding ...",
-                        //      ctx->co.id);
-                    }
-                }
-
-                DTQUEUE_FINI(&ctx->sleepq_bucket);
-            }
-
-            /* Finally process bucket owner */
-
-            //CTRACE(FBGREEN("Resuming expired bucket owner"));
-            //mrkthr_dump(ctx);
-
+        if (ctx->expire_ticks < timecounter_now) {
+            STQUEUE_ENQUEUE(&runq, runq_link, ctx);
             trie_remove_node(&the_sleepq, trn);
             trn = NULL;
-
-            if (resume(ctx) != 0) {
-                //TRACE("Could not resume co %d, discarding ...",
-                //      ctx->co.id);
-            }
-
         } else {
             break;
+        }
+    }
+
+    while ((ctx = STQUEUE_HEAD(&runq)) != NULL) {
+        mrkthr_ctx_t *bctx;
+
+        STQUEUE_DEQUEUE(&runq, runq_link);
+        STQUEUE_ENTRY_FINI(runq_link, ctx);
+
+        while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
+
+#ifdef TRACE_VERBOSE
+            CTRACE(FBGREEN("Resuming expired thread (from bucket)"));
+            mrkthr_dump(bctx);
+#endif
+            DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
+            DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
+
+            if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
+                /*
+                 * We cannot resume events here that can only be
+                 * resumed from within other places of mrkthr_loop().
+                 *
+                 * All other events not included here are
+                 * CO_STATE_READ and CO_STATE_WRITE. This
+                 * should never occur.
+                 */
+#ifdef TRACE_VERBOSE
+                TRACE(FRED("Have to deliver a %s event "
+                           "to co.id=%d that was not scheduled for!"),
+                           CO_STATE_STR(bctx->co.state),
+                           bctx->co.id);
+                mrkthr_dump(bctx);
+#endif
+            }
+
+            if (resume(bctx) != 0) {
+#ifdef TRACE_VERBOSE
+                TRACE("Could not resume co %d, discarding ...",
+                      bctx->co.id);
+#endif
+            }
+        }
+
+        if (!(ctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
+            /*
+             * We cannot resume events here that can only be
+             * resumed from within other places of mrkthr_loop().
+             *
+             * All other events not included here are
+             * CO_STATE_READ and CO_STATE_WRITE. This
+             * should never occur.
+             */
+#ifdef TRACE_VERBOSE
+            TRACE(FRED("Have to deliver a %s event "
+                       "to co.id=%d that was not scheduled for!"),
+                       CO_STATE_STR(bctx->co.state),
+                       ctx->co.id);
+            mrkthr_dump(ctx);
+#endif
+        }
+
+#ifdef TRACE_VERBOSE
+        CTRACE(FBGREEN("Resuming expired bucket owner"));
+        mrkthr_dump(ctx);
+#endif
+        if (resume(ctx) != 0) {
+#ifdef TRACE_VERBOSE
+            TRACE("Could not resume co %d, discarding ...",
+                  ctx->co.id);
+#endif
         }
     }
 }
@@ -1400,8 +1494,6 @@ mrkthr_loop(void)
     int i;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
-    //lldiv_t div;
-    long double secs, isecs, nsecs;
     int nempty, nkev;
     trie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
@@ -1412,7 +1504,9 @@ mrkthr_loop(void)
     while (!(mflags & CO_FLAG_SHUTDOWN)) {
         //sleep(1);
 
-        //TRACE(FRED("Sifting sleepq ..."));
+#ifdef TRACE_VERBOSE
+        TRACE(FRED("Sifting sleepq ..."));
+#endif
 
         /* this will make sure there are no expired ctxes in the sleepq */
         sift_sleepq();
@@ -1423,12 +1517,22 @@ mrkthr_loop(void)
             assert(ctx != NULL);
             //assert(ctx != NULL);
 
-            if (ctx->expire_ticks > tsc_now) {
-                secs = (long double)(ctx->expire_ticks - tsc_now) / tsc_freq;
+            if (ctx->expire_ticks > timecounter_now) {
+#ifdef USE_TSC
+                long double secs, isecs, nsecs;
+
+                secs = (long double)(ctx->expire_ticks - timecounter_now) / timecounter_freq;
                 nsecs = modfl(secs, &isecs);
                 //CTRACE("secs=%Lf isecs=%Lf nsecs=%Lf", secs, isecs, nsecs);
                 timeout.tv_sec = isecs;
                 timeout.tv_nsec = nsecs * 1000000000;
+#else
+                int64_t diff;
+
+                diff = ctx->expire_ticks - timecounter_now;
+                timeout.tv_sec = diff / 1000000000;
+                timeout.tv_nsec = diff % 1000000000;
+#endif
             } else {
                 /*
                  * some time has elapsed after the call to
@@ -1443,13 +1547,15 @@ mrkthr_loop(void)
             tmout = NULL;
         }
 
-        //TRACE(FRED("nsec_now=%ld tmout=%ld(%ld.%ld) loop..."),
-        //      nsec_now,
-        //      tmout != NULL ?
-        //          tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
-        //      tmout != NULL ? tmout->tv_sec : -1,
-        //      tmout != NULL ? tmout->tv_nsec : -1);
-        //array_traverse(&kevents0, (array_traverser_t)mrkthr_dump, NULL);
+#ifdef TRACE_VERBOSE
+        TRACE(FRED("nsec_now=%ld tmout=%ld(%ld.%ld) loop..."),
+              nsec_now,
+              tmout != NULL ?
+                  tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
+              tmout != NULL ? tmout->tv_sec : -1,
+              tmout != NULL ? tmout->tv_nsec : -1);
+        array_traverse(&kevents0, (array_traverser_t)mrkthr_dump, NULL);
+#endif
 
         /* how many discarded items are to the end of the kevnts0? */
         nempty = 0;
@@ -1489,16 +1595,24 @@ mrkthr_loop(void)
                 break;
             }
 
-            //TRACE("kevent returned %d", kevres);
-            //array_traverse(&kevents1, (array_traverser_t)mrkthr_dump);
+#ifdef TRACE_VERBOSE
+            TRACE("kevent returned %d", kevres);
+            array_traverse(&kevents1, (array_traverser_t)dump_ctx_traverser, NULL);
+#endif
 
             if (kevres == 0) {
-                //TRACE("Nothing to process ...");
+#ifdef TRACE_VERBOSE
+                TRACE("Nothing to process ...");
+#endif
                 if (tmout != NULL) {
-                    //TRACE("Timed out.");
+#ifdef TRACE_VERBOSE
+                    TRACE("Timed out.");
+#endif
                     continue;
                 } else {
-                    //TRACE("No events, exiting.");
+#ifdef TRACE_VERBOSE
+                    TRACE("No events, exiting.");
+#endif
                     break;
                 }
             }
@@ -1522,13 +1636,17 @@ mrkthr_loop(void)
                                         ctx != NULL ? ctx->_idx0 : -1);
 
                     if (kev->flags & EV_ERROR) {
+#ifdef TRACE_VERBOSE
                         //TRACE("Error condition for FD %08lx, (%s) skipping ...",
                         //      kev->ident, strerror(kev->data));
+#endif
                         continue;
                     }
 
+#ifdef TRACE_VERBOSE
                     //CTRACE("Processing:");
                     //mrkthr_dump(ctx);
+#endif
 
 
                     if (ctx != NULL) {
@@ -1615,9 +1733,6 @@ mrkthr_loop(void)
                     //TRACE("Nothing to pass to kevent(), nanosleep ? ...");
                     kevres = nanosleep(tmout, NULL);
 
-                    //XXX moved to sift_sleepq()
-                    update_now();
-
                     if (kevres == -1) {
                         perror("nanosleep");
                         if (errno == EINTR) {
@@ -1629,15 +1744,15 @@ mrkthr_loop(void)
                         break;
                     }
                 } else {
-                    //TRACE("tmout was zero, no nanosleep.");
-                    //XXX moved to sift_sleepq()
-                    update_now();
+#ifdef TRACE_VERBOSE
+                    TRACE("tmout was zero, no nanosleep.");
+#endif
                 }
 
-                continue;
-
             } else {
-                //TRACE("Nothing to pass to kevent(), breaking the loop ? ...");
+#ifdef TRACE_VERBOSE
+                TRACE("Nothing to pass to kevent(), breaking the loop ? ...");
+#endif
                 kevres = 0;
                 break;
             }
@@ -1971,7 +2086,7 @@ mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 }
 
 int
-mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
+mrkthr_signal_subscribe(mrkthr_signal_t *signal)
 {
     assert(signal->owner == me);
 
@@ -2112,6 +2227,20 @@ mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
     return res;
 }
 
+int
+mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *lock)
+{
+    if (lock->fwriter) {
+        return MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL;
+    }
+
+    assert(!lock->fwriter);
+
+    ++(lock->nreaders);
+
+    return 0;
+}
+
 void
 mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
 {
@@ -2140,6 +2269,20 @@ mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
     lock->fwriter = 1;
 
     return res;
+}
+
+int
+mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
+{
+    if (lock->fwriter || (lock->nreaders > 0)) {
+        return MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL;
+    }
+
+    assert(!(lock->fwriter || (lock->nreaders > 0)));
+
+    lock->fwriter = 1;
+
+    return 0;
 }
 
 void
@@ -2209,8 +2352,6 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
         /* it's timeout, we have to interrupt it */
         assert(ctx->co.state & CO_STATE_RESUMABLE);
 
-        ctx->co.rc = CO_RC_TIMEDOUT;
-
         remove_me_from_waitq(&ctx->waitq);
 #ifndef NDEBUG
         if (ctx == me) {
@@ -2219,6 +2360,11 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
         }
 #endif
         mrkthr_set_interrupt(ctx);
+        /*
+         * override co.rc (was set to CO_RC_USER_INTERRUPTED in
+         * mrkthr_set_interrupt())
+         */
+        ctx->co.rc = CO_RC_TIMEDOUT;
 
         res = MRKTHR_WAIT_TIMEOUT;
     }

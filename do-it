@@ -21,6 +21,13 @@ then
     autoreconf
     ./configure --prefix=$HOME --enable-debug
     make
+elif test "$1" = "dev-rdtsc"
+then
+    export LDFLAGS=-L$HOME/lib
+    export CFLAGS=-I$HOME/include
+    autoreconf
+    ./configure --prefix=$HOME --enable-debug --with-rdtsc
+    make
 elif test "$1" = "dev-ndebug"
 then
     export LDFLAGS=-L$HOME/lib
@@ -49,5 +56,5 @@ then
         fi
     done
 else
-    echo "`basename $0` {init|dev|dist|dev-ndebug}"
+    echo "`basename $0` {init|dev|dist|dev-ndebug|dev-rdtsc}"
 fi
