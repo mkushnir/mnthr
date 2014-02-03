@@ -5,6 +5,7 @@ aclocal.m4
 ar-lib
 autom4te.cache
 *.log
+compile
 config.guess
 config.h
 config.h.in

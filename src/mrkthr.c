@@ -155,7 +155,7 @@ rdtsc(void)
 {
   uint64_t res;
 
-  __asm __volatile ("rdtscp; shl $32,%%rdx; or %%rdx,%%rax"
+  __asm __volatile ("rdtsc; shl $32,%%rdx; or %%rdx,%%rax"
                     : "=a"(res)
                     :
                     : "%rcx", "%rdx"

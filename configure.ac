@@ -95,13 +95,13 @@ static inline uint64_t
 rdtsc(void)
 {
   uint64_t res;
-  __asm __volatile ("rdtscp; shl \$32,%%rdx; or %%rdx,%%rax"
+  __asm __volatile ("rdtsc; shl \$32,%%rdx; or %%rdx,%%rax"
                     : "=a"(res)
                     :
                     : "%rcx", "%rdx"
                    );
   return res;
-} ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSCP... yes)], AC_MSG_FAILURE([rdtscp instruction is not supported by your CPU]))
+} ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))
 fi
 
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
