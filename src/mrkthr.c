@@ -150,6 +150,7 @@ static void set_resume(mrkthr_ctx_t *);
 static void clear_event(int, int, int);
 static struct kevent *get_event(int);
 
+#ifdef USE_TSC
 static inline uint64_t
 rdtsc(void)
 {
@@ -162,6 +163,7 @@ rdtsc(void)
                    );
   return res;
 }
+#endif
 
 static void
 update_now(void)
