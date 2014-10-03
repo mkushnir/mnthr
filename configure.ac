@@ -56,10 +56,11 @@ dnl AM_MAINTAINER_MODE
 AC_CONFIG_FILES([Makefile src/Makefile src/test/Makefile man/Makefile])
 AC_CONFIG_HEADERS(config.h)
 
-AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h])
+AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limits.h sys/limits.h])
 
 AC_C_CONST
 AC_C_INLINE
+AC_C_RESTRICT
 AC_TYPE_INT64_T
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
@@ -68,9 +69,12 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 
 AC_CHECK_FUNCS([clock_gettime munmap strerror])
+AC_CHECK_FUNCS([gettimeofday])
+AC_CHECK_FUNCS([memset])
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_MMAP
+
 
 AC_PRESERVE_HELP_ORDER
 

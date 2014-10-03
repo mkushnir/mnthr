@@ -148,6 +148,7 @@ static void push_free_ctx(mrkthr_ctx_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
 static void set_resume(mrkthr_ctx_t *);
 static void clear_event(int, int, int);
+static void clear_event_by_idx(int);
 static struct kevent *get_event(int);
 
 #ifdef USE_TSC
@@ -888,7 +889,7 @@ yield(void)
 }
 
 static int
-__sleep(uint64_t msec)
+sleepmsec(uint64_t msec)
 {
     /* first remove an old reference (if any) */
     sleepq_remove(me);
@@ -915,7 +916,7 @@ __sleep(uint64_t msec)
 }
 
 static int
-__sleepticks(uint64_t ticks)
+sleepticks(uint64_t ticks)
 {
     /* first remove an old reference (if any) */
     sleepq_remove(me);
@@ -941,7 +942,7 @@ mrkthr_sleep(uint64_t msec)
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
-    return __sleep(msec);
+    return sleepmsec(msec);
 }
 
 int
@@ -950,7 +951,7 @@ mrkthr_sleep_ticks(uint64_t ticks)
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
-    return __sleepticks(ticks);
+    return sleepticks(ticks);
 }
 
 long double
@@ -1201,11 +1202,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     /* clear event */
     if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
         if (ctx->_idx0 != -1) {
-            struct kevent *kev;
-
-            kev = get_event(ctx->_idx0);
-            assert(kev != NULL);
-            clear_event(kev->ident, kev->filter, ctx->_idx0);
+            clear_event_by_idx(ctx->_idx0);
         }
     }
 
@@ -1246,6 +1243,17 @@ mrkthr_is_dead(mrkthr_ctx_t *ctx)
 /**
  * Remove an event from the kevents array.
  */
+static void
+clear_event_by_idx(int idx)
+{
+    struct kevent *kev;
+
+    kev = get_event(idx);
+    assert(kev != NULL);
+    clear_event(kev->ident, kev->filter, idx);
+}
+
+
 static void
 clear_event(int fd, int filter, int idx)
 {
@@ -2335,7 +2343,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     //CTRACE("before sleep:");
     //mrkthr_dump_sleepq();
 
-    res = __sleep(msec);
+    res = sleepmsec(msec);
 
     /* now remove me from both queues */
 
