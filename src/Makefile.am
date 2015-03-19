@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 
-distdir = ../$(PACKAGE)-$(VERSION)/src
+distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
 dist_HEADERS = mrkthr_private.h kevent_util.h
 
 BUILT_SOURCES = diag.c diag.h
@@ -27,11 +27,9 @@ else
 RDTSC_FLAGS =
 endif
 
-libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I$(includedir)
+libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99
 
 libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon
-
-SUBDIRS = . test
 
 diag.c diag.h: diag.txt
 	sh ./gen-diag mrkthr
