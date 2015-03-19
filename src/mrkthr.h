@@ -17,15 +17,19 @@ extern "C" {
 
 const char *mrkthr_diag_str(int);
 
-#define CTRACE(s, ...) \
-    do {\
-        struct timeval ts; \
-        gettimeofday(&ts, NULL); \
-        struct tm *t = localtime(&ts.tv_sec); \
-        char ss[64]; \
-        strftime(ss, sizeof(ss), "%Y-%m-%d %H:%M:%S", t); \
-        TRACE("%s.%06lu [% 4d] " s, ss, ts.tv_usec, mrkthr_id(), ##__VA_ARGS__); \
-    } while (0)
+#define CTRACE(s, ...)                                         \
+    do {                                                       \
+        struct timeval ts;                                     \
+        gettimeofday(&ts, NULL);                               \
+        struct tm *t = localtime(&ts.tv_sec);                  \
+        char ss[64];                                           \
+        strftime(ss, sizeof(ss), "%Y-%m-%d %H:%M:%S", t);      \
+        TRACE("%s.%06lu [% 4d] " s,                            \
+              ss,                                              \
+              ts.tv_usec,                                      \
+              mrkthr_id(), ##__VA_ARGS__);                     \
+    } while (0)                                                \
+
 
 typedef int (*cofunc)(int, void *[]);
 typedef struct _mrkthr_ctx mrkthr_ctx_t;

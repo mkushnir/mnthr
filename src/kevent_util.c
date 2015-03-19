@@ -6,11 +6,10 @@
 
 #include "mrkcommon/dumpm.h"
 
-static char _flags_str[1024];
-
 static const char *
 kevent_flags_str (unsigned short f)
 {
+    static char _flags_str[1024];
 #define _GEN_FLAGS(f) {f, #f}
     struct {
         unsigned short f;
@@ -29,14 +28,24 @@ kevent_flags_str (unsigned short f)
     };
     char *p = _flags_str;
     unsigned i;
-    p += snprintf(p, 1024, "<");
-    for (i = 0; i < sizeof(flags)/sizeof(flags[0]); ++i) {
+
+    p += snprintf(p, sizeof(_flags_str), "<");
+    for (i = 0;
+         i < sizeof(flags)/sizeof(flags[0]);
+         ++i) {
+
         if (f & flags[i].f) {
-            p += snprintf(p, 1024 - (p - _flags_str), "%s", flags[i].s);
-            p += snprintf(p, 1024, ",");
+            p += snprintf(p,
+                          sizeof(_flags_str) - (p - _flags_str),
+                          "%s", flags[i].s);
+            p += snprintf(p, sizeof(_flags_str), ",");
         }
     }
-    p += snprintf(p-((p-1)==_flags_str ? 0 : 1), 1024, ">");
+
+    p += snprintf(p - ((p - 1) == _flags_str ? 0 : 1),
+                  sizeof(_flags_str),
+                  ">");
+
     return _flags_str;
 }
 

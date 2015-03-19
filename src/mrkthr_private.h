@@ -57,44 +57,48 @@ struct _mrkthr_ctx {
 #       define CO_STATE_CONDWAIT 0x400
 #       define CO_STATE_WAITFOR 0x800
 
-#       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP | \
-                                               CO_STATE_SET_RESUME | \
-                                               CO_STATE_SET_INTERRUPT | \
-                                               CO_STATE_SIGNAL_SUBSCRIBE | \
-                                               CO_STATE_JOIN | \
-                                               CO_STATE_JOIN_INTERRUPTED | \
-                                               CO_STATE_CONDWAIT | \
-                                               CO_STATE_WAITFOR)
+#       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP |                \
+                                               CO_STATE_SET_RESUME |           \
+                                               CO_STATE_SET_INTERRUPT |        \
+                                               CO_STATE_SIGNAL_SUBSCRIBE |     \
+                                               CO_STATE_JOIN |                 \
+                                               CO_STATE_JOIN_INTERRUPTED |     \
+                                               CO_STATE_CONDWAIT |             \
+                                               CO_STATE_WAITFOR)               \
 
-#       define CO_STATE_RESUMABLE (CO_STATE_READ | \
-                                   CO_STATE_WRITE | \
-                                   CO_STATES_RESUMABLE_EXTERNALLY)
 
-#       define CO_STATE_STR(st) ( \
-            (st) == CO_STATE_DORMANT ? "DORMANT" : \
-            (st) == CO_STATE_RESUMED ? "RESUMED" : \
-            (st) == CO_STATE_READ ? "READ" : \
-            (st) == CO_STATE_WRITE ? "WRITE" : \
-            (st) == CO_STATE_SLEEP ? "SLEEP" : \
-            (st) == CO_STATE_SET_RESUME ? "SET_RESUME" : \
-            (st) == CO_STATE_SET_INTERRUPT ? "SET_INTERRUPT" : \
-            (st) == CO_STATE_SIGNAL_SUBSCRIBE ? "SIGNAL_SUBSCRIBE" : \
-            (st) == CO_STATE_JOIN ? "JOIN" : \
-            (st) == CO_STATE_JOIN_INTERRUPTED ? "JOIN_INTERRUPTED" : \
-            (st) == CO_STATE_CONDWAIT ? "CONDWAIT" : \
-            (st) == CO_STATE_WAITFOR ? "WAITFOR" : \
-            "<unknown>")
+#       define CO_STATE_RESUMABLE (CO_STATE_READ |                     \
+                                   CO_STATE_WRITE |                    \
+                                   CO_STATES_RESUMABLE_EXTERNALLY)     \
+
+
+#       define CO_STATE_STR(st) (                                      \
+            (st) == CO_STATE_DORMANT ? "DORMANT" :                     \
+            (st) == CO_STATE_RESUMED ? "RESUMED" :                     \
+            (st) == CO_STATE_READ ? "READ" :                           \
+            (st) == CO_STATE_WRITE ? "WRITE" :                         \
+            (st) == CO_STATE_SLEEP ? "SLEEP" :                         \
+            (st) == CO_STATE_SET_RESUME ? "SET_RESUME" :               \
+            (st) == CO_STATE_SET_INTERRUPT ? "SET_INTERRUPT" :         \
+            (st) == CO_STATE_SIGNAL_SUBSCRIBE ? "SIGNAL_SUBSCRIBE" :   \
+            (st) == CO_STATE_JOIN ? "JOIN" :                           \
+            (st) == CO_STATE_JOIN_INTERRUPTED ? "JOIN_INTERRUPTED" :   \
+            (st) == CO_STATE_CONDWAIT ? "CONDWAIT" :                   \
+            (st) == CO_STATE_WAITFOR ? "WAITFOR" :                     \
+            "<unknown>")                                               \
+
 
         unsigned int state;
 #       define CO_RC_USER_INTERRUPTED 0x01
 #       define CO_RC_TIMEDOUT 0x02
 #       define CO_RC_SIMULTANEOUS 0x03
-#       define CO_RC_STR(rc) ( \
-            (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" : \
-            (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" : \
-            (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" : \
-            "OK" \
-        )
+#       define CO_RC_STR(rc) (                                         \
+            (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :      \
+            (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" :                      \
+            (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :              \
+            "OK"                                                       \
+        )                                                              \
+
         unsigned char rc;
     } co;
 

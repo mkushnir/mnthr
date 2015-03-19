@@ -1546,7 +1546,7 @@ mrkthr_loop(void)
             } else {
                 /*
                  * some time has elapsed after the call to
-                 * proces_sleep_resume_list() that made an event expire.
+                 * sift_sleepq() that made an event expire.
                  */
                 timeout.tv_sec = 0;
                 //timeout.tv_nsec = 100000000; /* 100 msec */
@@ -1578,12 +1578,14 @@ mrkthr_loop(void)
                 break;
             }
         }
-        //TRACE("saved %d items of %ld total off from kevents0", nempty, kevents0.elnum);
+        //TRACE("saved %d items of %ld total off from kevents0",
+        //      nempty,
+        //      kevents0.elnum);
 
         /* there are *some* events */
         nkev = kevents0.elnum - nempty;
         if (nkev != 0) {
-            if (array_ensure_len(&kevents1, nkev, 0) != 0) {
+            if (array_ensure_len_dirty(&kevents1, nkev, 0) != 0) {
                 FAIL("array_ensure_len");
             }
 
