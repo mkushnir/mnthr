@@ -21,23 +21,34 @@ else
 RDTSC_FLAGS =
 endif
 
+if LINUX
+ls_platform= ../src/epoll_util.c
+else
+if FREEBSD
+ls_platform= ../src/kevent_util.c
+else
+endif
+endif
+
+base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
+
 nodist_testco_SOURCES = ../src/diag.c
-testco_SOURCES = ../src/mrkthr.c ../src/kevent_util.c testco.c
+testco_SOURCES = $(base_sources) testco.c
 testco_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
 testco_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testsleep_SOURCES = ../src/diag.c
-testsleep_SOURCES = ../src/mrkthr.c ../src/kevent_util.c testsleep.c
+testsleep_SOURCES = $(base_sources) testsleep.c
 testsleep_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
 testsleep_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testclock_SOURCES = ../src/diag.c
-testclock_SOURCES = ../src/mrkthr.c ../src/kevent_util.c testclock.c
+testclock_SOURCES = $(base_sources) testclock.c
 testclock_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
 testclock_LDFLAGS = -L$(libdir) -lmrkcommon
 
 nodist_testwaitfor_SOURCES = ../src/diag.c
-testwaitfor_SOURCES = ../src/mrkthr.c ../src/kevent_util.c testwaitfor.c
+testwaitfor_SOURCES = $(base_sources) testwaitfor.c
 testwaitfor_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
 testwaitfor_LDFLAGS = -L$(libdir) -lmrkcommon
 

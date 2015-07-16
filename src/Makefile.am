@@ -1,7 +1,19 @@
 AUTOMAKE_OPTIONS = foreign
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
-dist_HEADERS = mrkthr_private.h kevent_util.h
+
+if LINUX
+dh_platform= epoll_util.h
+ls_platform= epoll_util.c
+else
+if FREEBSD
+dh_platform= kevent_util.h
+ls_platform= kevent_util.c
+else
+endif
+endif
+
+dist_HEADERS = mrkthr_private.h $(dh_platform)
 
 BUILT_SOURCES = diag.c diag.h
 EXTRA_DIST = diag.txt gen-diag
@@ -12,7 +24,7 @@ lib_LTLIBRARIES = libmrkthr.la
 
 nobase_include_HEADERS = mrkthr.h
 
-libmrkthr_la_SOURCES = mrkthr.c kevent_util.c bytestream_helper.c
+libmrkthr_la_SOURCES = mrkthr.c poller.c $(ls_platform) bytestream_helper.c
 nodist_libmrkthr_la_SOURCES = diag.c
 
 if DEBUG

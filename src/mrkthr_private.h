@@ -167,6 +167,29 @@ struct _mrkthr_profile {
     long double avg;
 };
 
+
+#define CO_FLAG_INITIALIZED 0x01
+#define CO_FLAG_SHUTDOWN 0x02
+extern int mflags;
+extern struct _mrkthr_ctx *me;
+extern ucontext_t main_uc;
+extern trie_t the_sleepq;
+uint64_t nsec_zero, nsec_now;
+extern uint64_t timecounter_zero, timecounter_now;
+#ifndef USE_TSC
+#   define timecounter_now nsec_now
+#endif
+
+void update_now(void);
+int yield(void);
+void push_free_ctx(struct _mrkthr_ctx *);
+void sleepq_remove(struct _mrkthr_ctx *);
+void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
+
+void poller_clear_event(struct _mrkthr_ctx *);
+void poller_init(void);
+void poller_fini(void);
+
 #ifdef __cplusplus
 }
 #endif
