@@ -21,14 +21,14 @@ else
 RDTSC_FLAGS =
 endif
 
-if LINUX
-ls_platform= ../src/epoll_util.c
+if USE_EV
+dh_platform=
+ls_platform= ../src/ev_poller.c
 else
-if FREEBSD
-ls_platform= ../src/kevent_util.c
-else
+dh_platform= ../src/kevent_util.h
+ls_platform= ../src/kevent_poller.c ../src/kevent_util.c
 endif
-endif
+
 
 base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
 

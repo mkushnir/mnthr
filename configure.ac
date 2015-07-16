@@ -108,8 +108,13 @@ rdtsc(void)
 } ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))
 fi
 
-AM_CONDITIONAL([LINUX], [echo $build_os | grep linux >/dev/null])
-AM_CONDITIONAL([FREEBSD], [echo $build_os | grep freebsd >/dev/null])
+AC_ARG_ENABLE(ev,
+              AC_HELP_STRING([--with-ev],
+                             [Use libev (default=no)]),
+              [AM_CONDITIONAL([EV], [with_ev=yes])],
+              [AM_CONDITIONAL([EV], [test "$with_ev" = "yes"])])
+
+AM_CONDITIONAL([USE_EV], [echo $build_os | grep linux >/dev/null || test "$with_ev" = "yes"])
 
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 

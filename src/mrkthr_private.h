@@ -11,6 +11,7 @@
 #include <ucontext.h>
 
 #include "mrkcommon/dtqueue.h"
+#include "mrkcommon/stqueue.h"
 #include "mrkcommon/rbt.h"
 #include "mrkcommon/util.h"
 
@@ -189,6 +190,9 @@ void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
 void poller_clear_event(struct _mrkthr_ctx *);
 void poller_init(void);
 void poller_fini(void);
+int poller_resume(struct _mrkthr_ctx *);
+void poller_sift_sleepq(void);
+void poller_clear_event_by_idx(int);
 
 #ifdef __cplusplus
 }

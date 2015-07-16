@@ -2,15 +2,12 @@ AUTOMAKE_OPTIONS = foreign
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
 
-if LINUX
-dh_platform= epoll_util.h
-ls_platform= epoll_util.c
+if USE_EV
+dh_platform=
+ls_platform= ev_poller.c
 else
-if FREEBSD
 dh_platform= kevent_util.h
-ls_platform= kevent_util.c
-else
-endif
+ls_platform= kevent_poller.c kevent_util.c
 endif
 
 dist_HEADERS = mrkthr_private.h $(dh_platform)
