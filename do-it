@@ -25,6 +25,12 @@ then
     export CFLAGS=-I$HOME/include
     autoreconf
     ./configure --prefix=$HOME --enable-debug --with-rdtsc
+elif test "$1" = "dev-ev"
+then
+    export LDFLAGS="-L$HOME/lib -L/usr/local/lib"
+    export CFLAGS="-I$HOME/include -I/usr/local/include"
+    autoreconf
+    ./configure --prefix=$HOME --enable-debug --with-ev
 elif test "$1" = "dev-ndebug"
 then
     export LDFLAGS=-L$HOME/lib

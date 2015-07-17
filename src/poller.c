@@ -12,15 +12,6 @@
 #include <mrkcommon/dumpm.h>
 //#define TRACE_VERBOSE
 
-void
-poller_clear_event(struct _mrkthr_ctx *ctx)
-{
-    if (ctx->_idx0 != -1) {
-        poller_clear_event_by_idx(ctx->_idx0);
-    }
-}
-
-
 int
 poller_resume(mrkthr_ctx_t *ctx)
 {
@@ -49,7 +40,8 @@ poller_resume(mrkthr_ctx_t *ctx)
     res = swapcontext(&main_uc, &me->co.uc);
 
     if (errno == EINTR) {
-        perror("resume(), ignoring ...");
+        mrkthr_dump(ctx);
+        perror("poller_resume(), ignoring ...");
         errno = 0;
         return 0;
     }
@@ -95,20 +87,13 @@ poller_sift_sleepq(void)
     STQUEUE(_mrkthr_ctx, runq);
     trie_node_t *trn;
     mrkthr_ctx_t *ctx;
+    uint64_t now;
 
     /* run expired threads */
 
     STQUEUE_INIT(&runq);
 
-    update_now();
-
-#ifdef TRACE_VERBOSE
-    CTRACE(FBBLUE("Processing: delta=%ld (%Lf)"),
-           (int64_t)(ctx->expire_ticks) - (int64_t)timecounter_now,
-           mrkthr_ticksdiff2sec(
-           (int64_t)(ctx->expire_ticks) - (int64_t)timecounter_now));
-    mrkthr_dump(ctx);
-#endif
+    now = mrkthr_get_now_ticks();
 
     for (trn = TRIE_MIN(&the_sleepq);
          trn != NULL;
@@ -117,7 +102,7 @@ poller_sift_sleepq(void)
         ctx = (mrkthr_ctx_t *)(trn->value);
         assert(ctx != NULL);
 
-        if (ctx->expire_ticks < timecounter_now) {
+        if (ctx->expire_ticks < now) {
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
             trie_remove_node(&the_sleepq, trn);
             trn = NULL;

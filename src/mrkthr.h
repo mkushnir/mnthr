@@ -81,7 +81,6 @@ typedef struct _mrkthr_rwlock {
 int mrkthr_init(void);
 int mrkthr_fini(void);
 int mrkthr_loop(void);
-int wallclock_init(void);
 void mrkthr_shutdown(void);
 size_t mrkthr_compact_sleepq(size_t);
 size_t mrkthr_get_sleepq_length(void);

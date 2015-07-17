@@ -84,11 +84,11 @@ AC_ARG_ENABLE(debug,
               [AM_CONDITIONAL([DEBUG], [enable_debug=yes])],
               [AM_CONDITIONAL([DEBUG], [test "$enable_debug" = "yes"])])
 
-AC_ARG_ENABLE(rdtsc,
-              AC_HELP_STRING([--with-rdtsc],
-                             [Use RDTSC (default=no)]),
-              [AM_CONDITIONAL([RDTSC], [with_rdtsc=yes])],
-              [AM_CONDITIONAL([RDTSC], [test "$with_rdtsc" = "yes"])])
+AC_ARG_WITH(rdtsc,
+            AC_HELP_STRING([--with-rdtsc],
+                           [Use RDTSC (default=no)]),
+            [AM_CONDITIONAL([RDTSC], [with_rdtsc=yes])],
+            [AM_CONDITIONAL([RDTSC], [test "$with_rdtsc" = "yes"])])
 
 if test "$with_rdtsc" = "yes"
 then
@@ -108,13 +108,24 @@ rdtsc(void)
 } ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))
 fi
 
-AC_ARG_ENABLE(ev,
-              AC_HELP_STRING([--with-ev],
-                             [Use libev (default=no)]),
-              [AM_CONDITIONAL([EV], [with_ev=yes])],
-              [AM_CONDITIONAL([EV], [test "$with_ev" = "yes"])])
+if echo $build_os | grep linux >/dev/null
+then
+   with_ev=yes
+   AM_CONDITIONAL([USE_EV], [true])
+else
+   AC_ARG_WITH(ev,
+               AC_HELP_STRING([--with-ev],
+                              [Use libev (default=no)]),
+               [AM_CONDITIONAL([USE_EV], [with_ev=yes])],
+               [AM_CONDITIONAL([USE_EV], [test "$with_ev" = "yes"])])
+    
+fi
 
-AM_CONDITIONAL([USE_EV], [echo $build_os | grep linux >/dev/null || test "$with_ev" = "yes"])
+
+if test "$with_ev" = "yes"
+then
+    AC_CHECK_LIB(ev, ev_run, [], [AC_MSG_FAILURE(libev.so is required.)])
+fi
 
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 

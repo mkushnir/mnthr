@@ -69,7 +69,6 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stdint.h>
-#include <sys/sysctl.h>
 #include <sys/time.h>
 
 #include <assert.h>
@@ -115,14 +114,6 @@ static STQUEUE(_mrkthr_ctx, free_list);
  */
 trie_t the_sleepq;
 
-#ifdef USE_TSC
-static uint64_t timecounter_freq;
-#else
-#   define timecounter_freq (1000000000)
-#endif
-
-uint64_t nsec_zero, nsec_now;
-uint64_t timecounter_zero, timecounter_now;
 
 static int mrkthr_ctx_init(mrkthr_ctx_t *);
 static int mrkthr_ctx_fini(mrkthr_ctx_t *);
@@ -133,60 +124,6 @@ static void resume_waitq_all(mrkthr_waitq_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
 static void set_resume(mrkthr_ctx_t *);
 
-#ifdef USE_TSC
-static inline uint64_t
-rdtsc(void)
-{
-  uint64_t res;
-
-  __asm __volatile ("rdtsc; shl $32,%%rdx; or %%rdx,%%rax"
-                    : "=a"(res)
-                    :
-                    : "%rcx", "%rdx"
-                   );
-  return res;
-}
-#endif
-
-void
-update_now(void)
-{
-#ifdef USE_TSC
-    timecounter_now = rdtsc();
-    /* do it here so that get_now() returns precomputed value */
-    nsec_now = nsec_zero + (uint64_t)(((long double)(timecounter_now - timecounter_zero)) /
-        ((long double)(timecounter_freq)) * 1000000000.);
-#else
-    struct timespec ts;
-
-    if (clock_gettime(CLOCK_REALTIME_PRECISE, &ts) != 0) {
-        FAIL("clock_gettime");
-    }
-    nsec_now = ts.tv_nsec + ts.tv_sec * 1000000000;
-#endif
-}
-
-/**
- * Set the initial point of reference of the Epoch clock and synchronize
- * it with the internal initial TSC value. Can also be used to
- * periodically correct the internal wallclock along with that system's.
- */
-int
-wallclock_init(void)
-{
-    struct timespec ts;
-
-#ifdef USE_TSC
-    timecounter_zero = rdtsc();
-#endif
-
-    if (clock_gettime(CLOCK_REALTIME_PRECISE, &ts) != 0) {
-        TRRET(WALLCLOCK_INIT + 1);
-    }
-    nsec_zero = ts.tv_nsec + ts.tv_sec * 1000000000;
-    return 0;
-}
-
 void
 push_free_ctx(mrkthr_ctx_t *ctx)
 {
@@ -195,32 +132,6 @@ push_free_ctx(mrkthr_ctx_t *ctx)
     //mrkthr_dump(ctx);
 }
 
-
-uint64_t
-mrkthr_get_now(void)
-{
-    return nsec_now;
-}
-
-uint64_t
-mrkthr_get_now_precise(void)
-{
-    update_now();
-    return nsec_now;
-}
-
-uint64_t
-mrkthr_get_now_ticks(void)
-{
-    return timecounter_now;
-}
-
-uint64_t
-mrkthr_get_now_ticks_precise(void)
-{
-    update_now();
-    return timecounter_now;
-}
 
 UNUSED static void
 dump_ucontext (ucontext_t *uc)
@@ -467,16 +378,6 @@ mrkthr_init(void)
     main_uc.uc_stack.ss_size = sizeof(main_stack);
     me = NULL;
     trie_init(&the_sleepq);
-#ifdef USE_TSC
-    sz = sizeof(timecounter_freq);
-    if (sysctlbyname("machdep.tsc_freq", &timecounter_freq, &sz, NULL, 0) != 0) {
-        FAIL("sysctlbyname");
-    }
-#endif
-
-    if (wallclock_init() != 0) {
-        FAIL("wallclock_init");
-    }
 
     mflags |= CO_FLAG_INITIALIZED;
 
@@ -582,7 +483,7 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
 
     STQUEUE_ENTRY_INIT(free_link, ctx);
     STQUEUE_ENTRY_INIT(runq_link, ctx);
-    ctx->_idx0 = -1;
+    poller_mrkthr_ctx_init(ctx);
 
     return 0;
 }
@@ -641,7 +542,7 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
         ctx->hosting_waitq = NULL;
     }
 
-    ctx->_idx0 = -1;
+    poller_mrkthr_ctx_init(ctx);
 }
 
 static int
@@ -867,11 +768,7 @@ sleepmsec(uint64_t msec)
         if (msec == 0) {
             me->expire_ticks = 1;
         } else {
-#ifdef USE_TSC
-            me->expire_ticks = timecounter_now + (uint64_t)(((long double)msec / 1000.) * timecounter_freq);
-#else
-            me->expire_ticks = timecounter_now + msec * 1000000;
-#endif
+            me->expire_ticks = poller_msec2ticks_absolute(msec);
         }
     }
 
@@ -894,7 +791,7 @@ sleepticks(uint64_t ticks)
         if (ticks == 0) {
             me->expire_ticks = 1;
         } else {
-            me->expire_ticks = timecounter_now + ticks;
+            me->expire_ticks = poller_ticks_absolute(ticks);
         }
     }
 
@@ -919,28 +816,6 @@ mrkthr_sleep_ticks(uint64_t ticks)
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
     return sleepticks(ticks);
-}
-
-long double
-mrkthr_ticks2sec(uint64_t ticks)
-{
-    return (long double)ticks / (long double)timecounter_freq;
-}
-
-long double
-mrkthr_ticksdiff2sec(int64_t ticks)
-{
-    return (long double)ticks / (long double)timecounter_freq;
-}
-
-uint64_t
-mrkthr_msec2ticks(uint64_t msec)
-{
-#ifdef USE_TSC
-    return ((long double)msec / 1000. * (long double)timecounter_freq);
-#else
-    return msec * 1000000;
-#endif
 }
 
 static void

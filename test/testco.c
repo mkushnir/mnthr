@@ -13,7 +13,7 @@
 
 static mrkthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
-static const int nthreads = 1;
+static const int nthreads = 10;
 static const int niter = 10;
 static const int nrecur = 5;
 static long total = 0;
@@ -24,10 +24,14 @@ static int wt = 100;
 static void
 sigterm_handler(int sig, siginfo_t *info, UNUSED ucontext_t *uap)
 {
-    TRACE("sig=%d si_signo=%d si_errno=%d si_si_code=%d",
+    CTRACE("sig=%d si_signo=%d si_errno=%d si_si_code=%d",
           sig, info->si_signo, info->si_errno, info->si_code);
 
-    mrkthr_run(shutdown_timer_ctx);
+    if (!_shutdown) {
+        mrkthr_run(shutdown_timer_ctx);
+    } else {
+        _exit(0);
+    }
 
 }
 
@@ -44,11 +48,11 @@ r(int n)
         int nn = niter;
         while (nn-- && !_shutdown) {
             ++dummy;
-            //CTRACE(">>>");
+            CTRACE(">>>");
             //mrkthr_sleep(100);
             //now1 = mrkthr_get_now_precise();
             mrkthr_sleep(0);
-            //CTRACE("<<<");
+            CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
             //mrkthr_ctx_dump(me);
             //now2 = mrkthr_get_now_precise();
@@ -73,7 +77,7 @@ baz(UNUSED int argc, UNUSED void *argv[])
     t = n2 - n1;
     ++ntotal;
     total += t;
-    //fprintf(stderr, "partial total %ld\n", (n2-n1) / 1000);
+    fprintf(stderr, "partial total %ld\n", (n2-n1) / 1000);
     return 0;
 }
 
@@ -157,7 +161,7 @@ qwe(UNUSED int argc, void *argv[])
             return 1;
         }
     }
-    TRACE("Exiting");
+    CTRACE("Exiting");
     return 0;
 }
 
@@ -169,6 +173,7 @@ shut_me_down(UNUSED int argc, UNUSED void *argv[])
     //close(write_pipe[0]);
     //close(write_pipe[1]);
     _shutdown = 1;
+    CTRACE("Shutting down ...");
     return 0;
 }
 
@@ -216,7 +221,7 @@ test0(void)
 
     mrkthr_fini();
 
-    TRACE("res=%d", res);
+    CTRACE("res=%d", res);
 }
 
 
