@@ -59,10 +59,14 @@ ev_item_hash(ev_item_t *ev)
             int *i;
             unsigned char *c;
         } u;
+        // typeof(ev->ev.io.events)
+        int events;
+
         u.i = &ev->ev.io.fd;
         ev->hash = fasthash(0, u.c, sizeof(ev->ev.io.fd));
-        u.i = &ev->ev.io.events;
-        ev->hash = fasthash(ev->hash, u.c, sizeof(ev->ev.io.events));
+        events = ev->ev.io.events & ~EV__IOFDSET;
+        u.i = &events;
+        ev->hash = fasthash(ev->hash, u.c, sizeof(events));
     }
     return ev->hash;
 }
