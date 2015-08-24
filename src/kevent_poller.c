@@ -457,7 +457,7 @@ mrkthr_loop(void)
                   tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
               tmout != NULL ? tmout->tv_sec : -1,
               tmout != NULL ? tmout->tv_nsec : -1);
-        array_traverse(&kevents0, (array_traverser_t)mrkthr_dump, NULL);
+        array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
 #endif
 
         /* how many discarded items are to the end of the kevnts0? */
@@ -471,9 +471,11 @@ mrkthr_loop(void)
                 break;
             }
         }
-        //TRACE("saved %d items of %ld total off from kevents0",
-        //      nempty,
-        //      kevents0.elnum);
+#ifdef TRACE_VERBOSE
+        TRACE("saved %d items of %ld total off from kevents0",
+              nempty,
+              kevents0.elnum);
+#endif
 
         /* there are *some* events */
         nkev = kevents0.elnum - nempty;
@@ -503,7 +505,7 @@ mrkthr_loop(void)
 #ifdef TRACE_VERBOSE
             TRACE("kevent returned %d", kevres);
             array_traverse(&kevents1,
-                           (array_traverser_t)dump_ctx_traverser,
+                           (array_traverser_t)kevent_dump,
                            NULL);
 #endif
 

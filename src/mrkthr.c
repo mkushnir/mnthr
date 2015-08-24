@@ -92,8 +92,11 @@
 #include <mrkcommon/trie.h>
 #include "mrkthr_private.h"
 
+
+#ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
 MEMDEBUG_DECLARE(mrkthr);
+#endif
 
 typedef int (*writer_t) (int, int, int);
 
@@ -208,7 +211,7 @@ dump_ucontext (ucontext_t *uc)
     );
 }
 
-UNUSED static int
+static int
 dump_sleepq_node(trie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
@@ -361,7 +364,9 @@ mrkthr_init(void)
         return 0;
     }
 
+#ifdef DO_MEMDEBUG
     MEMDEBUG_REGISTER(mrkthr);
+#endif
 
     STQUEUE_INIT(&free_list);
 
@@ -432,7 +437,7 @@ mrkthr_get_sleepq_volume(void)
     return trie_get_volume(&the_sleepq);
 }
 
-static int
+int
 dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
 {
     if ((ctx)->co.id != -1) {
@@ -610,7 +615,8 @@ mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
     ctx->co.id = co_id++;
 
     if (name != NULL) {
-        strncpy(ctx->co.name, name, sizeof(ctx->co.name));
+        strncpy(ctx->co.name, name, sizeof(ctx->co.name) - 1);
+        ctx->co.name[sizeof(ctx->co.name) - 1] = '\0';
     } else {
         ctx->co.name[0] = '\0';
     }
@@ -1282,6 +1288,17 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
         }
     }
     //CTRACE("Not resuming orphan signal. See you next time.");
+}
+
+void
+mrkthr_signal_error(mrkthr_signal_t *signal, unsigned char rc)
+{
+    if (signal->owner != NULL) {
+        if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {
+            signal->owner->co.rc = rc;
+            set_resume(signal->owner);
+        }
+    }
 }
 
 /**

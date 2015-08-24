@@ -120,6 +120,7 @@ void mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_has_owner(mrkthr_signal_t *);
 MRKTHR_ASYNC int mrkthr_signal_subscribe(mrkthr_signal_t *);
 void mrkthr_signal_send(mrkthr_signal_t *);
+void mrkthr_signal_error(mrkthr_signal_t *, unsigned char);
 
 void mrkthr_cond_init(mrkthr_cond_t *);
 MRKTHR_ASYNC int mrkthr_cond_wait(mrkthr_cond_t *);
