@@ -674,7 +674,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     ucontext_t uc;
     mrkthr_ctx_t *tmp;
 
-    CTRACE("mrkthr_ctx@%p '%s' id=%d f=%p st=%s rc=%s exp=%016lx",
+    CTRACE("mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx",
            ctx,
            ctx->co.name,
            ctx->co.id,
