@@ -1270,6 +1270,24 @@ mrkthr_signal_subscribe(mrkthr_signal_t *signal)
     return yield();
 }
 
+int
+mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal, uint64_t msec)
+{
+    int res;
+
+    assert(signal->owner == me);
+
+    //CTRACE("holding on ...");
+    me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
+    res = sleepmsec(msec);
+    if (me->expire_ticks == 1) {
+        /* I had been sleeping, but was resumed by signal_send() ... */
+    } else {
+        res = MRKTHR_WAIT_TIMEOUT;
+    }
+    return res;
+}
+
 void
 mrkthr_signal_send(mrkthr_signal_t *signal)
 {
