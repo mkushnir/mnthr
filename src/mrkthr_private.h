@@ -1,13 +1,27 @@
 #ifndef MRKTHR_PRIVATE_H
 #define MRKTHR_PRIVATE_H
 
-#include <sys/param.h> /* PAGE_SIZE */
-#include <sys/limits.h> /* ULONG_MAX*/
-#include <sys/socket.h>
-#include <sys/types.h>
+#include <limits.h> /* ULONG_MAX*/
 
 #include <netinet/in.h>
 #include <ucontext.h>
+
+#ifdef HAVE_CONFIG_H
+#   include <config.h>
+#endif
+
+#include <sys/param.h> /* PAGE_SIZE */
+
+#ifndef PAGE_SIZE
+#   ifdef HAVE_SYS_USER_H
+#       include <sys/user.h>
+#   else
+#       error "PAGE_SIZE cannot be defined"
+#   endif
+#endif
+
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include "mrkcommon/dtqueue.h"
 #include "mrkcommon/stqueue.h"
@@ -18,7 +32,9 @@
 extern "C" {
 #endif
 
-#define STACKSIZE (PAGE_SIZE * 1024)
+#ifndef STACKSIZE
+#   define STACKSIZE (PAGE_SIZE * 1024)
+#endif
 
 struct _mrkthr_ctx;
 

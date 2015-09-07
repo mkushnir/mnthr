@@ -40,6 +40,14 @@ else
     fi
 fi
 
+uname_s=`uname -s`
+if test "$uname_s" = "Linux"
+then
+    AC_SUBST(_GNU_SOURCE_MACRO, ['-D_GNU_SOURCE'])
+else
+    AC_SUBST(_GNU_SOURCE_MACRO, [''])
+fi
+
 AC_PREREQ
 
 AC_PROG_CC
@@ -57,7 +65,7 @@ dnl AM_MAINTAINER_MODE
 AC_CONFIG_FILES([Makefile src/Makefile man/Makefile test/Makefile])
 AC_CONFIG_HEADERS(config.h)
 
-AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limits.h sys/limits.h])
+AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limits.h sys/user.h])
 
 AC_C_CONST
 AC_C_INLINE

@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <math.h> /* INFINITY */
 #include <sys/ioctl.h>
 
 #include <mrkcommon/dict.h>
@@ -10,17 +11,19 @@
 
 #include "mrkthr_private.h"
 
+//#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
-//#define TRACE_VERBOSE
 
 #include <ev.h>
 
-#define EV_STR(e)                      \
-    ((e) == EV_READ ? "READ" :         \
-     (e) == EV_WRITE ? "WRITE" :       \
-     "<unknown>")                      \
+#define EV_STR(e)              \
+    ((e) & EV_READ ? "READ" :  \
+     (e) & EV_WRITE ? "WRITE" :\
+     "<unknown>")              \
 
+
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
 typedef struct _ev_item {
     union {
@@ -94,6 +97,7 @@ ev_item_new(int fd, int event)
         FAIL("malloc");
     }
     ev_io_init(&res->ev.io, ev_io_cb, fd, event);
+    res->ev.io.data = NULL;
     res->hash = 0;
 
     return res;
@@ -104,6 +108,11 @@ static void
 ev_item_destroy(ev_item_t **ev)
 {
     if (*ev != NULL) {
+#ifdef TRACE_VERBOSE
+        CTRACE(FRED("destroying ev_io %d/%s"),
+               (*ev)->ev.io.fd,
+               EV_STR((*ev)->ev.io.events));
+#endif
         ev_io_stop(the_loop, &(*ev)->ev.io);
         free(*ev);
         *ev = NULL;
@@ -221,6 +230,11 @@ poller_clear_event(mrkthr_ctx_t *ctx)
         ev_item_t *ev;
 
         ev = ctx->pdata._ev;
+#ifdef TRACE_VERBOSE
+        CTRACE(FRED("clearing ev_io %d/%s"),
+               ev->ev.io.fd,
+               EV_STR(ev->ev.io.events));
+#endif
         ev_io_stop(the_loop, &ev->ev.io);
     }
 }
@@ -229,6 +243,11 @@ poller_clear_event(mrkthr_ctx_t *ctx)
 static void
 clear_event(ev_item_t *ev)
 {
+#ifdef TRACE_VERBOSE
+    CTRACE(FRED("clearing ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
+#endif
     ev_io_stop(the_loop, &ev->ev.io);
 }
 
@@ -237,15 +256,18 @@ mrkthr_get_rbuflen(int fd)
 {
     ssize_t sz;
     int res;
-    ev_item_t *ev;
+    UNUSED ev_item_t *ev, *ev1;
 
     ev = ev_item_get(fd, EV_READ);
+    //ev_io_set(&ev->ev.io, fd, EV_READ);
     me->pdata._ev = ev;
 
     /*
      * check if there is another thread waiting for the same event.
      */
-    if (ev->ev.io.data != NULL) {
+    if (ev->ev.io.data == NULL) {
+        ev->ev.io.data = me;
+    } else if (ev->ev.io.data != me) {
         /*
          * in this case we are not allowed to wait for this event,
          * sorry.
@@ -254,23 +276,31 @@ mrkthr_get_rbuflen(int fd)
         return -1;
     }
 
-    ev->ev.io.data = me;
-
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+#endif
     ev_io_start(the_loop, &ev->ev.io);
 
     /* wait for an event */
     me->co.state = CO_STATE_READ;
     res = yield();
+
+    ev1 = ev_item_get(fd, EV_READ);
+
+    assert(ev == ev1);
+
+    assert(ev->ev.io.data == me);
+
+    ev->ev.io.data = NULL;
+    me->pdata._ev = NULL;
+
     if (res != 0) {
         return -1;
     }
 
-    ev = ev_item_get(fd, EV_READ);
-
-    assert(ev->ev.io.data == me);
-
     sz = 0;
     if ((res = ioctl(fd, FIONREAD, &sz)) != 0) {
+        perror("ioctl");
         return -1;
     }
 
@@ -279,19 +309,22 @@ mrkthr_get_rbuflen(int fd)
 
 
 ssize_t
-mrkthr_get_wbuflen(UNUSED int fd)
+mrkthr_get_wbuflen(int fd)
 {
     ssize_t sz;
     int res;
     ev_item_t *ev;
 
     ev = ev_item_get(fd, EV_WRITE);
+    //ev_io_set(&ev->ev.io, fd, EV_WRITE);
     me->pdata._ev = ev;
 
     /*
      * check if there is another thread waiting for the same event.
      */
-    if (ev->ev.io.data != NULL) {
+    if (ev->ev.io.data == NULL) {
+        ev->ev.io.data = me;
+    } else if (ev->ev.io.data != me) {
         /*
          * in this case we are not allowed to wait for this event,
          * sorry.
@@ -300,25 +333,34 @@ mrkthr_get_wbuflen(UNUSED int fd)
         return -1;
     }
 
-    ev->ev.io.data = me;
-
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+#endif
     ev_io_start(the_loop, &ev->ev.io);
 
     /* wait for an event */
     me->co.state = CO_STATE_WRITE;
     res = yield();
-    if (res != 0) {
-        return -1;
-    }
 
     ev = ev_item_get(fd, EV_WRITE);
 
     assert(ev->ev.io.data == me);
 
+    ev->ev.io.data = NULL;
+    me->pdata._ev = NULL;
+
+    if (res != 0) {
+        return -1;
+    }
+
     sz = 0;
+#ifdef FIONSPACE
     if ((res = ioctl(fd, FIONSPACE, &sz)) != 0) {
         return -1;
     }
+#else
+    sz = 4096;
+#endif
 
     return sz;
 }
@@ -340,6 +382,7 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
               "using default [discard]...", w->fd,
               EV_STR(w->events));
         ev_io_stop(the_loop, w);
+
     } else {
         ev = ctx->pdata._ev;
 
@@ -350,6 +393,8 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 
         if (ctx->co.f == NULL) {
             TRACE("co for FD %d is NULL, discarding ...", w->fd);
+            clear_event(ev);
+
         } else {
             if (w->events == EV_READ) {
                 if (ctx->co.state != CO_STATE_READ) {
@@ -357,22 +402,24 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
                                "that was not scheduled for!"));
                 }
             } else if (w->events == EV_WRITE) {
-                if (ctx->co.state != CO_STATE_READ) {
+                if (ctx->co.state != CO_STATE_WRITE) {
                     TRACE(FRED("Delivering a read event "
                                "that was not scheduled for!"));
                 }
             } else {
                 TRACE("filter %s is not supporting", EV_STR(w->events));
             }
+
+            clear_event(ev);
+
             if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
                 TRACE("Could not resume co %d "
-                      "for read FD %d, discarding ...",
+                      "for FD %d, discarding ...",
                       ctx->co.id, w->fd);
 #endif
             }
         }
-        clear_event(ev);
     }
 }
 
@@ -387,14 +434,14 @@ mrkthr_loop(void)
 static void
 _idle_cb(UNUSED EV_P_ UNUSED ev_idle *w, UNUSED int revents)
 {
-    //CTRACE("revents=%08x", revents);
+    CTRACE("revents=%08x", revents);
 }
 
 
 static void
 _timer_cb(UNUSED EV_P_ UNUSED ev_timer *w, UNUSED int revents)
 {
-    //cTRACE("revents=%08x", revents);
+    //CTRACE("revents=%08x", revents);
 }
 
 
@@ -431,15 +478,24 @@ _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
                 secs =   0.00000095367431640625;
             }
 
-            //CTRACE("wait %f", secs);
+#ifdef TRACE_VERBOSE
+            CTRACE("wait %f", secs);
+#endif
             etimer.repeat = secs;
             ev_timer_again(the_loop, &etimer);
         } else {
-            //CTRACE("no wait");
-            ev_timer_stop(the_loop, &etimer);
-            ev_unref(the_loop);
+#ifdef TRACE_VERBOSE
+            CTRACE("no wait");
+#endif
+            //etimer.repeat = 1.00000095367431640625;
+            //etimer.repeat = INFINITY;
+            etimer.repeat = 59.0; /* <MAX_BLOCKTIME */
+            ev_timer_again(the_loop, &etimer);
+            //ev_timer_stop(the_loop, &etimer);
+            //ev_unref(the_loop);
         }
     } else {
+        CTRACE("breaking the loop");
         ev_break(the_loop, EVBREAK_ALL);
     }
     //CTRACE("revents=%08x", revents);
@@ -452,10 +508,12 @@ _check_cb(UNUSED EV_P_ UNUSED ev_check *w, UNUSED int revents)
     int npending;
 
     npending = ev_pending_count(the_loop);
-    //CTRACE("ev_pending_count=%d", npending);
+#ifdef TRACE_VERBOSE
+    CTRACE("ev_pending_count=%d", npending);
+#endif
     if (npending <= 0) {
-        TRACE("Breaking loop ...");
-        ev_break(the_loop, EVBREAK_ALL);
+        CTRACE("Breaking loop? ...");
+        //ev_break(the_loop, EVBREAK_ALL);
     }
     timecounter_now = (uint64_t)(ev_now(the_loop) * 1000000000.);
 

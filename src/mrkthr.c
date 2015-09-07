@@ -43,46 +43,28 @@
  * readiness of the thread's "event of interest". Such events of interest
  * can be either an I/O event (as a result of a read or write request), or
  * a timer event (the result of a sleep request).
- *
- *
- * Miscellaneous.
- *
- * EX-TODO: Optimize sleep lists performance. Sleep lists are essentially
- * priority queues. Linear insert time is not acceptable in the thread
- * management. The issue was addressed by devising a somewhat unusual
- * combination of red-black tree (equipped with the in-order traversal)
- * and a sort of hash-like "buckets" internal to the tree entries, the
- * mrkthr_ctx_t * instances. When put together, this makes an effect of
- * a multimap, and provides for O(log(N)) sleep queue insert and delete
- * time complexity.
- *
- *
- * TODO list:
- *  - time API. Currently the only API is mrkthr_get_now() which reports
- *    the number of nanoseconds since the Epoch.
- *  - wait_for() function that would run another function and wait for its
- *    return.
- *  - port to Linux epoll
  */
 #include <sys/types.h>
-#include <sys/param.h> /* PAGE_SIZE */
+
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
-#include <sys/stdint.h>
+#include <stdint.h>
 #include <sys/time.h>
 
 #include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+//#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
-//#define TRACE_VERBOSE
 
 #include <mrkcommon/array.h>
 #include <mrkcommon/list.h>
@@ -90,6 +72,7 @@
 #include <mrkcommon/stqueue.h>
 /* Experimental trie use */
 #include <mrkcommon/trie.h>
+
 #include "mrkthr_private.h"
 
 
@@ -122,7 +105,6 @@ static int mrkthr_ctx_init(mrkthr_ctx_t *);
 static int mrkthr_ctx_fini(mrkthr_ctx_t *);
 static void co_fini_ucontext(struct _co *);
 static void co_fini_other(struct _co *);
-static mrkthr_ctx_t *mrkthr_vnew(const char *, cofunc, int, va_list);
 static void resume_waitq_all(mrkthr_waitq_t *);
 static mrkthr_ctx_t *pop_free_ctx(void);
 static void set_resume(mrkthr_ctx_t *);
@@ -137,8 +119,9 @@ push_free_ctx(mrkthr_ctx_t *ctx)
 
 
 UNUSED static void
-dump_ucontext (ucontext_t *uc)
+dump_ucontext (UNUSED ucontext_t *uc)
 {
+#ifdef __FreeBSD__
     printf("sigmask=%08x %08x %08x %08x "
     "link=%p "
     "ss_sp=%p "
@@ -209,6 +192,7 @@ dump_ucontext (ucontext_t *uc)
         uc->uc_mcontext.mc_r15
 #endif
     );
+#endif
 }
 
 static int
@@ -449,9 +433,9 @@ dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
 void
 mrkthr_dump_all_ctxes(void)
 {
-    CTRACE("all ctxes:");
+    TRACEC("all ctxes:\n");
     list_traverse(&ctxes, (list_traverser_t)dump_ctx_traverser, NULL);
-    CTRACE("end of all ctxes");
+    TRACEC("end of all ctxes\n");
 }
 
 /*
@@ -593,68 +577,57 @@ pop_free_ctx(void)
  * be freed, and should be treated as an opaque object. It's internally
  * reclaimed as soon as the worker function returns.
  */
+#define VNEW_BODY()                                                            \
+    int i;                                                                     \
+    assert(mflags & CO_FLAG_INITIALIZED);                                      \
+    ctx = pop_free_ctx();                                                      \
+    assert(ctx!= NULL);                                                        \
+    if (ctx->co.id != -1) {                                                    \
+        mrkthr_dump(ctx);                                                      \
+        CTRACE("Unclear ctx: during thread %s creation", name);                \
+    }                                                                          \
+    assert(ctx->co.id == -1);                                                  \
+    ctx->co.id = co_id++;                                                      \
+    if (name != NULL) {                                                        \
+        strncpy(ctx->co.name, name, sizeof(ctx->co.name) - 1);                 \
+        ctx->co.name[sizeof(ctx->co.name) - 1] = '\0';                         \
+    } else {                                                                   \
+        ctx->co.name[0] = '\0';                                                \
+    }                                                                          \
+    if (ctx->co.stack == MAP_FAILED) {                                         \
+        if ((ctx->co.stack = mmap(NULL,                                        \
+                                  STACKSIZE,                                   \
+                                  PROT_READ|PROT_WRITE,                        \
+                                  MAP_PRIVATE|MAP_ANON,                        \
+                                  -1,                                          \
+                                  0)) == MAP_FAILED) {                         \
+            TR(MRKTHR_CTX_NEW + 1);                                            \
+            ctx = NULL;                                                        \
+        }                                                                      \
+        if (mprotect(ctx->co.stack, PAGE_SIZE, PROT_NONE) != 0) {              \
+            FAIL("mprotect");                                                  \
+        }                                                                      \
+        ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;                             \
+        ctx->co.uc.uc_stack.ss_size = STACKSIZE;                               \
+    }                                                                          \
+    ctx->co.uc.uc_link = &main_uc;                                             \
+    ctx->co.f = f;                                                             \
+    if (argc > 0) {                                                            \
+        ctx->co.argc = argc;                                                   \
+        if ((ctx->co.argv = malloc(sizeof(void *) * ctx->co.argc)) == NULL) {  \
+            FAIL("malloc");                                                    \
+        }                                                                      \
+        for (i = 0; i < ctx->co.argc; ++i) {                                   \
+            ctx->co.argv[i] = va_arg(ap, void *);                              \
+        }                                                                      \
+    }                                                                          \
+    if (_getcontext(&ctx->co.uc) != 0) {                                       \
+        TR(MRKTHR_CTX_NEW + 2);                                                \
+        ctx = NULL;                                                            \
+    }                                                                          \
+    makecontext(&ctx->co.uc, (void(*)(void))f, 2, ctx->co.argc, ctx->co.argv); \
 
-static mrkthr_ctx_t *
-mrkthr_vnew(const char *name, cofunc f, int argc, va_list ap)
-{
-    int i;
-    mrkthr_ctx_t *ctx = NULL;
 
-
-    assert(mflags & CO_FLAG_INITIALIZED);
-    ctx = pop_free_ctx();
-
-    assert(ctx!= NULL);
-    if (ctx->co.id != -1) {
-        mrkthr_dump(ctx);
-        CTRACE("This happened during thread %s creation", name);
-    }
-    assert(ctx->co.id == -1);
-
-    /* Thread id is actually an index into the ctxes list */
-    ctx->co.id = co_id++;
-
-    if (name != NULL) {
-        strncpy(ctx->co.name, name, sizeof(ctx->co.name) - 1);
-        ctx->co.name[sizeof(ctx->co.name) - 1] = '\0';
-    } else {
-        ctx->co.name[0] = '\0';
-    }
-
-    if (ctx->co.stack == MAP_FAILED) {
-        if ((ctx->co.stack = mmap(NULL, STACKSIZE, PROT_READ|PROT_WRITE,
-                                  MAP_ANON, -1, 0)) == MAP_FAILED) {
-            TRRETNULL(MRKTHR_CTX_NEW + 1);
-        }
-        if (mprotect(ctx->co.stack, PAGE_SIZE, PROT_NONE) != 0) {
-            FAIL("mprotect");
-        }
-        ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;
-        ctx->co.uc.uc_stack.ss_size = STACKSIZE;
-    }
-
-    ctx->co.uc.uc_link = &main_uc;
-
-    ctx->co.f = f;
-
-    if (argc > 0) {
-        ctx->co.argc = argc;
-        if ((ctx->co.argv = malloc(sizeof(void *) * ctx->co.argc)) == NULL) {
-            FAIL("malloc");
-        }
-        for (i = 0; i < ctx->co.argc; ++i) {
-            ctx->co.argv[i] = va_arg(ap, void *);
-            //CTRACE("ctx->co.argv[%d]=%p", i, ctx->co.argv[i]);
-        }
-    }
-
-    if (_getcontext(&ctx->co.uc) != 0) {
-        TRRETNULL(MRKTHR_CTX_NEW + 2);
-    }
-    makecontext(&ctx->co.uc, (void(*)(void))f, 2, ctx->co.argc, ctx->co.argv);
-
-    return ctx;
-}
 
 mrkthr_ctx_t *
 mrkthr_new(const char *name, cofunc f, int argc, ...)
@@ -663,18 +636,21 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
     mrkthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    ctx = mrkthr_vnew(name, f, argc, ap);
+    VNEW_BODY();
     va_end(ap);
+    if (ctx == NULL) {
+        FAIL("mrkthr_new");
+    }
     return ctx;
 }
 
 int
 mrkthr_dump(const mrkthr_ctx_t *ctx)
 {
-    ucontext_t uc;
+    UNUSED ucontext_t uc;
     mrkthr_ctx_t *tmp;
 
-    CTRACE("mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx",
+    TRACEC("mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx\n",
            ctx,
            ctx->co.name,
            ctx->co.id,
@@ -687,12 +663,12 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     uc = ctx->co.uc;
     //dump_ucontext(&uc);
     if (DTQUEUE_HEAD(&ctx->sleepq_bucket) != NULL) {
-        CTRACE("Bucket:");
+        TRACEC("Bucket:\n");
         for (tmp = DTQUEUE_HEAD(&ctx->sleepq_bucket);
              tmp != NULL;
              tmp = DTQUEUE_NEXT(sleepq_link, tmp)) {
 
-            CTRACE(" mrkthr_ctx@%p '%s' id=%d f=%p st=%s rc=%s exp=%016lx",
+            TRACEC(" +mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx\n",
                    tmp,
                    tmp->co.name,
                    tmp->co.id,
@@ -751,14 +727,22 @@ yield(void)
 {
     int res;
 
-    //CTRACE("yielding from ...");
+#ifdef TRACE_VERBOSE
+    CTRACE("yielding from <<<");
     //mrkthr_dump(me);
+#endif
+
     res = swapcontext(&me->co.uc, &main_uc);
     if(res != 0) {
         CTRACE("swapcontext() error");
         return setcontext(&main_uc);
     }
-    //CTRACE("back from yield ?");
+
+#ifdef TRACE_VERBOSE
+    CTRACE("back from yield >>>");
+    //mrkthr_dump(me);
+#endif
+
     return me->co.rc;
 }
 
@@ -925,10 +909,10 @@ mrkthr_spawn(const char *name, cofunc f, int argc, ...)
     mrkthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    ctx = mrkthr_vnew(name, f, argc, ap);
+    VNEW_BODY();
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_vnew");
+        FAIL("mrkthr_spawn");
     }
     mrkthr_run(ctx);
     return ctx;
@@ -941,7 +925,9 @@ set_resume(mrkthr_ctx_t *ctx)
 {
     assert(ctx != me);
 
+    //CTRACE("Setting for resume: ---");
     //mrkthr_dump(ctx);
+    //CTRACE("---");
 
     //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
@@ -1019,6 +1005,42 @@ mrkthr_is_dead(mrkthr_ctx_t *ctx)
 {
     return ctx->co.id == -1;
 }
+
+
+/*
+ * socket/file/etc
+ */
+int
+mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
+{
+    int res = 0;
+
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        perror("fcntl");
+        TRRET(MRKTHR_CONNECT + 1);
+    }
+
+    if ((res = connect(fd, addr, addrlen)) != 0) {
+        perror("connect");
+        if (errno == EINPROGRESS) {
+            int optval;
+            socklen_t optlen;
+
+            if (mrkthr_get_wbuflen(fd) < 0) {
+                TRRET(MRKTHR_CONNECT + 2);
+            }
+
+            optlen = sizeof(optval);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &optval, &optlen) != 0) {
+                perror("getsockopt");
+                TRRET(MRKTHR_CONNECT + 3);
+            }
+            res = optval;
+        }
+    }
+    return res;
+}
+
 
 int
 mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
@@ -1142,6 +1164,46 @@ mrkthr_read_allb(int fd, char *buf, ssize_t sz)
     return nread;
 }
 
+
+/*
+ * edge-triggered version of mrkthr_read_allb()
+ */
+ssize_t
+mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
+{
+    ssize_t nleft, totread;
+
+    nleft = sz;
+    totread = 0;
+    while (totread < sz) {
+        ssize_t nread;
+        ssize_t navail;
+        ssize_t sz0;
+
+        if ((navail = mrkthr_get_rbuflen(fd)) < 0) {
+            return -1;
+        }
+
+        sz0 = nleft;
+
+        if ((nread = read(fd, buf + totread, sz0)) == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break;
+            } else {
+                return -1;
+            }
+        }
+        nleft -= nread;
+        totread += nread;
+
+        if (nread <= sz0) {
+            break;
+        }
+    }
+    return totread;
+}
+
+
 /**
  * Perform a single recvfrom from fd into buf.
  * Return the number of bytes received or -1 in case of error.
@@ -1206,6 +1268,35 @@ mrkthr_write_all(int fd, const char *buf, size_t len)
     return 0;
 }
 
+
+int
+mrkthr_write_all_et(int fd, const char *buf, size_t len)
+{
+    ssize_t navail;
+    ssize_t nwritten;
+    off_t remaining = len;
+
+    assert(me != NULL);
+
+    while (remaining > 0) {
+        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MRKTHR_WRITE_ALL + 1);
+        }
+
+        if ((nwritten = write(fd, buf + len - remaining,
+                              MIN(navail, remaining))) == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            } else {
+                TRRET(MRKTHR_WRITE_ALL + 2);
+            }
+
+        }
+        remaining -= nwritten;
+    }
+    return 0;
+}
+
 /**
  * Write len bytes from buf into fd.
  */
@@ -1261,7 +1352,7 @@ mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 }
 
 int
-mrkthr_signal_subscribe(mrkthr_signal_t *signal)
+mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 {
     assert(signal->owner == me);
 
@@ -1271,7 +1362,8 @@ mrkthr_signal_subscribe(mrkthr_signal_t *signal)
 }
 
 int
-mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal, uint64_t msec)
+mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
+                                     uint64_t msec)
 {
     int res;
 
@@ -1521,9 +1613,8 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     assert(me != NULL);
 
     va_start(ap, argc);
-    ctx = mrkthr_vnew(name, f, argc, ap);
+    VNEW_BODY();
     va_end(ap);
-
     if (ctx == NULL) {
         FAIL("mrkthr_wait_for");
     }

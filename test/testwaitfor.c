@@ -27,7 +27,7 @@ r (UNUSED int argc, UNUSED void *argv[])
     char buf[1024];
     ssize_t nread;
 
-    memset(buf, sizeof(buf), 0);
+    memset(buf, 0, sizeof(buf));
 
     nread = mrkthr_read_allb(0, buf, sizeof(buf));
     CTRACE("nread=%ld", nread);

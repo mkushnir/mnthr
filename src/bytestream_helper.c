@@ -4,6 +4,11 @@
 
 #define BLOCKSZ 4096
 
+#ifdef USE_EV
+#define mrkthr_read_allb mrkthr_read_allb_et
+#define mrkthr_write_all mrkthr_write_all_et
+#endif
+
 ssize_t
 mrkthr_bytestream_read_more(bytestream_t *stream, int fd, ssize_t sz)
 {
@@ -18,7 +23,9 @@ mrkthr_bytestream_read_more(bytestream_t *stream, int fd, ssize_t sz)
         }
     }
 
-    if ((nread = mrkthr_read_allb(fd, stream->buf.data + stream->eod, sz)) >= 0) {
+    if ((nread = mrkthr_read_allb(fd,
+                                  stream->buf.data + stream->eod,
+                                  sz)) >= 0) {
         stream->eod += nread;
     }
 

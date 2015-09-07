@@ -84,7 +84,7 @@ baz(UNUSED int argc, UNUSED void *argv[])
 UNUSED static int
 bar(UNUSED int argc, UNUSED void *argv[])
 {
-    mrkthr_ctx_t *ctx;
+    UNUSED mrkthr_ctx_t *ctx;
     int n = nthreads;
     long double oldtotal = total;
 
@@ -184,7 +184,7 @@ test0(void)
     struct sigaction act = {
         .sa_flags = SA_SIGINFO,
     };
-    mrkthr_ctx_t *cli;
+    UNUSED mrkthr_ctx_t *cli;
     //mrkthr_ctx_t *srv;
 
     sigemptyset(&(act.sa_mask));

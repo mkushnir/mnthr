@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 CLEANFILES = *.core
 #CLEANFILES += *.in
 
-noinst_PROGRAMS=testco testsleep testclock testwaitfor
+noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/test
 dist_HEADERS = unittest.h
@@ -33,27 +33,32 @@ endif
 base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
 
 nodist_testco_SOURCES = ../src/diag.c
-testco_SOURCES = $(base_sources) testco.c
-testco_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
-testco_LDFLAGS = -L$(libdir) -lmrkcommon
+testco_SOURCES = testco.c
+testco_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testco_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 nodist_testsleep_SOURCES = ../src/diag.c
-testsleep_SOURCES = $(base_sources) testsleep.c
-testsleep_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
-testsleep_LDFLAGS = -L$(libdir) -lmrkcommon
+testsleep_SOURCES = testsleep.c
+testsleep_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testsleep_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 nodist_testclock_SOURCES = ../src/diag.c
-testclock_SOURCES = $(base_sources) testclock.c
-testclock_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
-testclock_LDFLAGS = -L$(libdir) -lmrkcommon
+testclock_SOURCES = testclock.c
+testclock_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testclock_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 nodist_testwaitfor_SOURCES = ../src/diag.c
-testwaitfor_SOURCES = $(base_sources) testwaitfor.c
-testwaitfor_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
-testwaitfor_LDFLAGS = -L$(libdir) -lmrkcommon
+testwaitfor_SOURCES = testwaitfor.c
+testwaitfor_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testwaitfor_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+
+nodist_testsocket_SOURCES = ../src/diag.c
+testsocket_SOURCES = testsocket.c
+testsocket_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testsocket_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
-	sh ../src/gen-diag mrkthr
+	$(AM_V_GEN) /bin/sh ../src/gen-diag mrkthr
 
 testrun: all
 	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

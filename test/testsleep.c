@@ -29,8 +29,8 @@ sleeper(UNUSED int id, UNUSED void *argv[])
 static int
 waitee(UNUSED int id, UNUSED void *argv[])
 {
-    uint64_t before, after;
-    uint64_t before_nsec, after_nsec;
+    UNUSED uint64_t before, after;
+    UNUSED uint64_t before_nsec, after_nsec;
     int n = (int)(intptr_t)(argv[0]);
 
     //CTRACE("sleeping for: %ld ...", (uint64_t)(n * 1000));

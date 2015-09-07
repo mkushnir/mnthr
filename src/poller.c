@@ -8,17 +8,14 @@
 
 #include "mrkthr_private.h"
 
+//#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
-//#define TRACE_VERBOSE
 
 int
 poller_resume(mrkthr_ctx_t *ctx)
 {
     int res;
-
-    //CTRACE("resuming ...");
-    //mrkthr_dump(ctx);
 
     /*
      * Can only be the result of yield or start, ie, the state cannot be
@@ -37,11 +34,23 @@ poller_resume(mrkthr_ctx_t *ctx)
 
     me = ctx;
 
+#ifdef TRACE_VERBOSE
+    CTRACE("resuming >>>");
+    //mrkthr_dump(ctx);
+#endif
+
     res = swapcontext(&main_uc, &me->co.uc);
 
+#ifdef TRACE_VERBOSE
+    CTRACE("back from resume <<<");
+    //mrkthr_dump(me);
+#endif
+
     if (errno == EINTR) {
-        mrkthr_dump(ctx);
         perror("poller_resume(), ignoring ...");
+#ifdef TRACE_VERBOSE
+        //mrkthr_dump(ctx);
+#endif
         errno = 0;
         return 0;
     }
@@ -120,8 +129,9 @@ poller_sift_sleepq(void)
         while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
 
 #ifdef TRACE_VERBOSE
-            CTRACE(FBGREEN("Resuming expired thread (from bucket)"));
+            CTRACE(FBGREEN("Resuming expired thread (from bucket) >>>"));
             mrkthr_dump(bctx);
+            CTRACE(FBGREEN("<<<"));
 #endif
             DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
             DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
@@ -162,17 +172,20 @@ poller_sift_sleepq(void)
              * should never occur.
              */
 #ifdef TRACE_VERBOSE
+            TRACE("bctx=%p", bctx);
+            TRACE("ctx=%p", ctx);
             TRACE(FRED("Have to deliver a %s event "
                        "to co.id=%d that was not scheduled for!"),
-                       CO_STATE_STR(bctx->co.state),
+                       bctx != NULL ? CO_STATE_STR(bctx->co.state) : "<bctx NULL>",
                        ctx->co.id);
             mrkthr_dump(ctx);
 #endif
         }
 
 #ifdef TRACE_VERBOSE
-        CTRACE(FBGREEN("Resuming expired bucket owner"));
+        CTRACE(FBGREEN("Resuming expired bucket owner >>>"));
         mrkthr_dump(ctx);
+        CTRACE(FBGREEN("<<<"));
 #endif
         if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
