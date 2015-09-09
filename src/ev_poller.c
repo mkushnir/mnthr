@@ -359,7 +359,7 @@ mrkthr_get_wbuflen(int fd)
         return -1;
     }
 #else
-    sz = 4096;
+    sz = 1024*1024;
 #endif
 
     return sz;
