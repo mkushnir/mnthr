@@ -17,11 +17,48 @@
 
 #include <ev.h>
 
-#define EV_STR(e)              \
-    ((e) & EV_READ ? "READ" :  \
-     (e) & EV_WRITE ? "WRITE" :\
-     "<unknown>")              \
+static const char *
+ev_str(int e)
+{
+    static char buf[1024];
 
+    if (e == 0) {
+        snprintf(buf, sizeof(buf), "NONE");
+    } else if (e == EV_UNDEF) {
+        snprintf(buf, sizeof(buf), "UNDEF");
+    } else {
+#define EV_STR_CASE(E) if (e & EV_##E) nwritten += snprintf(buf + nwritten, sizeof(buf) - nwritten, "|" #E)
+
+        int nwritten;
+
+        nwritten = 0;
+
+        if (e & EV_READ) {
+            nwritten += snprintf(buf + nwritten, sizeof(buf) - nwritten, "READ");
+        }
+        EV_STR_CASE(WRITE);
+        EV_STR_CASE(_IOFDSET);
+        EV_STR_CASE(TIMER);
+        EV_STR_CASE(PERIODIC);
+        EV_STR_CASE(SIGNAL);
+        EV_STR_CASE(CHILD);
+        EV_STR_CASE(STAT);
+        EV_STR_CASE(IDLE);
+        EV_STR_CASE(PREPARE);
+        EV_STR_CASE(CHECK);
+        EV_STR_CASE(EMBED);
+        EV_STR_CASE(FORK);
+        EV_STR_CASE(CLEANUP);
+        EV_STR_CASE(ASYNC);
+        EV_STR_CASE(CUSTOM);
+        EV_STR_CASE(ERROR);
+    }
+
+    return buf;
+}
+
+
+#define EV_STR(e) ev_str(e)
 
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
