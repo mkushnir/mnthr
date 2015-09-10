@@ -43,31 +43,11 @@ recvthr(UNUSED int argc, void **argv)
 static int
 run0(UNUSED int argc, UNUSED void **argv)
 {
-    struct addrinfo hints, *ainfos, *ai;
     int fd;
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    ainfos = NULL;
-    if (getaddrinfo("10.1.2.10", "1234", &hints, &ainfos) != 0) {
-        FAIL("getaddrinfo");
-    }
 
-    for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
-        if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
-            continue;
-        }
-
-        if (mrkthr_connect(fd, ai->ai_addr, ai->ai_addrlen) != 0) {
-            continue;
-        }
-        break;
-
-    }
-
-    if (ainfos != NULL) {
-        freeaddrinfo(ainfos);
+    if ((fd = mrkthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
+        FAIL("mrkthr_socket_connect");
     }
 
     mrkthr_spawn("recvthr", recvthr, 1, (void **)(uintptr_t)fd);

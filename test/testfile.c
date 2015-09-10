@@ -57,7 +57,7 @@ run0(UNUSED int argc, UNUSED void **argv)
         return 1;
     }
 
-    if ((fdout = open("asd", O_CREAT|O_WRONLY|O_NONBLOCK, 00600)) == -1) {
+    if ((fdout = open("asd", O_CREAT|O_WRONLY|O_TRUNC|O_NONBLOCK, 00600)) == -1) {
         perror("open 2");
         return 1;
     }
@@ -94,7 +94,7 @@ run1(UNUSED int argc, UNUSED void **argv)
         return 1;
     }
 
-    if ((fdout = open("asd", O_CREAT|O_WRONLY|O_NONBLOCK, 00600)) == -1) {
+    if ((fdout = open("asd", O_CREAT|O_WRONLY|O_TRUNC|O_NONBLOCK, 00600)) == -1) {
         perror("open 2");
         return 1;
     }
@@ -125,6 +125,42 @@ run1(UNUSED int argc, UNUSED void **argv)
 }
 
 
+UNUSED static int
+run2(UNUSED int argc, UNUSED void **argv)
+{
+    int res;
+    int fdin, fdout;
+    bytestream_t bs;
+
+    if ((fdin = mrkthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
+        perror("mrkthr_socket_connect");
+        return 1;
+    }
+
+    if ((fdout = open("asd", O_CREAT|O_WRONLY|O_TRUNC|O_NONBLOCK, 00600)) == -1) {
+        perror("open 2");
+        return 1;
+    }
+
+    bytestream_init(&bs, 1024*1024);
+
+    bs.read_more = mrkthr_bytestream_read_more;
+    bs.write = mrkthr_bytestream_write;
+    while ((res = bytestream_consume_data_with_timeout(&bs, fdin, 5000)) == 0) {
+        if (bytestream_produce_data(&bs, fdout) != 0) {
+            return 1;
+        }
+        //D8(SDATA(&bs, 0), SEOD(&bs));
+        bytestream_rewind(&bs);
+    }
+
+    bytestream_fini(&bs);
+    close(fdin);
+    close(fdout);
+    return 0;
+}
+
+
 int
 main(void)
 {
@@ -133,7 +169,8 @@ main(void)
     mrkthr_init();
 
     //mrkthr_spawn("run0", run0, 0);
-    mrkthr_spawn("run1", run1, 0);
+    //mrkthr_spawn("run1", run1, 0);
+    mrkthr_spawn("run2", run2, 0);
     res = mrkthr_loop();
 
     mrkthr_fini();

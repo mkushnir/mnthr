@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
+#include <netdb.h>
 
 #include "mrkcommon/dtqueue.h"
 #include "mrkcommon/dumpm.h"
@@ -108,13 +109,20 @@ void mrkthr_set_interrupt(mrkthr_ctx_t *);
 MRKTHR_ASYNC int mrkthr_set_interrupt_and_join(mrkthr_ctx_t *);
 int mrkthr_is_dead(mrkthr_ctx_t *);
 
+int mrkthr_socket(const char *, const char *, int, int);
+MRKTHR_ASYNC int mrkthr_socket_connect(const char *, const char *, int);
 MRKTHR_ASYNC int mrkthr_connect(int, const struct sockaddr *, socklen_t);
 MRKTHR_ASYNC ssize_t mrkthr_get_rbuflen(int);
 MRKTHR_ASYNC int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
 MRKTHR_ASYNC int mrkthr_read_all(int, char **, off_t *);
 MRKTHR_ASYNC ssize_t mrkthr_read_allb(int, char *, ssize_t);
 MRKTHR_ASYNC ssize_t mrkthr_read_allb_et(int, char *, ssize_t);
-MRKTHR_ASYNC ssize_t mrkthr_recvfrom_allb(int, void * restrict, ssize_t, int, struct sockaddr * restrict, socklen_t * restrict);
+MRKTHR_ASYNC ssize_t mrkthr_recvfrom_allb(int,
+                                          void * restrict,
+                                          ssize_t,
+                                          int,
+                                          struct sockaddr * restrict,
+                                          socklen_t * restrict);
 MRKTHR_ASYNC ssize_t mrkthr_get_wbuflen(int);
 MRKTHR_ASYNC int mrkthr_write_all(int, const char *, size_t);
 MRKTHR_ASYNC int mrkthr_write_all_et(int, const char *, size_t);
