@@ -356,7 +356,7 @@ mrkthr_get_wbuflen(int fd)
     sz = 0;
 #ifdef FIONSPACE
     if ((res = ioctl(fd, FIONSPACE, &sz)) != 0) {
-        return -1;
+        return 1024*1024;
     }
 #else
     sz = 1024*1024;

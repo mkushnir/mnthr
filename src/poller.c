@@ -71,7 +71,7 @@ poller_resume(mrkthr_ctx_t *ctx)
         mrkthr_ctx_finalize(ctx);
         push_free_ctx(ctx);
         //TRRET(RESUME + 2);
-        return RESUME + 2;
+        return CO_RC_EXITED;
 
     } else {
         CTRACE("Unknown case:");

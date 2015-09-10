@@ -382,7 +382,7 @@ mrkthr_get_wbuflen(int fd)
         }
 
         if ((kev = result_event(fd, EVFILT_WRITE)) != NULL) {
-            return (ssize_t)(kev->data);
+            return (ssize_t)(kev->data ? kev->data : 1024*1024);
         }
     }
     return -1;
@@ -527,6 +527,7 @@ mrkthr_loop(void)
             }
 
             for (i = 0; i < kevres; ++i) {
+                int pres;
 
                 kev = array_get(&kevents1, i);
 
@@ -575,14 +576,15 @@ mrkthr_loop(void)
                                                "that was not scheduled for!"));
                                 }
 
-                                if (poller_resume(ctx) != 0) {
+                                if ((pres = poller_resume(ctx)) != 0) {
 #ifdef TRACE_VERBOSE
                                     TRACE("Could not resume co %d "
                                           "for read FD %08lx, discarding ...",
                                           ctx->co.id, kev->ident);
 #endif
-                                    discard_event(kev->ident,
-                                                          kev->filter);
+                                    if ((pres & RESUME) == RESUME) {
+                                        discard_event(kev->ident, kev->filter);
+                                    }
                                 }
 
                             } else {
@@ -600,14 +602,15 @@ mrkthr_loop(void)
                                                "that was not scheduled for!"));
                                 }
 
-                                if (poller_resume(ctx) != 0) {
+                                if ((pres = poller_resume(ctx)) != 0) {
 #ifdef TRACE_VERBOSE
                                     TRACE("Could not resume co %d "
                                           "for write FD %08lx, discarding ...",
                                           ctx->co.id, kev->ident);
 #endif
-                                    discard_event(kev->ident,
-                                                          kev->filter);
+                                    if ((pres & RESUME) == RESUME) {
+                                        discard_event(kev->ident, kev->filter);
+                                    }
                                 }
 
                             } else {

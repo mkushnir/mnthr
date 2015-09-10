@@ -105,11 +105,13 @@ struct _mrkthr_ctx {
 
 
         unsigned int state;
-#       define CO_RC_USER_INTERRUPTED 0x01
-#       define CO_RC_TIMEDOUT 0x02
-#       define CO_RC_SIMULTANEOUS 0x03
+#       define CO_RC_EXITED 0x01
+#       define CO_RC_USER_INTERRUPTED 0x02
+#       define CO_RC_TIMEDOUT 0x03
+#       define CO_RC_SIMULTANEOUS 0x04
 #       define CO_RC_STR(rc) (                                         \
             (rc) == 0 ? "OK" :                                         \
+            (rc) == CO_RC_EXITED ? "EXITED" :                          \
             (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :      \
             (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" :                      \
             (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :              \

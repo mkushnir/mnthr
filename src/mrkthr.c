@@ -44,22 +44,21 @@
  * can be either an I/O event (as a result of a read or write request), or
  * a timer event (the result of a sleep request).
  */
-#include <sys/types.h>
-
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <stdint.h>
-#include <sys/time.h>
-
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <math.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <time.h>
 
 //#define TRACE_VERBOSE
@@ -603,6 +602,7 @@ pop_free_ctx(void)
                                   0)) == MAP_FAILED) {                         \
             TR(MRKTHR_CTX_NEW + 1);                                            \
             ctx = NULL;                                                        \
+            goto vnew_body_end;                                                \
         }                                                                      \
         if (mprotect(ctx->co.stack, PAGE_SIZE, PROT_NONE) != 0) {              \
             FAIL("mprotect");                                                  \
@@ -624,8 +624,10 @@ pop_free_ctx(void)
     if (_getcontext(&ctx->co.uc) != 0) {                                       \
         TR(MRKTHR_CTX_NEW + 2);                                                \
         ctx = NULL;                                                            \
+        goto vnew_body_end;                                                    \
     }                                                                          \
     makecontext(&ctx->co.uc, (void(*)(void))f, 2, ctx->co.argc, ctx->co.argv); \
+vnew_body_end:                                                                 \
 
 
 
