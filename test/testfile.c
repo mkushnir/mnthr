@@ -81,6 +81,7 @@ run0(UNUSED int argc, UNUSED void **argv)
 UNUSED static int
 run1(UNUSED int argc, UNUSED void **argv)
 {
+    int res;
     int fdin, fdout;
     bytestream_t bs;
 
@@ -98,12 +99,14 @@ run1(UNUSED int argc, UNUSED void **argv)
 
     bs.read_more = mrkthr_bytestream_read_more;
     bs.write = mrkthr_bytestream_write;
-    while (bytestream_consume_data_with_timeout(&bs, fdin, 1000) == 0) {
+    while ((res = bytestream_consume_data_with_timeout(&bs, fdin, 1000)) == 0) {
         if (bytestream_produce_data(&bs, fdout)) {
             return 1;
         }
         bytestream_rewind(&bs);
     }
+
+    TRACE("res=%d", res);
 
     //SPOS(&bs) = 0;
     //if (bytestream_produce_data(&bs, fdout)) {
