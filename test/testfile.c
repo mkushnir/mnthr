@@ -24,11 +24,15 @@ _bytestream_consume_data(UNUSED int argc, void **argv)
 {
     bytestream_t *bs;
     int fd;
+    int res;
 
     bs = argv[0];
     fd = (int)(uintptr_t)argv[1];
 
-    return bytestream_consume_data(bs, fd);
+    res = bytestream_consume_data(bs, fd);
+    //mrkthr_set_retval(res);
+    //return res;
+    MRKTHRET(res);
 }
 
 static int
@@ -67,7 +71,7 @@ run0(UNUSED int argc, UNUSED void **argv)
     }
 
     SPOS(&bs) = 0;
-    if (bytestream_produce_data(&bs, fdout)) {
+    if (bytestream_produce_data(&bs, fdout) != 0) {
         return 1;
     }
 
@@ -100,13 +104,14 @@ run1(UNUSED int argc, UNUSED void **argv)
     bs.read_more = mrkthr_bytestream_read_more;
     bs.write = mrkthr_bytestream_write;
     while ((res = bytestream_consume_data_with_timeout(&bs, fdin, 1000)) == 0) {
-        if (bytestream_produce_data(&bs, fdout)) {
+        //TRACE("res=%d", res);
+        if (bytestream_produce_data(&bs, fdout) != 0) {
             return 1;
         }
         bytestream_rewind(&bs);
     }
 
-    TRACE("res=%d", res);
+    //TRACE("res=%d", res);
 
     //SPOS(&bs) = 0;
     //if (bytestream_produce_data(&bs, fdout)) {

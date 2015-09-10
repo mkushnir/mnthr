@@ -39,6 +39,8 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 #define MRKTHR_WAITQ_T_DEFINED
 #endif
 
+#define MRKTHRET(rv) mrkthr_set_retval(rv); return rv
+
 #define MRKTHR_WAIT_TIMEOUT (-1)
 #define MRKTHR_JOIN_FAILURE (-2)
 #define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL (-3)

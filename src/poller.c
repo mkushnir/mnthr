@@ -24,7 +24,6 @@ poller_resume(mrkthr_ctx_t *ctx)
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* This is an error (currently no reason is known, though) */
         sleepq_remove(ctx);
-        mrkthr_ctx_finalize(ctx);
         /* not sure if we can push it here ... */
         push_free_ctx(ctx);
         TRRET(RESUME + 1);
@@ -65,13 +64,15 @@ poller_resume(mrkthr_ctx_t *ctx)
         /*
          * This is the case of the exited (dead) thread.
          */
-        //CTRACE("Assuming dead ...");
+#ifdef TRACE_VERBOSE
+        CTRACE("Assuming exited (dead) ...");
         //mrkthr_dump(ctx);
+#endif
         sleepq_remove(ctx);
-        mrkthr_ctx_finalize(ctx);
         push_free_ctx(ctx);
         //TRRET(RESUME + 2);
-        return CO_RC_EXITED;
+        //return CO_RC_EXITED;
+        return 0;
 
     } else {
         CTRACE("Unknown case:");

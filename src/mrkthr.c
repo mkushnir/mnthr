@@ -111,9 +111,10 @@ static void set_resume(mrkthr_ctx_t *);
 void
 push_free_ctx(mrkthr_ctx_t *ctx)
 {
-    STQUEUE_ENQUEUE(&free_list, free_link, ctx);
     //CTRACE("push_free_ctx");
     //mrkthr_dump(ctx);
+    mrkthr_ctx_finalize(ctx);
+    STQUEUE_ENQUEUE(&free_list, free_link, ctx);
 }
 
 
@@ -502,7 +503,8 @@ co_fini_other(struct _co *co)
         co->argv = NULL;
     }
     co->state = CO_STATE_DORMANT;
-    co->rc = 0;
+    // XXX let it stay for a while, and clear later ...
+    //co->rc = 0;
 }
 
 
@@ -538,6 +540,7 @@ mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
 {
     co_fini_ucontext(&ctx->co);
     mrkthr_ctx_finalize(ctx);
+    ctx->co.rc = 0;
     return 0;
 }
 
@@ -560,6 +563,7 @@ pop_free_ctx(void)
     if ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
         STQUEUE_DEQUEUE(&free_list, free_link);
         STQUEUE_ENTRY_FINI(free_link, ctx);
+        ctx->co.rc = 0;
         //CTRACE("pop_free_ctx 0");
     } else {
         if ((ctx = list_incr(&ctxes)) == NULL) {
@@ -1179,28 +1183,25 @@ mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
     totread = 0;
     while (totread < sz) {
         ssize_t nread;
-        ssize_t navail;
-        ssize_t sz0;
 
-        if ((navail = mrkthr_get_rbuflen(fd)) < 0) {
-            return -1;
-        }
-
-        sz0 = nleft;
-
-        if ((nread = read(fd, buf + totread, sz0)) == -1) {
+        if ((nread = read(fd, buf + totread, nleft)) == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
+                ssize_t navail;
+
+                if ((navail = mrkthr_get_rbuflen(fd)) < 0) {
+                    return -1;
+                }
+                continue;
+
             } else {
                 return -1;
             }
         }
-        nleft -= nread;
         totread += nread;
-
-        if (nread <= sz0) {
+        if (nread < nleft) {
             break;
         }
+        nleft -= nread;
     }
     return totread;
 }
@@ -1274,26 +1275,27 @@ mrkthr_write_all(int fd, const char *buf, size_t len)
 int
 mrkthr_write_all_et(int fd, const char *buf, size_t len)
 {
-    ssize_t navail;
     ssize_t nwritten;
     off_t remaining = len;
+    ssize_t navail = len;
 
     assert(me != NULL);
 
     while (remaining > 0) {
-        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
-            TRRET(MRKTHR_WRITE_ALL + 1);
-        }
-
         if ((nwritten = write(fd, buf + len - remaining,
                               MIN(navail, remaining))) == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
+                    TRRET(MRKTHR_WRITE_ALL + 1);
+                }
                 continue;
+
             } else {
                 TRRET(MRKTHR_WRITE_ALL + 2);
             }
 
         }
+
         remaining -= nwritten;
     }
     return 0;
@@ -1644,6 +1646,8 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
         //mrkthr_dump(me);
 
         sleepq_remove(me);
+
+        res = ctx->co.rc;
 
     } else {
         /* it's timeout, we have to interrupt it */
