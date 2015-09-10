@@ -5,19 +5,19 @@ User-level threading library inspired by [ironport/shrapnel](https://github.com/
 
 Based on standard POSIX _ucontext.h_ interface and the concept of
 coroutines. Implements event-driven thread context switch using the
-FreeBSD's _kqueue(2)_ system interface.
-
-Primary development platform: FreeBSD.
+_[libev](http://software.schmorp.de/pkg/libev.html)_ -based poller.  On
+FreeBSD, where it was originally developed, the _kqueue(2)_ -based poller
+can be used as an alternative to _libev_.
 
 Features:
 
 *   basic threads management: create and schedule threads for run, request thread's
     interruption;
     
-*   x86 _rdtsc_-based internal clock, calibrated by _gettimeofday(2)_ and
-    the _machdep.tsc\_freq_ sysctl;
+*   FreeBSD only: x86 _rdtsc_-based internal clock, calibrated by
+    _gettimeofday(2)_ and the _machdep.tsc\_freq_ sysctl;
 
-*   basic thread synchronization primitives: signal, condition variable;
+*   basic thread synchronization primitives: signal, semaphore, condition variable, reader-writrer lock;
 
 *   have a thread _join_ another thread until the latter one completes its execution;
 
@@ -26,7 +26,8 @@ Features:
 
 *   wrappers over _read(2)_, _write(2)_, _accept(2)_, _sendto(2)_, _recvfrom(2)_ syscalls;
 
-*   relatively good performance and scalability.
+*   relatively good performance and scalability, derived from the
+    underlying _libevent_ and _ucontext_ features.
 
 Limitations:
 
@@ -40,8 +41,6 @@ The porject is gradually getting mature.
 
 TODO
 ====
-
-*   Linux;
 
 *   more testing;
 
