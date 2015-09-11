@@ -98,6 +98,7 @@ PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
 void mrkthr_set_retval(int);
+void mrkthr_set_prio(mrkthr_ctx_t *, int);
 MRKTHR_ASYNC int mrkthr_sleep(uint64_t);
 MRKTHR_ASYNC int mrkthr_sleep_ticks(uint64_t);
 long double mrkthr_ticks2sec(uint64_t);

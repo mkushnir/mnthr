@@ -128,6 +128,8 @@ struct _mrkthr_ctx {
      uint64_t expire_ticks;
 #   define MRKTHR_SLEEP_FOREVER (ULONG_MAX)
 
+    void (*sleepq_enqueue)(struct _mrkthr_ctx *);
+
     /*
      * Sleep list bucket.
      *

@@ -308,6 +308,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
     //CTRACE(FBLUE("---"));
 }
 
+
 static void
 sleepq_insert(mrkthr_ctx_t *ctx)
 {
@@ -324,8 +325,10 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     if (bucket_host != NULL) {
         //TRACE("while inserting, found bucket:");
         //mrkthr_dump(tmp);
-
-        DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
+        DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
+                              sleepq_link,
+                              DTQUEUE_HEAD(&bucket_host->sleepq_bucket),
+                              ctx);
 
         //TRACE("After adding to the bucket:");
         //mrkthr_dump(tmp);
@@ -336,6 +339,43 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     //mrkthr_dump_sleepq();
     //CTRACE(FGREEN("---"));
 }
+
+
+static void
+sleepq_append(mrkthr_ctx_t *ctx)
+{
+    trie_node_t *trn;
+    mrkthr_ctx_t *bucket_host;
+
+    //CTRACE(FGREEN("SL appending"));
+    //mrkthr_dump(ctx);
+
+    if ((trn = trie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
+        FAIL("trie_add_node");
+    }
+    bucket_host = (mrkthr_ctx_t *)(trn->value);
+    if (bucket_host != NULL) {
+        //TRACE("while appending, found bucket:");
+        //mrkthr_dump(tmp);
+        DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
+
+        //TRACE("After adding to the bucket:");
+        //mrkthr_dump(tmp);
+    } else {
+        trn->value = ctx;
+    }
+    //CTRACE(FGREEN("SL after appending:"));
+    //mrkthr_dump_sleepq();
+    //CTRACE(FGREEN("---"));
+}
+
+
+void
+mrkthr_set_prio(mrkthr_ctx_t *ctx, int flag)
+{
+    ctx->sleepq_enqueue = flag ? sleepq_insert : sleepq_append;
+}
+
 
 /*
  * Module init/fini
@@ -462,6 +502,8 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
     ctx->co.rc = 0;
 
     /* the rest of ctx */
+    ctx->sleepq_enqueue = sleepq_append;
+
     DTQUEUE_INIT(&ctx->sleepq_bucket);
     DTQUEUE_ENTRY_INIT(sleepq_link, ctx);
     ctx->expire_ticks = 0;
@@ -771,7 +813,7 @@ sleepmsec(uint64_t msec)
 
     //CTRACE("msec=%ld expire_ticks=%ld", msec, me->expire_ticks);
 
-    sleepq_insert(me);
+    me->sleepq_enqueue(me);
 
     return yield();
 }
@@ -792,7 +834,7 @@ sleepticks(uint64_t ticks)
         }
     }
 
-    sleepq_insert(me);
+    me->sleepq_enqueue(me);
 
     return yield();
 }
@@ -948,7 +990,7 @@ set_resume(mrkthr_ctx_t *ctx)
 
     ctx->co.state = CO_STATE_SET_RESUME;
     ctx->expire_ticks = 1;
-    sleepq_insert(ctx);
+    ctx->sleepq_enqueue(ctx);
 }
 
 /**
@@ -991,7 +1033,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     ctx->co.rc = CO_RC_USER_INTERRUPTED;
     ctx->co.state = CO_STATE_SET_INTERRUPT;
     ctx->expire_ticks = 1;
-    sleepq_insert(ctx);
+    ctx->sleepq_enqueue(ctx);
 }
 
 int
