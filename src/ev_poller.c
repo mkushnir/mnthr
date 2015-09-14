@@ -3,6 +3,11 @@
 #include <math.h> /* INFINITY */
 #include <sys/ioctl.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr_ev_poller);
+#endif
+
 #include <mrkcommon/dict.h>
 #include <mrkcommon/fasthash.h>
 /* Experimental trie use */

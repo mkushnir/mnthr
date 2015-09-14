@@ -1,6 +1,11 @@
 #include <assert.h>
 #include <errno.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr_poller);
+#endif
+
 #include <mrkcommon/dtqueue.h>
 #include <mrkcommon/stqueue.h>
 /* Experimental trie use */

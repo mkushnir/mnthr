@@ -3,6 +3,11 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr_poller);
+#endif
+
 #include <mrkcommon/array.h>
 /* Experimental trie use */
 #include <mrkcommon/trie.h>

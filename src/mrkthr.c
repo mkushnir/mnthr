@@ -62,6 +62,11 @@
 #include <time.h>
 #include <netdb.h>
 
+#ifdef DO_MEMDEBUG
+#include <mrkcommon/memdebug.h>
+MEMDEBUG_DECLARE(mrkthr);
+#endif
+
 //#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
@@ -75,11 +80,6 @@
 
 #include "mrkthr_private.h"
 
-
-#ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr);
-#endif
 
 typedef int (*writer_t) (int, int, int);
 
@@ -325,10 +325,14 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     if (bucket_host != NULL) {
         //TRACE("while inserting, found bucket:");
         //mrkthr_dump(tmp);
-        DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
-                              sleepq_link,
-                              DTQUEUE_HEAD(&bucket_host->sleepq_bucket),
-                              ctx);
+        if (DTQUEUE_HEAD(&bucket_host->sleepq_bucket) == NULL) {
+            DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
+        } else {
+            DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
+                                  sleepq_link,
+                                  DTQUEUE_HEAD(&bucket_host->sleepq_bucket),
+                                  ctx);
+        }
 
         //TRACE("After adding to the bucket:");
         //mrkthr_dump(tmp);

@@ -19,6 +19,12 @@ then
     export CFLAGS="${CFLAGS} -I$HOME/include"
     autoreconf
     ./configure --prefix=$HOME --enable-debug
+elif test "$1" = "dev-memdebug"
+then
+    export LDFLAGS="${LDFLAGS} -L$HOME/lib"
+    export CFLAGS="${CFLAGS} -I$HOME/include -DDO_MEMDEBUG"
+    autoreconf
+    ./configure --prefix=$HOME --enable-debug
 elif test "$1" = "dev-rdtsc"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
@@ -29,6 +35,12 @@ elif test "$1" = "dev-ev"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include"
+    autoreconf
+    ./configure --prefix=$HOME --enable-debug --with-ev
+elif test "$1" = "dev-ev-memdebug"
+then
+    export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
+    export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include -DDO_MEMDEBUG"
     autoreconf
     ./configure --prefix=$HOME --enable-debug --with-ev
 elif test "$1" = "dev-ndebug"
