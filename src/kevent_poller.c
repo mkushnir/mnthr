@@ -5,7 +5,7 @@
 
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr_poller);
+MEMDEBUG_DECLARE(mrkthr_kevent_poller);
 #endif
 
 #include <mrkcommon/array.h>
