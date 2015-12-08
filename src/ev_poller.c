@@ -3,6 +3,9 @@
 #include <math.h> /* INFINITY */
 #include <sys/ioctl.h>
 
+#define NO_PROFILE
+#include <mrkcommon/profile.h>
+
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
 MEMDEBUG_DECLARE(mrkthr_ev_poller);
@@ -21,6 +24,11 @@ MEMDEBUG_DECLARE(mrkthr_ev_poller);
 #include <mrkcommon/dumpm.h>
 
 #include <ev.h>
+
+extern const profile_t *mrkthr_user_p;
+extern const profile_t *mrkthr_swap_p;
+extern const profile_t *mrkthr_sched0_p;
+extern const profile_t *mrkthr_sched1_p;
 
 static const char *
 ev_str(int e)
@@ -469,7 +477,12 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 int
 mrkthr_loop(void)
 {
-    return ev_run(the_loop, 0);
+    int res;
+
+    PROFILE_START(mrkthr_sched0_p);
+    res = ev_run(the_loop, 0);
+    PROFILE_STOP(mrkthr_sched0_p);
+    return res;
 }
 
 

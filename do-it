@@ -49,6 +49,12 @@ then
     export CFLAGS="${CFLAGS} -I$HOME/include"
     autoreconf
     ./configure --prefix=$HOME
+elif test "$1" = "dev-ndebug-rdtsc"
+then
+    export LDFLAGS="${LDFLAGS} -L$HOME/lib"
+    export CFLAGS="${CFLAGS} -I$HOME/include"
+    autoreconf
+    ./configure --prefix=$HOME --with-rdtsc
 elif test "$1" = "dist"
 then
     unset LDFLAGS

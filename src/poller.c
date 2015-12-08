@@ -1,6 +1,9 @@
 #include <assert.h>
 #include <errno.h>
 
+#define NO_PROFILE
+#include <mrkcommon/profile.h>
+
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
 MEMDEBUG_DECLARE(mrkthr_poller);
@@ -16,6 +19,13 @@ MEMDEBUG_DECLARE(mrkthr_poller);
 //#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
+
+
+extern const profile_t *mrkthr_user_p;
+extern const profile_t *mrkthr_swap_p;
+extern const profile_t *mrkthr_sched0_p;
+extern const profile_t *mrkthr_sched1_p;
+
 
 int
 poller_resume(mrkthr_ctx_t *ctx)
@@ -43,7 +53,11 @@ poller_resume(mrkthr_ctx_t *ctx)
     //mrkthr_dump(ctx);
 #endif
 
+    PROFILE_STOP(mrkthr_sched0_p);
+    PROFILE_START(mrkthr_swap_p);
     res = swapcontext(&main_uc, &me->co.uc);
+    PROFILE_STOP(mrkthr_swap_p);
+    PROFILE_START(mrkthr_sched0_p);
 
 #ifdef TRACE_VERBOSE
     CTRACE("back from resume <<<");

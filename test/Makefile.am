@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 CLEANFILES = *.core
 #CLEANFILES += *.in
 
-noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile
+noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/test
 dist_HEADERS = unittest.h
@@ -61,6 +61,11 @@ nodist_testfile_SOURCES = ../src/diag.c
 testfile_SOURCES = testfile.c
 testfile_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
 testfile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+
+nodist_testprofile_SOURCES = ../src/diag.c
+testprofile_SOURCES = testprofile.c
+testprofile_CFLAGS = $(RDTSC_FLAGS) @_GNU_SOURCE_MACRO@ $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 -I../src
+testprofile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
 	$(AM_V_GEN) /bin/sh ../src/gen-diag mrkthr

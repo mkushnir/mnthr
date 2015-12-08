@@ -62,6 +62,9 @@
 #include <time.h>
 #include <netdb.h>
 
+#define NO_PROFILE
+#include <mrkcommon/profile.h>
+
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
 MEMDEBUG_DECLARE(mrkthr);
@@ -79,6 +82,12 @@ MEMDEBUG_DECLARE(mrkthr);
 #include <mrkcommon/trie.h>
 
 #include "mrkthr_private.h"
+
+
+const profile_t *mrkthr_user_p;
+const profile_t *mrkthr_swap_p;
+const profile_t *mrkthr_sched0_p;
+const profile_t *mrkthr_sched1_p;
 
 
 typedef int (*writer_t) (int, int, int);
@@ -393,6 +402,12 @@ mrkthr_init(void)
         return 0;
     }
 
+    PROFILE_INIT_MODULE();
+    mrkthr_user_p = PROFILE_REGISTER("user");
+    mrkthr_swap_p = PROFILE_REGISTER("swap");
+    mrkthr_sched0_p = PROFILE_REGISTER("sched0");
+    mrkthr_sched1_p = PROFILE_REGISTER("sched1");
+
 #ifdef DO_MEMDEBUG
     MEMDEBUG_REGISTER(mrkthr);
 #endif
@@ -430,6 +445,9 @@ mrkthr_fini(void)
     STQUEUE_FINI(&free_list);
     trie_fini(&the_sleepq);
     poller_fini();
+
+    PROFILE_REPORT_SEC();
+    PROFILE_FINI_MODULE();
 
     mflags &= ~CO_FLAG_INITIALIZED;
 
@@ -785,7 +803,11 @@ yield(void)
     //mrkthr_dump(me);
 #endif
 
+    PROFILE_STOP(mrkthr_user_p);
+    PROFILE_START(mrkthr_swap_p);
     res = swapcontext(&me->co.uc, &main_uc);
+    PROFILE_STOP(mrkthr_swap_p);
+    PROFILE_START(mrkthr_user_p);
     if(res != 0) {
         CTRACE("swapcontext() error");
         return setcontext(&main_uc);

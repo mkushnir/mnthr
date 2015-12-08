@@ -1,7 +1,12 @@
 #include <assert.h>
 #include <errno.h>
+#include <math.h>
+
 #include <sys/types.h>
 #include <sys/sysctl.h>
+
+#define NO_PROFILE
+#include <mrkcommon/profile.h>
 
 #ifdef DO_MEMDEBUG
 #include <mrkcommon/memdebug.h>
@@ -19,6 +24,11 @@ MEMDEBUG_DECLARE(mrkthr_kevent_poller);
 //#define TRACE_VERBOSE
 
 #include <kevent_util.h>
+
+extern const profile_t *mrkthr_user_p;
+extern const profile_t *mrkthr_swap_p;
+extern const profile_t *mrkthr_sched0_p;
+extern const profile_t *mrkthr_sched1_p;
 
 static int q0 = -1;
 static array_t kevents0;
@@ -409,6 +419,8 @@ mrkthr_loop(void)
     mrkthr_ctx_t *ctx = NULL;
     array_iter_t it;
 
+    PROFILE_START(mrkthr_sched0_p);
+
     while (!(mflags & CO_FLAG_SHUTDOWN)) {
         //sleep(1);
         update_now();
@@ -681,6 +693,8 @@ mrkthr_loop(void)
         }
     }
 
+    PROFILE_STOP(mrkthr_sched0_p);
+
     TRACE("exiting mrkthr_loop ...");
 
     return kevres;
@@ -698,6 +712,7 @@ void
 poller_init(void)
 {
 #ifdef USE_TSC
+    size_t sz;
     sz = sizeof(timecounter_freq);
     if (sysctlbyname("machdep.tsc_freq", &timecounter_freq, &sz, NULL, 0) != 0) {
         FAIL("sysctlbyname");
