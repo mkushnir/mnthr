@@ -1,4 +1,5 @@
 AUTOMAKE_OPTIONS = foreign
+AM_MAKEFLAGS = -s
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
 

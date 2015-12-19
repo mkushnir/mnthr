@@ -25,11 +25,13 @@ run(UNUSED int argc, void **argv)
     n = argv[0];
     j = (int)(uintptr_t)argv[1];
     for (i = 0; i < *n; ++i) {
-        if (j == 0)
+        if (j == 0) {
             PROFILE_START(s0_p);
+        }
         mrkthr_sleep(0);
-        if (j == 0)
+        if (j == 0) {
             PROFILE_STOP(s0_p);
+        }
     }
     PROFILE_STOP(mrkthr_user_p);
     PROFILE_START(mrkthr_swap_p);
