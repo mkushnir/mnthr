@@ -58,11 +58,19 @@ rdtsc(void)
 {
   uint64_t res;
 
+#if defined(__amd64__) || defined(__i386__)
   __asm __volatile ("rdtsc; shl $32,%%rdx; or %%rdx,%%rax"
                     : "=a"(res)
                     :
                     : "%rcx", "%rdx"
                    );
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+        FAIL("clock_gettime");
+    }
+    res = ts.tv_nsec + ts.tv_sec * 1000000000;
+#endif
   return res;
 }
 #endif
