@@ -13,9 +13,9 @@
 
 static mrkthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
-static const int nthreads = 10;
-static const int niter = 10;
-static const int nrecur = 5;
+static const int nthreads = 100000;
+static const int niter = 20;
+static const int nrecur = 50;
 static long total = 0;
 static int ntotal = 0;
 static int wt = 100;
@@ -48,11 +48,11 @@ r(int n)
         int nn = niter;
         while (nn-- && !_shutdown) {
             ++dummy;
-            CTRACE(">>>");
+            //CTRACE(">>>");
             //mrkthr_sleep(100);
             //now1 = mrkthr_get_now_precise();
             mrkthr_sleep(0);
-            CTRACE("<<<");
+            //CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
             //mrkthr_ctx_dump(me);
             //now2 = mrkthr_get_now_precise();
@@ -77,7 +77,7 @@ baz(UNUSED int argc, UNUSED void *argv[])
     t = n2 - n1;
     ++ntotal;
     total += t;
-    fprintf(stderr, "partial total %ld\n", (n2-n1) / 1000);
+    //fprintf(stderr, "partial total %ld\n", (n2-n1) / 1000);
     return 0;
 }
 

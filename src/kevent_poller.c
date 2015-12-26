@@ -19,9 +19,9 @@ MEMDEBUG_DECLARE(mrkthr_kevent_poller);
 
 #include "mrkthr_private.h"
 
+//#define TRACE_VERBOSE
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
-//#define TRACE_VERBOSE
 
 #include <kevent_util.h>
 
@@ -56,12 +56,12 @@ static uint64_t timecounter_freq;
 static inline uint64_t
 rdtsc(void)
 {
-#if defined(__amd64__) || defined(__i386__)
+#if defined(__amd64__)
   uint64_t res;
   __asm __volatile ("rdtsc; shl $32,%%rdx; or %%rdx,%%rax"
                     : "=a"(res)
                     :
-                    : "%rax", "%rdx"
+                    :
                    );
   return res;
 #else

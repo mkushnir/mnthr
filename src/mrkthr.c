@@ -860,6 +860,8 @@ sleepticks(uint64_t ticks)
         }
     }
 
+    //CTRACE("ticks=%ld expire_ticks=%ld", ticks, me->expire_ticks);
+
     me->sleepq_enqueue(me);
 
     return yield();
