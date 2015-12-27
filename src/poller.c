@@ -12,7 +12,7 @@ MEMDEBUG_DECLARE(mrkthr_poller);
 #include <mrkcommon/dtqueue.h>
 #include <mrkcommon/stqueue.h>
 /* Experimental trie use */
-#include <mrkcommon/trie.h>
+#include <mrkcommon/btrie.h>
 
 #include "mrkthr_private.h"
 
@@ -114,7 +114,7 @@ void
 poller_sift_sleepq(void)
 {
     STQUEUE(_mrkthr_ctx, runq);
-    trie_node_t *trn;
+    btrie_node_t *trn;
     mrkthr_ctx_t *ctx;
     uint64_t now;
 
@@ -124,16 +124,16 @@ poller_sift_sleepq(void)
 
     now = mrkthr_get_now_ticks();
 
-    for (trn = TRIE_MIN(&the_sleepq);
+    for (trn = BTRIE_MIN(&the_sleepq);
          trn != NULL;
-         trn = TRIE_MIN(&the_sleepq)) {
+         trn = BTRIE_MIN(&the_sleepq)) {
 
         ctx = (mrkthr_ctx_t *)(trn->value);
         assert(ctx != NULL);
 
         if (ctx->expire_ticks < now) {
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
-            trie_remove_node(&the_sleepq, trn);
+            btrie_remove_node(&the_sleepq, trn);
             trn = NULL;
         } else {
             break;

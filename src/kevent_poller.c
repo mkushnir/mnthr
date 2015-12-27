@@ -15,7 +15,7 @@ MEMDEBUG_DECLARE(mrkthr_kevent_poller);
 
 #include <mrkcommon/array.h>
 /* Experimental trie use */
-#include <mrkcommon/trie.h>
+#include <mrkcommon/btrie.h>
 
 #include "mrkthr_private.h"
 
@@ -422,7 +422,7 @@ mrkthr_loop(void)
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
     int nempty, nkev;
-    trie_node_t *node;
+    btrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
     array_iter_t it;
 
@@ -439,7 +439,7 @@ mrkthr_loop(void)
         poller_sift_sleepq();
 
         /* get the first to wake sleeping mrkthr */
-        if ((node = TRIE_MIN(&the_sleepq)) != NULL) {
+        if ((node = BTRIE_MIN(&the_sleepq)) != NULL) {
             ctx = node->value;
             assert(ctx != NULL);
 

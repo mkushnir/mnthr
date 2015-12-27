@@ -79,7 +79,7 @@ MEMDEBUG_DECLARE(mrkthr);
 #include <mrkcommon/dtqueue.h>
 #include <mrkcommon/stqueue.h>
 /* Experimental trie use */
-#include <mrkcommon/trie.h>
+#include <mrkcommon/btrie.h>
 
 #include "mrkthr_private.h"
 
@@ -107,7 +107,7 @@ static STQUEUE(_mrkthr_ctx, free_list);
  * Sleep list holds threads that are waiting for resume
  * in the future. It's prioritized by the thread's expire_ticks.
  */
-trie_t the_sleepq;
+btrie_t the_sleepq;
 
 
 static int mrkthr_ctx_init(mrkthr_ctx_t *);
@@ -206,7 +206,7 @@ dump_ucontext (UNUSED ucontext_t *uc)
 }
 
 static int
-dump_sleepq_node(trie_node_t *trn, uint64_t key, UNUSED void *udata)
+dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
@@ -224,7 +224,7 @@ void
 mrkthr_dump_sleepq(void)
 {
     CTRACE("sleepq:");
-    trie_traverse(&the_sleepq, dump_sleepq_node, NULL);
+    btrie_traverse(&the_sleepq, dump_sleepq_node, NULL);
     CTRACE("end of sleepq");
 }
 
@@ -233,7 +233,7 @@ mrkthr_dump_sleepq(void)
 void
 sleepq_remove(mrkthr_ctx_t *ctx)
 {
-    trie_node_t *trn;
+    btrie_node_t *trn;
 
     //CTRACE(FBLUE("SL removing"));
     //mrkthr_dump(ctx);
@@ -241,7 +241,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
     //mrkthr_dump_sleepq();
     //CTRACE(FBLUE("---"));
 
-    if ((trn = trie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
+    if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
         mrkthr_ctx_t *sle, *bucket_host_pretendent;
 
         sle = trn->value;
@@ -307,7 +307,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 //assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
             } else {
                 trn->value = NULL;
-                trie_remove_node(&the_sleepq, trn);
+                btrie_remove_node(&the_sleepq, trn);
             }
         }
     } else {
@@ -321,14 +321,14 @@ sleepq_remove(mrkthr_ctx_t *ctx)
 static void
 sleepq_insert(mrkthr_ctx_t *ctx)
 {
-    trie_node_t *trn;
+    btrie_node_t *trn;
     mrkthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL inserting"));
     //mrkthr_dump(ctx);
 
-    if ((trn = trie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
-        FAIL("trie_add_node");
+    if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
+        FAIL("btrie_add_node");
     }
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
@@ -357,14 +357,14 @@ sleepq_insert(mrkthr_ctx_t *ctx)
 static void
 sleepq_append(mrkthr_ctx_t *ctx)
 {
-    trie_node_t *trn;
+    btrie_node_t *trn;
     mrkthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL appending"));
     //mrkthr_dump(ctx);
 
-    if ((trn = trie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
-        FAIL("trie_add_node");
+    if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
+        FAIL("btrie_add_node");
     }
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
@@ -426,7 +426,7 @@ mrkthr_init(void)
     main_uc.uc_stack.ss_sp = main_stack;
     main_uc.uc_stack.ss_size = sizeof(main_stack);
     me = NULL;
-    trie_init(&the_sleepq);
+    btrie_init(&the_sleepq);
 
     mflags |= CO_FLAG_INITIALIZED;
 
@@ -443,7 +443,7 @@ mrkthr_fini(void)
     me = NULL;
     list_fini(&ctxes);
     STQUEUE_FINI(&free_list);
-    trie_fini(&the_sleepq);
+    btrie_fini(&the_sleepq);
     poller_fini();
 
     PROFILE_REPORT_SEC();
@@ -465,9 +465,9 @@ mrkthr_compact_sleepq(size_t threshold)
 {
     size_t volume = 0;
 
-    volume = trie_get_volume(&the_sleepq);
+    volume = btrie_get_volume(&the_sleepq);
     if (volume > threshold) {
-        trie_cleanup(&the_sleepq);
+        btrie_cleanup(&the_sleepq);
     }
     return volume;
 }
@@ -475,13 +475,13 @@ mrkthr_compact_sleepq(size_t threshold)
 size_t
 mrkthr_get_sleepq_length(void)
 {
-    return trie_get_nvals(&the_sleepq);
+    return btrie_get_nvals(&the_sleepq);
 }
 
 size_t
 mrkthr_get_sleepq_volume(void)
 {
-    return trie_get_volume(&the_sleepq);
+    return btrie_get_volume(&the_sleepq);
 }
 
 int

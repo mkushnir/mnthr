@@ -14,7 +14,7 @@ MEMDEBUG_DECLARE(mrkthr_ev_poller);
 #include <mrkcommon/hash.h>
 #include <mrkcommon/fasthash.h>
 /* Experimental trie use */
-#include <mrkcommon/trie.h>
+#include <mrkcommon/btrie.h>
 #include <mrkcommon/util.h>
 
 #include "mrkthr_private.h"
@@ -503,7 +503,7 @@ _timer_cb(UNUSED EV_P_ UNUSED ev_timer *w, UNUSED int revents)
 static void
 _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
 {
-    trie_node_t *node;
+    btrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
 
     if (!(mflags & CO_FLAG_SHUTDOWN)) {
@@ -516,7 +516,7 @@ _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
         poller_sift_sleepq();
 
         /* get the first to wake sleeping mrkthr */
-        if ((node = TRIE_MIN(&the_sleepq)) != NULL) {
+        if ((node = BTRIE_MIN(&the_sleepq)) != NULL) {
             ev_tstamp secs;
 
             ctx = node->value;
