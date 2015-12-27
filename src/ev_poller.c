@@ -11,7 +11,7 @@
 MEMDEBUG_DECLARE(mrkthr_ev_poller);
 #endif
 
-#include <mrkcommon/dict.h>
+#include <mrkcommon/hash.h>
 #include <mrkcommon/fasthash.h>
 /* Experimental trie use */
 #include <mrkcommon/trie.h>
@@ -85,7 +85,7 @@ typedef struct _ev_item {
     uint64_t hash;
 } ev_item_t;
 
-dict_t events;
+hash_t events;
 
 static struct ev_loop *the_loop;
 
@@ -182,15 +182,15 @@ static ev_item_t *
 ev_item_get(int fd, int event)
 {
     ev_item_t probe, *ev;
-    dict_item_t *dit;
+    hash_item_t *dit;
 
     probe.ev.io.fd = fd;
     probe.ev.io.events = event;
     probe.hash = 0;
 
-    if ((dit = dict_get_item(&events, &probe)) == NULL) {
+    if ((dit = hash_get_item(&events, &probe)) == NULL) {
         ev = ev_item_new(fd, event);
-        dict_set_item(&events, ev, NULL);
+        hash_set_item(&events, ev, NULL);
     } else {
         ev = dit->key;
     }
@@ -616,17 +616,17 @@ poller_init(void)
     ev_check_start(the_loop, &echeck);
     ev_set_syserr_cb(_syserr_cb);
 
-    dict_init(&events,
+    hash_init(&events,
               65521,
-              (dict_hashfn_t)ev_item_hash,
-              (dict_item_comparator_t)ev_item_cmp,
-              (dict_item_finalizer_t)ev_item_fini);
+              (hash_hashfn_t)ev_item_hash,
+              (hash_item_comparator_t)ev_item_cmp,
+              (hash_item_finalizer_t)ev_item_fini);
 }
 
 
 void
 poller_fini(void)
 {
-    dict_fini(&events);
+    hash_fini(&events);
     ev_loop_destroy(the_loop);
 }

@@ -14,7 +14,7 @@
 static mrkthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
 static const int nthreads = 100000;
-static const int niter = 20;
+static const int niter = 1;
 static const int nrecur = 50;
 static long total = 0;
 static int ntotal = 0;
