@@ -1,6 +1,8 @@
 #include <assert.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <math.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -334,6 +336,99 @@ poller_clear_event(mrkthr_ctx_t *ctx)
 }
 
 
+mrkthr_stat_t *
+mrkthr_stat_new(const char *path)
+{
+    mrkthr_stat_t *res;
+    if ((res = malloc(sizeof(mrkthr_stat_t))) == NULL) {
+        FAIL("malloc");
+    }
+    res->path = strdup(path);
+    if ((res->fd = open(path, O_RDONLY)) < 0) {
+        goto err;
+    }
+
+end:
+    return res;
+
+err:
+    free(res);
+    res = NULL;
+    goto end;
+}
+
+
+void
+mrkthr_stat_destroy(mrkthr_stat_t **st)
+{
+    if (*st != NULL) {
+        if ((*st)->path != NULL) {
+            free((*st)->path);
+            (*st)->path = NULL;
+        }
+        if ((*st)->fd != -1) {
+            close((*st)->fd);
+            (*st)->fd = -1;
+        }
+        free(*st);
+    }
+}
+
+
+int
+mrkthr_stat_wait(mrkthr_stat_t *st)
+{
+    int res;
+    struct kevent *kev;
+
+    while (1) {
+        kev = new_event(st->fd, EVFILT_VNODE, &me->pdata._kevent);
+
+        /*
+         * check if there is another thread waiting for the same event.
+         */
+        if (kev->udata != NULL) {
+            /*
+             * in this case we are not allowed to wait for this event,
+             * sorry.
+             */
+            me->co.rc = CO_RC_SIMULTANEOUS;
+            return -1;
+        }
+
+        EV_SET(kev,
+               st->fd,
+               EVFILT_VNODE,
+               EV_ADD|EV_ONESHOT,
+               NOTE_DELETE|NOTE_RENAME|NOTE_WRITE|NOTE_ATTRIB,
+               0,
+               me);
+
+        /* wait for an event */
+        me->co.state = CO_STATE_READ;
+        res = yield();
+        if (res != 0) {
+            return -1;
+        }
+
+        res = 0;
+        if ((kev = result_event(st->fd, EVFILT_VNODE)) != NULL) {
+            if (kev->fflags & NOTE_DELETE) {
+                res |= MRKTHR_ST_DELETE;
+            }
+            if (kev->fflags & NOTE_WRITE) {
+                res |= MRKTHR_ST_WRITE;
+            }
+            if (kev->fflags & NOTE_ATTRIB) {
+                res |= MRKTHR_ST_ATTRIB;
+            }
+            return res;
+        }
+    }
+    return -1;
+}
+
+
 ssize_t
 mrkthr_get_rbuflen(int fd)
 {
@@ -642,6 +737,33 @@ mrkthr_loop(void)
                                       "discarding ...", kev->ident);
                             }
                             break;
+
+                        case EVFILT_VNODE:
+
+                            if (ctx->co.f != NULL) {
+
+                                if (ctx->co.state != CO_STATE_READ) {
+                                    TRACE(FRED("Delivering a vnode event "
+                                               "that was not scheduled for!"));
+                                }
+
+                                if ((pres = poller_resume(ctx)) != 0) {
+#ifdef TRACE_VERBOSE
+                                    TRACE("Could not resume co %d "
+                                          "for read FD %08lx, discarding ...",
+                                          ctx->co.id, kev->ident);
+#endif
+                                    if ((pres & RESUME) == RESUME) {
+                                        discard_event(kev->ident, kev->filter);
+                                    }
+                                }
+
+                            } else {
+                                TRACE("co for FD %08lx NULL, "
+                                      "discarding ...", kev->ident);
+                            }
+                            break;
+
 
                         default:
                             TRACE("Filter %s is not supported, discarding",

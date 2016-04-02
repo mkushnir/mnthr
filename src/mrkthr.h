@@ -137,6 +137,7 @@ MRKTHR_ASYNC int mrkthr_sendto_all(int,
 /*
  *
  */
+#define MRKTHR_ST_UNKNOWN (0x00)
 #define MRKTHR_ST_DELETE (0x01)
 #define MRKTHR_ST_WRITE  (0x02)
 #define MRKTHR_ST_ATTRIB (0x04)

@@ -15,8 +15,8 @@ then
     ./configure --prefix=$HOME --enable-debug
 elif test "$1" = "dev"
 then
-    export LDFLAGS="${LDFLAGS} -L$HOME/lib"
-    export CFLAGS="${CFLAGS} -I$HOME/include"
+    export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
+    export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include"
     autoreconf
     ./configure --prefix=$HOME --enable-debug
 elif test "$1" = "dev-memdebug"
