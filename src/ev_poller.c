@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <math.h> /* INFINITY */
+#include <string.h>
 #include <sys/ioctl.h>
 
 #define NO_PROFILE
@@ -11,6 +12,7 @@
 MEMDEBUG_DECLARE(mrkthr_ev_poller);
 #endif
 
+#include <mrkcommon/bytes.h>
 #include <mrkcommon/hash.h>
 #include <mrkcommon/fasthash.h>
 /* Experimental trie use */
@@ -78,11 +80,17 @@ ev_str(int e)
 typedef struct _ev_item {
     union {
         ev_io io;
+        ev_stat stat;
     } ev;
+    bytes_t *stat_path;
     /*
      * ev.io->fd, ev.io->events
+     * ev.stat->wd, ev.stat->path
      */
     uint64_t hash;
+#define EV_TYPE_IO 1
+#define EV_TYPE_STAT 2
+    int ty;
 } ev_item_t;
 
 hash_t events;
@@ -90,6 +98,7 @@ hash_t events;
 static struct ev_loop *the_loop;
 
 static void ev_io_cb(EV_P_ ev_io *, int);
+static void ev_stat_cb(EV_P_ ev_stat *, int);
 
 static ev_idle eidle;
 static ev_timer etimer;
@@ -110,16 +119,28 @@ ev_item_hash(ev_item_t *ev)
     if (ev->hash == 0) {
         union {
             int *i;
-            unsigned char *c;
+            const unsigned char *c;
+            uint64_t *h;
         } u;
-        // typeof(ev->ev.io.events)
-        int events;
 
-        u.i = &ev->ev.io.fd;
-        ev->hash = fasthash(0, u.c, sizeof(ev->ev.io.fd));
-        events = ev->ev.io.events & ~EV__IOFDSET;
-        u.i = &events;
-        ev->hash = fasthash(ev->hash, u.c, sizeof(events));
+        u.i = &ev->ty;
+        ev->hash = fasthash(0, u.c, sizeof(ev->ty));
+        if (ev->ty == EV_TYPE_IO) {
+            int events;
+            u.i = &ev->ev.io.fd;
+            ev->hash = fasthash(ev->hash, u.c, sizeof(ev->ev.io.fd));
+            events = ev->ev.io.events & ~EV__IOFDSET;
+            u.i = &events;
+            ev->hash = fasthash(ev->hash, u.c, sizeof(events));
+        } else if (ev->ty == EV_TYPE_STAT) {
+            uint64_t h;
+            h = bytes_hash(ev->stat_path);
+            u.h = &h;
+            ev->hash = fasthash(ev->hash, u.c, sizeof(u.h));
+        } else {
+            TRACE("ev->ty=%d", ev->ty);
+            FAIL("ev_item_hash");
+        }
     }
     return ev->hash;
 }
@@ -128,18 +149,35 @@ ev_item_hash(ev_item_t *ev)
 static int
 ev_item_cmp(ev_item_t *a, ev_item_t *b)
 {
-    if (a->ev.io.fd == b->ev.io.fd) {
-        if (a->ev.io.events == b->ev.io.events) {
-            return 0;
-        }
-        return a->ev.io.events > b->ev.io.events ? 1 : -1;
+    uint64_t ha, hb;
+
+    ha = ev_item_hash(a);
+    hb = ev_item_hash(b);
+    if (ha != hb) {
+        return ha > hb ? 1 : ha < hb ? -1 : 0;
     }
-    return a->ev.io.fd > b->ev.io.fd ? 1 : -1;
+    if (a->ty != b->ty) {
+        return a->ty - b->ty;
+    }
+    if (a->ty == EV_TYPE_IO) {
+        if (a->ev.io.fd == b->ev.io.fd) {
+            if (a->ev.io.events == b->ev.io.events) {
+                return 0;
+            }
+            return a->ev.io.events > b->ev.io.events ? 1 : -1;
+        }
+        return a->ev.io.fd > b->ev.io.fd ? 1 : -1;
+    } else if (a->ty == EV_TYPE_STAT) {
+        return bytes_cmp(a->stat_path, b->stat_path);
+    } else {
+        FAIL("ev_item_cmp");
+    }
+    return 0;
 }
 
 
 static ev_item_t *
-ev_item_new(int fd, int event)
+ev_item_new_io(int fd, int event)
 {
     ev_item_t *res;
 
@@ -149,6 +187,28 @@ ev_item_new(int fd, int event)
     ev_io_init(&res->ev.io, ev_io_cb, fd, event);
     res->ev.io.data = NULL;
     res->hash = 0;
+    res->ty = EV_TYPE_IO;
+
+    return res;
+}
+
+
+static ev_item_t *
+ev_item_new_stat(const char *path, UNUSED int event)
+{
+    ev_item_t *res;
+
+    if ((res = malloc(sizeof(ev_item_t))) == NULL) {
+        FAIL("malloc");
+    }
+    res->stat_path = bytes_new_from_str(path);
+    BYTES_INCREF(res->stat_path);
+    ev_stat_init(&res->ev.stat,
+                 ev_stat_cb,
+                 res->stat_path->data, 0.0);
+    res->ev.stat.data = NULL;
+    res->hash = 0;
+    res->ty = EV_TYPE_STAT;
 
     return res;
 }
@@ -158,12 +218,23 @@ static void
 ev_item_destroy(ev_item_t **ev)
 {
     if (*ev != NULL) {
+        if ((*ev)->ty == EV_TYPE_IO) {
 #ifdef TRACE_VERBOSE
-        CTRACE(FRED("destroying ev_io %d/%s"),
-               (*ev)->ev.io.fd,
-               EV_STR((*ev)->ev.io.events));
+            CTRACE(FRED("destroying ev_io %d/%s"),
+                   (*ev)->ev.io.fd,
+                   EV_STR((*ev)->ev.io.events));
 #endif
-        ev_io_stop(the_loop, &(*ev)->ev.io);
+            ev_io_stop(the_loop, &(*ev)->ev.io);
+        } else if ((*ev)->ty == EV_TYPE_STAT) {
+#ifdef TRACE_VERBOSE
+            CTRACE(FRED("destroying ev_io %s/%d"),
+                   (*ev)->ev.stat.path, (*ev)->ev.stat.wd);
+#endif
+            ev_stat_stop(the_loop, &(*ev)->ev.stat);
+            BYTES_DECREF(&(*ev)->stat_path);
+        } else {
+            FAIL("ev_item_destroy");
+        }
         free(*ev);
         *ev = NULL;
     }
@@ -179,7 +250,7 @@ ev_item_fini(ev_item_t *key, UNUSED void *v)
 
 
 static ev_item_t *
-ev_item_get(int fd, int event)
+ev_io_item_get(int fd, int event)
 {
     ev_item_t probe, *ev;
     hash_item_t *dit;
@@ -187,15 +258,111 @@ ev_item_get(int fd, int event)
     probe.ev.io.fd = fd;
     probe.ev.io.events = event;
     probe.hash = 0;
+    probe.ty = EV_TYPE_IO;
 
     if ((dit = hash_get_item(&events, &probe)) == NULL) {
-        ev = ev_item_new(fd, event);
+        ev = ev_item_new_io(fd, event);
         hash_set_item(&events, ev, NULL);
     } else {
         ev = dit->key;
     }
     return ev;
 }
+
+static ev_item_t *
+ev_stat_item_get(const char *path, UNUSED int event)
+{
+    ev_item_t probe, *ev;
+    hash_item_t *dit;
+
+    probe.stat_path = bytes_new_from_str(path);
+    probe.hash = 0;
+    probe.ty = EV_TYPE_STAT;
+
+    if ((dit = hash_get_item(&events, &probe)) == NULL) {
+        ev = ev_item_new_stat(path, event);
+        hash_set_item(&events, ev, NULL);
+    } else {
+        ev = dit->key;
+    }
+    BYTES_DECREF(&probe.stat_path);
+    return ev;
+}
+
+
+mrkthr_stat_t *
+mrkthr_stat_new(const char *path)
+{
+    mrkthr_stat_t *res;
+    if ((res = malloc(sizeof(mrkthr_stat_t))) == NULL) {
+        FAIL("malloc");
+    }
+    res->ev = ev_stat_item_get(path, 0);
+    return res;
+}
+
+
+void
+mrkthr_stat_destroy(mrkthr_stat_t **st)
+{
+    if (*st != NULL) {
+        hash_item_t *hit;
+
+        if ((hit = hash_get_item(&events, (*st)->ev)) == NULL) {
+            FAIL("mrkthr_stat_destroy");
+        }
+        hash_delete_pair(&events, hit);
+        free(*st);
+    }
+}
+
+
+int
+mrkthr_stat_wait(mrkthr_stat_t *st)
+{
+    int res;
+    hash_item_t *hit;
+    ev_item_t *ev;
+
+    assert(st->ev->ty == EV_TYPE_STAT);
+    me->pdata._ev = st->ev;
+    if (st->ev->ev.stat.data == NULL) {
+        st->ev->ev.stat.data = me;
+    } else if (st->ev->ev.stat.data != me) {
+        /*
+         * in this case we are not allowed to wait for this event,
+         * sorry.
+         */
+        me->co.rc = CO_RC_SIMULTANEOUS;
+        return -1;
+    }
+
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_stat %s/%d"),
+           st->ev->ev.stat.path,
+           st->ev->ev.stat.wd);
+#endif
+    ev_stat_start(the_loop, &st->ev->ev.stat);
+
+    /* wait for an event */
+    me->co.state = CO_STATE_READ;
+    res = yield();
+
+    if ((hit = hash_get_item(&events, st->ev)) == NULL) {
+        FAIL("mrkthr_stat_wait");
+    }
+    ev = hit->key;
+
+    assert(ev == st->ev);
+
+    assert(ev->ev.stat.data == me);
+
+    ev->ev.stat.data = NULL;
+    me->pdata._ev = NULL;
+
+    return res;
+}
+
 
 /**
  *
@@ -285,13 +452,19 @@ poller_clear_event(mrkthr_ctx_t *ctx)
                ev->ev.io.fd,
                EV_STR(ev->ev.io.events));
 #endif
-        ev_io_stop(the_loop, &ev->ev.io);
+        if (ev->ty == EV_TYPE_IO) {
+            ev_io_stop(the_loop, &ev->ev.io);
+        } else if (ev->ty == EV_TYPE_STAT) {
+            ev_stat_stop(the_loop, &ev->ev.stat);
+        } else {
+            FAIL("poller_clear_event");
+        }
     }
 }
 
 
 static void
-clear_event(ev_item_t *ev)
+clear_event_io(ev_item_t *ev)
 {
 #ifdef TRACE_VERBOSE
     CTRACE(FRED("clearing ev_io %d/%s"),
@@ -301,14 +474,26 @@ clear_event(ev_item_t *ev)
     ev_io_stop(the_loop, &ev->ev.io);
 }
 
+
+static void
+clear_event_stat(ev_item_t *ev)
+{
+#ifdef TRACE_VERBOSE
+    CTRACE(FRED("clearing ev_stat %s/%d"),
+           ev->ev.stat.path, ev->ev.stat.wd);
+#endif
+    ev_stat_stop(the_loop, &ev->ev.stat);
+}
+
+
 ssize_t
 mrkthr_get_rbuflen(int fd)
 {
     ssize_t sz;
     int res;
-    UNUSED ev_item_t *ev, *ev1;
+    ev_item_t *ev, *ev1;
 
-    ev = ev_item_get(fd, EV_READ);
+    ev = ev_io_item_get(fd, EV_READ);
     //ev_io_set(&ev->ev.io, fd, EV_READ);
     me->pdata._ev = ev;
 
@@ -335,7 +520,7 @@ mrkthr_get_rbuflen(int fd)
     me->co.state = CO_STATE_READ;
     res = yield();
 
-    ev1 = ev_item_get(fd, EV_READ);
+    ev1 = ev_io_item_get(fd, EV_READ);
 
     assert(ev == ev1);
 
@@ -365,7 +550,7 @@ mrkthr_get_wbuflen(int fd)
     int res;
     ev_item_t *ev;
 
-    ev = ev_item_get(fd, EV_WRITE);
+    ev = ev_io_item_get(fd, EV_WRITE);
     //ev_io_set(&ev->ev.io, fd, EV_WRITE);
     me->pdata._ev = ev;
 
@@ -392,7 +577,7 @@ mrkthr_get_wbuflen(int fd)
     me->co.state = CO_STATE_WRITE;
     res = yield();
 
-    ev = ev_item_get(fd, EV_WRITE);
+    ev = ev_io_item_get(fd, EV_WRITE);
 
     assert(ev->ev.io.data == me);
 
@@ -443,7 +628,7 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 
         if (ctx->co.f == NULL) {
             TRACE("co for FD %d is NULL, discarding ...", w->fd);
-            clear_event(ev);
+            clear_event_io(ev);
 
         } else {
             if (w->events == EV_READ) {
@@ -460,13 +645,56 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
                 TRACE("filter %s is not supporting", EV_STR(w->events));
             }
 
-            clear_event(ev);
+            clear_event_io(ev);
 
             if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
                 TRACE("Could not resume co %d "
                       "for FD %d, discarding ...",
                       ctx->co.id, w->fd);
+#endif
+            }
+        }
+    }
+}
+
+
+static void
+ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
+{
+    mrkthr_ctx_t *ctx;
+    ev_item_t *ev;
+
+    ctx = w->data;
+
+    if (ctx == NULL) {
+        TRACE("no thread for stat path %s using default [discard]...", w->path);
+        ev_stat_stop(the_loop, w);
+
+    } else {
+        ev = ctx->pdata._ev;
+
+        assert(ev != NULL);
+        assert(&ev->ev.stat == w);
+
+        ctx->pdata._ev = NULL;
+
+        if (ctx->co.f == NULL) {
+            TRACE("co for stat path %s is NULL, discarding ...", w->path);
+            clear_event_stat(ev);
+
+        } else {
+            /*
+             * XXX
+             */
+
+            clear_event_stat(ev);
+
+            if (poller_resume(ctx) != 0) {
+#ifdef TRACE_VERBOSE
+                TRACE("Could not resume co %d "
+                      "for stat path %s, discarding ...",
+                      ctx->co.id, w->path);
 #endif
             }
         }
@@ -567,7 +795,7 @@ _check_cb(UNUSED EV_P_ UNUSED ev_check *w, UNUSED int revents)
     CTRACE("ev_pending_count=%d", npending);
 #endif
     if (npending <= 0) {
-        CTRACE("Breaking loop? ...");
+        //CTRACE("Breaking loop? ...");
         //ev_break(the_loop, EVBREAK_ALL);
     }
     timecounter_now = (uint64_t)(ev_now(the_loop) * 1000000000.);

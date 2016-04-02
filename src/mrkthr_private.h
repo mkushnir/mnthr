@@ -180,6 +180,43 @@ struct _mrkthr_ctx {
 
 };
 
+//#define MRKTHR_ST_DELETE
+// NOTE_DELETE
+// IN_DELETE_SELF
+//#define MRKTHR_ST_WRITE
+// NOTE_WRITE
+// IN_CREATE, IN_DELETE, IN_MOVED_FROM, IN_MOVED_TO
+//#define MRKTHR_ST_EXTEND
+//NOTE_EXTEND
+//
+//#define MRKTHR_ST_ATTRIB
+// NOTE_ATTRIB
+// IN_ATTRIB
+//#define MRKTHR_ST_LINK
+// NOTE_LINK
+//
+//#define MRKTHR_ST_RENAME
+// NOTE_RENAME
+//
+//#define MRKTHR_ST_REVOKE
+// NOTE_REVOKE
+//
+
+
+#ifdef USE_EV
+struct _ev_item;
+#endif
+
+struct _mrkthr_stat {
+#ifdef USE_EV
+    struct _ev_item *ev;
+#endif
+#ifdef USE_KEVENT
+    char *path;
+    int fd;
+#endif
+};
+
 struct _mrkthr_profile {
     const char *name;
     int id;

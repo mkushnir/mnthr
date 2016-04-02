@@ -127,7 +127,23 @@ MRKTHR_ASYNC ssize_t mrkthr_recvfrom_allb(int,
 MRKTHR_ASYNC ssize_t mrkthr_get_wbuflen(int);
 MRKTHR_ASYNC int mrkthr_write_all(int, const char *, size_t);
 MRKTHR_ASYNC int mrkthr_write_all_et(int, const char *, size_t);
-MRKTHR_ASYNC int mrkthr_sendto_all(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+MRKTHR_ASYNC int mrkthr_sendto_all(int,
+                                   const void *,
+                                   size_t,
+                                   int,
+                                   const struct sockaddr *,
+                                   socklen_t);
+
+/*
+ *
+ */
+#define MRKTHR_ST_DELETE (0x01)
+#define MRKTHR_ST_WRITE  (0x02)
+#define MRKTHR_ST_ATTRIB (0x04)
+typedef struct _mrkthr_stat mrkthr_stat_t;
+mrkthr_stat_t *mrkthr_stat_new(const char *path);
+void mrkthr_stat_destroy(mrkthr_stat_t **);
+MRKTHR_ASYNC int mrkthr_stat_wait(mrkthr_stat_t *);
 
 void mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
 void mrkthr_signal_fini(mrkthr_signal_t *);
