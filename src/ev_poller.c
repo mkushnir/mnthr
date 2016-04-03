@@ -347,6 +347,9 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     /* wait for an event */
     me->co.state = CO_STATE_READ;
     res = yield();
+    if (res != 0) {
+        return -1;
+    }
 
     if ((hit = hash_get_item(&events, st->ev)) == NULL) {
         FAIL("mrkthr_stat_wait");
