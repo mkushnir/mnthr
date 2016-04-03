@@ -137,10 +137,10 @@ MRKTHR_ASYNC int mrkthr_sendto_all(int,
 /*
  *
  */
-#define MRKTHR_ST_UNKNOWN (0x00)
-#define MRKTHR_ST_DELETE (0x01)
-#define MRKTHR_ST_WRITE  (0x02)
-#define MRKTHR_ST_ATTRIB (0x04)
+#define MRKTHR_ST_UNKNOWN   (0x00000)
+#define MRKTHR_ST_DELETE    (0x10000)
+#define MRKTHR_ST_WRITE     (0x20000)
+#define MRKTHR_ST_ATTRIB    (0x40000)
 typedef struct _mrkthr_stat mrkthr_stat_t;
 mrkthr_stat_t *mrkthr_stat_new(const char *path);
 void mrkthr_stat_destroy(mrkthr_stat_t **);
