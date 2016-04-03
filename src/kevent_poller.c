@@ -400,7 +400,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
                st->fd,
                EVFILT_VNODE,
                EV_ADD|EV_ONESHOT,
-               NOTE_DELETE|NOTE_RENAME|NOTE_WRITE|NOTE_ATTRIB,
+               NOTE_DELETE|NOTE_RENAME|NOTE_WRITE|NOTE_EXTEND|NOTE_ATTRIB|NOTE_REVOKE,
                0,
                me);
 
@@ -413,13 +413,13 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
 
         res = 0;
         if ((kev = result_event(st->fd, EVFILT_VNODE)) != NULL) {
-            if (kev->fflags & NOTE_DELETE) {
+            if (kev->fflags & (NOTE_DELETE | NOTE_RENAME)) {
                 res |= MRKTHR_ST_DELETE;
             }
-            if (kev->fflags & NOTE_WRITE) {
+            if (kev->fflags & (NOTE_WRITE | NOTE_EXTEND)) {
                 res |= MRKTHR_ST_WRITE;
             }
-            if (kev->fflags & NOTE_ATTRIB) {
+            if (kev->fflags & (NOTE_ATTRIB | NOTE_REVOKE)) {
                 res |= MRKTHR_ST_ATTRIB;
             }
             return res;
