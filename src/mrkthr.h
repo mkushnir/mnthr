@@ -20,14 +20,17 @@ const char *mrkthr_diag_str(int);
 
 #define CTRACE(s, ...)                                         \
     do {                                                       \
-        struct timeval ts;                                     \
-        gettimeofday(&ts, NULL);                               \
-        struct tm *t = localtime(&ts.tv_sec);                  \
-        char ss[64];                                           \
-        strftime(ss, sizeof(ss), "%Y-%m-%d %H:%M:%S", t);      \
-        TRACE("%s.%06lu [% 4d] " s,                            \
-              ss,                                              \
-              ts.tv_usec,                                      \
+        struct timeval _mrkthr_ts;                             \
+        gettimeofday(&_mrkthr_ts, NULL);                       \
+        struct tm *_mrkthr_tm = localtime(&_mrkthr_ts.tv_sec); \
+        char _mrkthr_ss[64];                                   \
+        strftime(_mrkthr_ss,                                   \
+                 sizeof(_mrkthr_ss),                           \
+                 "%Y-%m-%d %H:%M:%S",                          \
+                 _mrkthr_tm);                                  \
+        TRACE("%s.%06ld [% 4d] " s,                            \
+              _mrkthr_ss,                                      \
+              _mrkthr_ts.tv_usec,                              \
               mrkthr_id(), ##__VA_ARGS__);                     \
     } while (0)                                                \
 
