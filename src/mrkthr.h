@@ -97,6 +97,8 @@ void mrkthr_dump_sleepq(void);
 int mrkthr_dump(const mrkthr_ctx_t *);
 mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
 mrkthr_ctx_t *mrkthr_spawn(const char *name, cofunc f, int argc, ...);
+mrkthr_ctx_t *mrkthr_new_sig(const char *, cofunc, int, ...);
+mrkthr_ctx_t *mrkthr_spawn_sig(const char *, cofunc, int, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);

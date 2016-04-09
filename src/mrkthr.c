@@ -115,8 +115,10 @@ static int mrkthr_ctx_fini(mrkthr_ctx_t *);
 static void co_fini_ucontext(struct _co *);
 static void co_fini_other(struct _co *);
 static void resume_waitq_all(mrkthr_waitq_t *);
-static mrkthr_ctx_t *pop_free_ctx(void);
+static mrkthr_ctx_t *mrkthr_ctx_new(void);
+static mrkthr_ctx_t *mrkthr_ctx_pop_free(void);
 static void set_resume(mrkthr_ctx_t *);
+
 
 void
 push_free_ctx(mrkthr_ctx_t *ctx)
@@ -205,6 +207,7 @@ dump_ucontext (UNUSED ucontext_t *uc)
 #endif
 }
 
+
 static int
 dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
@@ -220,6 +223,7 @@ dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
     return 0;
 }
 
+
 void
 mrkthr_dump_sleepq(void)
 {
@@ -227,6 +231,7 @@ mrkthr_dump_sleepq(void)
     btrie_traverse(&the_sleepq, dump_sleepq_node, NULL);
     CTRACE("end of sleepq");
 }
+
 
 /* Sleep list */
 
@@ -433,6 +438,7 @@ mrkthr_init(void)
     return 0;
 }
 
+
 int
 mrkthr_fini(void)
 {
@@ -454,11 +460,13 @@ mrkthr_fini(void)
     return 0;
 }
 
+
 void
 mrkthr_shutdown(void)
 {
     mflags |= CO_FLAG_SHUTDOWN;
 }
+
 
 size_t
 mrkthr_compact_sleepq(size_t threshold)
@@ -472,17 +480,20 @@ mrkthr_compact_sleepq(size_t threshold)
     return volume;
 }
 
+
 size_t
 mrkthr_get_sleepq_length(void)
 {
     return btrie_get_nvals(&the_sleepq);
 }
 
+
 size_t
 mrkthr_get_sleepq_volume(void)
 {
     return btrie_get_volume(&the_sleepq);
 }
+
 
 int
 dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
@@ -493,6 +504,7 @@ dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
     return 0;
 }
 
+
 void
 mrkthr_dump_all_ctxes(void)
 {
@@ -500,6 +512,7 @@ mrkthr_dump_all_ctxes(void)
     list_traverse(&ctxes, (list_traverser_t)dump_ctx_traverser, NULL);
     TRACEC("end of all ctxes\n");
 }
+
 
 /*
  * mrkthr_ctx management
@@ -600,6 +613,7 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     poller_mrkthr_ctx_init(ctx);
 }
 
+
 static int
 mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
 {
@@ -608,6 +622,7 @@ mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
     ctx->co.rc = 0;
     return 0;
 }
+
 
 /* Ugly hack to work around -Wclobbered, a part of -Wextra in gcc */
 #ifdef __GNUC__
@@ -620,10 +635,22 @@ _getcontext(ucontext_t *ucp)
 #define _getcontext getcontext
 #endif
 
+
 static mrkthr_ctx_t *
-pop_free_ctx(void)
+mrkthr_ctx_new(void)
 {
-    mrkthr_ctx_t *ctx = NULL;
+    mrkthr_ctx_t *ctx;
+    if ((ctx = list_incr(&ctxes)) == NULL) {
+        FAIL("list_incr");
+    }
+    return ctx;
+}
+
+
+static mrkthr_ctx_t *
+mrkthr_ctx_pop_free(void)
+{
+    mrkthr_ctx_t *ctx;
 
     if ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
         STQUEUE_DEQUEUE(&free_list, free_link);
@@ -640,15 +667,16 @@ pop_free_ctx(void)
     return ctx;
 }
 
+
 /**
  * Return a new mrkthr_ctx_t instance. The new instance doesn't have to
  * be freed, and should be treated as an opaque object. It's internally
  * reclaimed as soon as the worker function returns.
  */
-#define VNEW_BODY()                                                            \
+#define VNEW_BODY(get_ctx_fn)                                                  \
     int i;                                                                     \
     assert(mflags & CO_FLAG_INITIALIZED);                                      \
-    ctx = pop_free_ctx();                                                      \
+    ctx = get_ctx_fn();                                                        \
     assert(ctx!= NULL);                                                        \
     if (ctx->co.id != -1) {                                                    \
         mrkthr_dump(ctx);                                                      \
@@ -669,7 +697,7 @@ pop_free_ctx(void)
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
                                   0)) == MAP_FAILED) {                         \
-            TR(MRKTHR_CTX_NEW + 1);                                            \
+            TR(MRKTHR_NEW + 1);                                                \
             ctx = NULL;                                                        \
             goto vnew_body_end;                                                \
         }                                                                      \
@@ -707,13 +735,30 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
     mrkthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY();
+    VNEW_BODY(mrkthr_ctx_pop_free);
     va_end(ap);
     if (ctx == NULL) {
         FAIL("mrkthr_new");
     }
     return ctx;
 }
+
+
+mrkthr_ctx_t *
+mrkthr_new_sig(const char *name, cofunc f, int argc, ...)
+{
+    va_list ap;
+    mrkthr_ctx_t *ctx = NULL;
+
+    va_start(ap, argc);
+    VNEW_BODY(mrkthr_ctx_new);
+    va_end(ap);
+    if (ctx == NULL) {
+        FAIL("mrkthr_new");
+    }
+    return ctx;
+}
+
 
 int
 mrkthr_dump(const mrkthr_ctx_t *ctx)
@@ -753,6 +798,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     return 0;
 }
 
+
 PRINTFLIKE(2, 3) int
 mrkthr_set_name(mrkthr_ctx_t *ctx,
                      const char *fmt,
@@ -767,6 +813,7 @@ mrkthr_set_name(mrkthr_ctx_t *ctx,
     return res < (int)(sizeof(ctx->co.name)) ? 0 : 1;
 }
 
+
 /*
  * mrkthr management
  */
@@ -776,6 +823,7 @@ mrkthr_me(void)
     return me;
 }
 
+
 int
 mrkthr_id(void)
 {
@@ -784,6 +832,7 @@ mrkthr_id(void)
     }
     return -1;
 }
+
 
 void
 mrkthr_set_retval(int rv)
@@ -821,6 +870,7 @@ yield(void)
     return me->co.rc;
 }
 
+
 static int
 sleepmsec(uint64_t msec)
 {
@@ -843,6 +893,7 @@ sleepmsec(uint64_t msec)
 
     return yield();
 }
+
 
 static int
 sleepticks(uint64_t ticks)
@@ -867,6 +918,7 @@ sleepticks(uint64_t ticks)
     return yield();
 }
 
+
 int
 mrkthr_sleep(uint64_t msec)
 {
@@ -876,6 +928,7 @@ mrkthr_sleep(uint64_t msec)
     return sleepmsec(msec);
 }
 
+
 int
 mrkthr_sleep_ticks(uint64_t ticks)
 {
@@ -884,6 +937,7 @@ mrkthr_sleep_ticks(uint64_t ticks)
     me->co.state = CO_STATE_SLEEP;
     return sleepticks(ticks);
 }
+
 
 static void
 append_me_to_waitq(mrkthr_waitq_t *waitq)
@@ -895,6 +949,7 @@ append_me_to_waitq(mrkthr_waitq_t *waitq)
     DTQUEUE_ENQUEUE(waitq, waitq_link, me);
     me->hosting_waitq = waitq;
 }
+
 
 static void
 remove_me_from_waitq(mrkthr_waitq_t *waitq)
@@ -979,6 +1034,7 @@ mrkthr_run(mrkthr_ctx_t *ctx)
     set_resume(ctx);
 }
 
+
 mrkthr_ctx_t *
 mrkthr_spawn(const char *name, cofunc f, int argc, ...)
 {
@@ -986,7 +1042,24 @@ mrkthr_spawn(const char *name, cofunc f, int argc, ...)
     mrkthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY();
+    VNEW_BODY(mrkthr_ctx_pop_free);
+    va_end(ap);
+    if (ctx == NULL) {
+        FAIL("mrkthr_spawn");
+    }
+    mrkthr_run(ctx);
+    return ctx;
+}
+
+
+mrkthr_ctx_t *
+mrkthr_spawn_sig(const char *name, cofunc f, int argc, ...)
+{
+    va_list ap;
+    mrkthr_ctx_t *ctx = NULL;
+
+    va_start(ap, argc);
+    VNEW_BODY(mrkthr_ctx_new);
     va_end(ap);
     if (ctx == NULL) {
         FAIL("mrkthr_spawn");
@@ -1021,6 +1094,7 @@ set_resume(mrkthr_ctx_t *ctx)
     ctx->sleepq_enqueue(ctx);
 }
 
+
 /**
  * Send an interrupt signal to the thread.
  */
@@ -1042,8 +1116,10 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     //mrkthr_dump(ctx);
 
     if (ctx->co.f == NULL) {
+#ifdef TRACE_VERBOSE
         CTRACE("Will not interrupt this ctx:");
         mrkthr_dump(ctx);
+#endif
         return;
     }
 
@@ -1063,6 +1139,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     ctx->expire_ticks = 1;
     ctx->sleepq_enqueue(ctx);
 }
+
 
 int
 mrkthr_set_interrupt_and_join(mrkthr_ctx_t *ctx)
@@ -1247,6 +1324,7 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     return 0;
 }
 
+
 /**
  * Allocate enough space in *buf beyond *offset for a single read
  * operation and read into that location from fd.
@@ -1290,6 +1368,7 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
 
     return 0;
 }
+
 
 /**
  * Perform a single read from fd into buf.
@@ -1397,6 +1476,7 @@ mrkthr_recvfrom_allb(int fd,
     return nrecv;
 }
 
+
 /**
  * Write len bytes from buf into fd.
  */
@@ -1454,6 +1534,7 @@ mrkthr_write_all_et(int fd, const char *buf, size_t len)
     return 0;
 }
 
+
 /**
  * Write len bytes from buf into fd.
  */
@@ -1487,6 +1568,7 @@ mrkthr_sendto_all(int fd,
     return 0;
 }
 
+
 /**
  * Event Primitive.
  */
@@ -1496,17 +1578,20 @@ mrkthr_signal_init(mrkthr_signal_t *signal, mrkthr_ctx_t *ctx)
     signal->owner = ctx;
 }
 
+
 void
 mrkthr_signal_fini(mrkthr_signal_t *signal)
 {
     signal->owner = NULL;
 }
 
+
 int
 mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 {
     return signal->owner != NULL;
 }
+
 
 int
 mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
@@ -1517,6 +1602,7 @@ mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     return yield();
 }
+
 
 int
 mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
@@ -1536,6 +1622,7 @@ mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
     }
     return res;
 }
+
 
 void
 mrkthr_signal_send(mrkthr_signal_t *signal)
@@ -1557,6 +1644,7 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
     //CTRACE("Not resuming orphan signal. See you next time.");
 }
 
+
 void
 mrkthr_signal_error(mrkthr_signal_t *signal, unsigned char rc)
 {
@@ -1568,6 +1656,7 @@ mrkthr_signal_error(mrkthr_signal_t *signal, unsigned char rc)
     }
 }
 
+
 /**
  * Condition Variable Primitive.
  */
@@ -1577,6 +1666,7 @@ mrkthr_cond_init(mrkthr_cond_t *cond)
     DTQUEUE_INIT(&cond->waitq);
 }
 
+
 int
 mrkthr_cond_wait(mrkthr_cond_t *cond)
 {
@@ -1584,11 +1674,13 @@ mrkthr_cond_wait(mrkthr_cond_t *cond)
     return join_waitq(&cond->waitq);
 }
 
+
 void
 mrkthr_cond_signal_all(mrkthr_cond_t *cond)
 {
     resume_waitq_all(&cond->waitq);
 }
+
 
 void
 mrkthr_cond_signal_one(mrkthr_cond_t *cond)
@@ -1596,12 +1688,15 @@ mrkthr_cond_signal_one(mrkthr_cond_t *cond)
     resume_waitq_one(&cond->waitq);
 }
 
+
 void
 mrkthr_cond_fini(mrkthr_cond_t *cond)
 {
     mrkthr_cond_signal_all(cond);
     DTQUEUE_FINI(&cond->waitq);
 }
+
+
 
 /**
  * Semaphore Primitive.
@@ -1613,6 +1708,7 @@ mrkthr_sema_init(mrkthr_sema_t *sema, int n)
     sema->n = n;
     sema->i = n;
 }
+
 
 int
 mrkthr_sema_acquire(mrkthr_sema_t *sema)
@@ -1634,6 +1730,7 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
     return res;
 }
 
+
 void
 mrkthr_sema_release(mrkthr_sema_t *sema)
 {
@@ -1651,6 +1748,7 @@ mrkthr_sema_fini(mrkthr_sema_t *sema)
     sema->i = -1;
 }
 
+
 /**
  * Readers-writer Lock Primitive.
  */
@@ -1661,6 +1759,7 @@ mrkthr_rwlock_init(mrkthr_rwlock_t *lock)
     lock->fwriter = 0;
     lock->nreaders = 0;
 }
+
 
 int
 mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
@@ -1680,6 +1779,7 @@ mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
     return res;
 }
 
+
 int
 mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *lock)
 {
@@ -1694,6 +1794,7 @@ mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *lock)
     return 0;
 }
 
+
 void
 mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
 {
@@ -1704,6 +1805,7 @@ mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
         mrkthr_cond_signal_one(&lock->cond);
     }
 }
+
 
 int
 mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
@@ -1724,6 +1826,7 @@ mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
     return res;
 }
 
+
 int
 mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
 {
@@ -1738,6 +1841,7 @@ mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
     return 0;
 }
 
+
 void
 mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
 {
@@ -1746,6 +1850,7 @@ mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
     lock->fwriter = 0;
     mrkthr_cond_signal_all(&lock->cond);
 }
+
 
 void
 mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
@@ -1770,7 +1875,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     assert(me != NULL);
 
     va_start(ap, argc);
-    VNEW_BODY();
+    VNEW_BODY(mrkthr_ctx_pop_free);
     va_end(ap);
     if (ctx == NULL) {
         FAIL("mrkthr_wait_for");
