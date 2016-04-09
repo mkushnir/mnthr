@@ -92,15 +92,6 @@ kevent_init(void *data)
     return 0;
 }
 
-int
-kevent_fini(void *data)
-{
-    struct kevent *kev = data;
-
-    EV_SET(kev, -1, 0, 0, 0, 0, NULL);
-    return 0;
-}
-
 void
 kevent_copy(struct kevent *src, struct kevent *dst)
 {

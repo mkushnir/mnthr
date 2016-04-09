@@ -35,6 +35,8 @@ extern const profile_t *mrkthr_sched1_p;
 static int q0 = -1;
 static array_t kevents0;
 static array_t kevents1;
+static ssize_t kevents0_elnum = 0;
+static ssize_t kevents1_elnum = 0;
 
 static uint64_t nsec_zero, nsec_now;
 UNUSED static uint64_t timecounter_zero, timecounter_now;
@@ -200,23 +202,13 @@ mrkthr_get_now_ticks_precise(void)
  *
  */
 static struct kevent *
-result_event(int fd, int filter)
+result_event(int idx)
 {
     struct kevent *kev;
-    array_iter_t it;
-
-    //TRACE("getting result event for FD %d filter %s", fd,
-    //      kevent_filter_str(filter));
-
-    for (kev = array_first(&kevents1, &it);
-         kev != NULL;
-         kev = array_next(&kevents1, &it)) {
-        if (kev->ident == (uintptr_t)fd && kev->filter == filter) {
-            return kev;
-        }
+    if ((kev = array_get(&kevents1, idx)) == NULL) {
+        return NULL;
     }
-
-    return NULL;
+    return kev;
 }
 
 
@@ -226,112 +218,38 @@ result_event(int fd, int filter)
  * the index in the kevents0 array to be used in a subsequent fast lookup.
  */
 static struct kevent *
-new_event(int fd, int filter, int *idx)
+new_event(int fd, int filter, int flags, int fflags, intptr_t data, void *udata)
 {
-    struct kevent *kev0, *kev1 = NULL;
-    array_iter_t it;
+    struct kevent *kev;
 
-    for (kev0 = array_first(&kevents0, &it);
-         kev0 != NULL;
-         kev0 = array_next(&kevents0, &it)) {
-        if (kevent_isempty(kev0)) {
-            if (kev1 == NULL) {
-                /* make note of the first empty slot */
-                kev1 = kev0;
-                *idx = it.iter;
-            }
-            continue;
-        } else if (kev0->ident == (uintptr_t)fd && kev0->filter == filter) {
-            kev1 = kev0;
-            *idx = it.iter;
-            break;
-        }
+    if ((kev = array_incr(&kevents0)) == NULL) {
+        FAIL("array_incr");
     }
-
-    /* no slot matched, init an empty or a brand new slot */
-
-    if (kev1 == NULL) {
-        /* there we no empty slots */
-        kev1 = array_incr(&kevents0);
-        assert(kev1 != NULL);
-        kevent_init(kev1);
-        *idx = kevents0.elnum - 1;
-    }
-
-    kev1->ident = fd;
-    kev1->filter = filter;
-
-    return kev1;
+    EV_SET(kev, fd, filter, flags, fflags, data, udata);
+    return kev;
 }
 
 /**
  * Schedule an event to be discarded from the kqueue.
  */
 static int
-discard_event(int fd, int filter)
+discard_event(int fd, int filter, mrkthr_ctx_t *ctx)
 {
     struct kevent *kev;
-    int idx;
-
-    kev = new_event(fd, filter, &idx);
-    EV_SET(kev, fd, filter, EV_DELETE, 0, 0, NULL);
+    kev = new_event(fd, filter, EV_DELETE, 0, 0, ctx);
+    --kevents0_elnum;
     return 0;
 }
 
 
-static struct kevent *
-get_event(int idx)
-{
-    struct kevent *kev;
-    kev = array_get(&kevents0, idx);
-    return kev;
-}
-
 /**
  * Remove an event from the kevents array.
  */
-static void
-clear_event(int fd, int filter, int idx)
-{
-    struct kevent *kev;
-    array_iter_t it;
-
-    /* First try fast */
-    if (idx != -1 &&
-        (kev = array_get(&kevents0, idx)) != NULL &&
-        kev->ident == (uintptr_t)fd &&
-        kev->filter == filter) {
-
-        //CTRACE("FAST");
-        //KEVENT_DUMP(kev);
-        kevent_init(kev);
-    } else {
-        for (kev = array_first(&kevents0, &it);
-             kev != NULL;
-             kev = array_next(&kevents0, &it)) {
-
-            if (kev->ident == (uintptr_t)fd && kev->filter == filter) {
-                //CTRACE("SLOW");
-                //KEVENT_DUMP(kev);
-                kevent_init(kev);
-                /* early return, assume fd/filter is unique in the kevents0 */
-                return;
-            }
-        }
-        //CTRACE("NOTFOUND");
-        //KEVENT_DUMP(kev);
-    }
-}
-
 void
 poller_clear_event(mrkthr_ctx_t *ctx)
 {
-    if (ctx->pdata._kevent != -1) {
-        struct kevent *kev;
-
-        kev = get_event(ctx->pdata._kevent);
-        assert(kev != NULL);
-        clear_event(kev->ident, kev->filter, ctx->pdata._kevent);
+    if (ctx->pdata.kev.ident != -1) {
+        discard_event(ctx->pdata.kev.ident, ctx->pdata.kev.filter, ctx);
     }
 }
 
@@ -381,53 +299,58 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     int res;
     struct kevent *kev;
 
-    while (1) {
-        kev = new_event(st->fd, EVFILT_VNODE, &me->pdata._kevent);
+    kev = new_event(st->fd,
+                    EVFILT_VNODE,
+                    EV_ADD|EV_ENABLE,
+                    NOTE_DELETE |
+                        NOTE_RENAME |
+                        NOTE_WRITE |
+                        NOTE_EXTEND |
+                        NOTE_ATTRIB |
+                        NOTE_REVOKE,
+                    0,
+                    me);
+    ++kevents0_elnum;
 
+    me->pdata.kev.ident = st->fd;
+    me->pdata.kev.filter = EVFILT_VNODE;
+
+    /* wait for an event */
+    me->co.state = CO_STATE_READ;
+    res = yield();
+    if (res != 0) {
+        return -1;
+    }
+
+    if (me->pdata.kev.ident == -1) {
         /*
-         * check if there is another thread waiting for the same event.
+         * we haven't got to kevent() call
          */
-        if (kev->udata != NULL) {
-            /*
-             * in this case we are not allowed to wait for this event,
-             * sorry.
-             */
-            me->co.rc = CO_RC_SIMULTANEOUS;
-            return -1;
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
+            FAIL("result_event");
         }
-
-        EV_SET(kev,
-               st->fd,
-               EVFILT_VNODE,
-               EV_ADD|EV_ONESHOT,
-               NOTE_DELETE|NOTE_RENAME|NOTE_WRITE|NOTE_EXTEND|NOTE_ATTRIB|NOTE_REVOKE,
-               0,
-               me);
-
-        /* wait for an event */
-        me->co.state = CO_STATE_READ;
-        res = yield();
-        if (res != 0) {
-            return -1;
-        }
-
+        poller_mrkthr_ctx_init(me);
         res = 0;
-        if ((kev = result_event(st->fd, EVFILT_VNODE)) != NULL) {
-            if (kev->fflags & (NOTE_DELETE | NOTE_RENAME)) {
-                res |= MRKTHR_ST_DELETE;
-            }
-            if (kev->fflags & (NOTE_WRITE | NOTE_EXTEND)) {
-                res |= MRKTHR_ST_WRITE;
-            }
-            if (kev->fflags & (NOTE_ATTRIB | NOTE_REVOKE)) {
-                res |= MRKTHR_ST_ATTRIB;
-            }
-            return res;
+        if (kev->fflags & (NOTE_DELETE | NOTE_RENAME)) {
+            res |= MRKTHR_ST_DELETE;
+        }
+        if (kev->fflags & (NOTE_WRITE | NOTE_EXTEND)) {
+            res |= MRKTHR_ST_WRITE;
+        }
+        if (kev->fflags & (NOTE_ATTRIB | NOTE_REVOKE)) {
+            res |= MRKTHR_ST_ATTRIB;
         }
     }
-    return -1;
+
+    return res;
 }
 
+
+#define MRKTHR_EVFILT_RW_FLAGS EV_ADD|EV_ENABLE
 
 ssize_t
 mrkthr_get_rbuflen(int fd)
@@ -435,35 +358,35 @@ mrkthr_get_rbuflen(int fd)
     int res;
     struct kevent *kev;
 
-    while (1) {
-        kev = new_event(fd, EVFILT_READ, &me->pdata._kevent);
+    kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
 
-        /*
-         * check if there is another thread waiting for the same event.
-         */
-        if (kev->udata != NULL) {
-            /*
-             * in this case we are not allowed to wait for this event,
-             * sorry.
-             */
-            me->co.rc = CO_RC_SIMULTANEOUS;
-            return -1;
-        }
+    me->pdata.kev.ident = fd;
+    me->pdata.kev.filter = EVFILT_READ;
 
-        EV_SET(kev, fd, EVFILT_READ, EV_ADD|EV_ONESHOT, 0, 0, me);
-
-        /* wait for an event */
-        me->co.state = CO_STATE_READ;
-        res = yield();
-        if (res != 0) {
-            return -1;
-        }
-
-        if ((kev = result_event(fd, EVFILT_READ)) != NULL) {
-            return (ssize_t)(kev->data);
-        }
+    /* wait for an event */
+    me->co.state = CO_STATE_READ;
+    res = yield();
+    if (res != 0) {
+        return -1;
     }
-    return -1;
+
+    if (me->pdata.kev.ident == -1) {
+        /*
+         * we haven't got to kevent() call
+         */
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
+            FAIL("result_event");
+        }
+        poller_mrkthr_ctx_init(me);
+        res = (ssize_t)kev->data;
+    }
+
+    return res;
 }
 
 
@@ -473,36 +396,36 @@ mrkthr_get_wbuflen(int fd)
     int res;
     struct kevent *kev;
 
-    while (1) {
-        kev = new_event(fd, EVFILT_WRITE, &me->pdata._kevent);
+    kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
 
-        /*
-         * check if there is another thread waiting for the same event.
-         */
-        if (kev->udata != NULL) {
-            /*
-             * in this case we are not allowed to wait for this event,
-             * sorry.
-             */
-            me->co.rc = CO_RC_SIMULTANEOUS;
-            return -1;
-        }
+    me->pdata.kev.ident = fd;
+    me->pdata.kev.filter = EVFILT_WRITE;
 
-        EV_SET(kev, fd, EVFILT_WRITE, EV_ADD|EV_ONESHOT, 0, 0, me);
+    /* wait for an event */
+    me->co.state = CO_STATE_WRITE;
+    res = yield();
 
-        /* wait for an event */
-        me->co.state = CO_STATE_WRITE;
-        res = yield();
-
-        if (res != 0) {
-            return -1;
-        }
-
-        if ((kev = result_event(fd, EVFILT_WRITE)) != NULL) {
-            return (ssize_t)(kev->data ? kev->data : 1024*1024);
-        }
+    if (res != 0) {
+        return -1;
     }
-    return -1;
+
+    if (me->pdata.kev.ident == -1) {
+        /*
+         * we haven't got to kevent() call
+         */
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
+            FAIL("result_event");
+        }
+        poller_mrkthr_ctx_init(me);
+        res = (ssize_t)(kev->data ? kev->data : MRKTHR_DEFAULT_WBUFLEN);
+    }
+
+    return res;
 }
 
 
@@ -513,10 +436,8 @@ int
 mrkthr_loop(void)
 {
     int kevres = 0;
-    int i;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
-    int nempty, nkev;
     btrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
     array_iter_t it;
@@ -533,7 +454,7 @@ mrkthr_loop(void)
         /* this will make sure there are no expired ctxes in the sleepq */
         poller_sift_sleepq();
 
-        /* get the first to wake sleeping mrkthr */
+        /* get the first to wake up */
         if ((node = BTRIE_MIN(&the_sleepq)) != NULL) {
             ctx = node->value;
             assert(ctx != NULL);
@@ -579,35 +500,29 @@ mrkthr_loop(void)
         array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
 #endif
 
-        /* how many discarded items are to the end of the kevnts0? */
-        nempty = 0;
-        for (kev = array_last(&kevents0, &it);
-             kev != NULL;
-             kev = array_prev(&kevents0, &it)) {
-            if (kev->ident == (uintptr_t)(-1)) {
-                ++nempty;
-            } else {
-                break;
-            }
-        }
-#ifdef TRACE_VERBOSE
-        TRACE("saved %d items of %ld total off from kevents0",
-              nempty,
-              kevents0.elnum);
-#endif
+        if (kevents0.elnum != 0 || kevents0_elnum != 0) {
+            kevents1_elnum = MAX(kevents1_elnum, kevents0_elnum);
+            UNUSED struct kevent *tmp;
 
-        /* there are *some* events */
-        nkev = kevents0.elnum - nempty;
-        if (nkev != 0) {
-            if (array_ensure_len_dirty(&kevents1, nkev, 0) != 0) {
+            if (array_ensure_len_dirty(&kevents1, kevents1_elnum, 0) != 0) {
                 FAIL("array_ensure_len");
             }
 
             kevres = kevent(q0,
-                         kevents0.data, nkev,
-                         kevents1.data, kevents1.elnum,
-                         tmout);
+                            kevents0.data, kevents0.elnum,
+                            kevents1.data, kevents1.elnum,
+                            tmout);
 
+#ifdef TRACE_VERBOSE
+            TRACE(FRED("...kevres=%d kevents0.elnum=%ld kevents0_elnum=%ld"), kevres, kevents0.elnum, kevents0_elnum);
+            for (tmp = array_first(&kevents1, &it);
+                 tmp != NULL && (int)it.iter < kevres;
+                 tmp = array_next(&kevents1, &it)) {
+                (void)kevent_dump(tmp);
+            }
+#endif
+
+            (void)array_clear(&kevents0);
             update_now();
 
             if (kevres == -1) {
@@ -621,14 +536,7 @@ mrkthr_loop(void)
                 break;
             }
 
-#ifdef TRACE_VERBOSE
-            TRACE("kevent returned %d", kevres);
-            array_traverse(&kevents1,
-                           (array_traverser_t)kevent_dump,
-                           NULL);
-#endif
-
-            if (kevres == 0) {
+            if (kevres == 0 && kevents0_elnum == 0) {
 #ifdef TRACE_VERBOSE
                 TRACE("Nothing to process ...");
 #endif
@@ -645,140 +553,49 @@ mrkthr_loop(void)
                 }
             }
 
-            for (i = 0; i < kevres; ++i) {
+            for (kev = array_first(&kevents1, &it);
+                 kev != NULL && (int)it.iter < kevres;
+                 kev = array_next(&kevents1, &it)) {
                 int pres;
 
-                kev = array_get(&kevents1, i);
-
                 assert(kev != NULL);
-
                 if (kev->ident != (uintptr_t)(-1)) {
-
                     ctx = kev->udata;
-
-
+                    unsigned char corc;
                     /*
                      * we first clear the event, and then the handlers/co's
                      * might re-add if needed.
                      */
-                    clear_event(kev->ident, kev->filter,
-                                        ctx != NULL ? ctx->pdata._kevent : -1);
-
-                    if (kev->flags & EV_ERROR) {
-#ifdef TRACE_VERBOSE
-                        TRACE("Error condition for FD %08lx, "
-                              "(%s) skipping ...",
-                              kev->ident, strerror(kev->data));
-#endif
-                        continue;
-                    }
-
 #ifdef TRACE_VERBOSE
                     //CTRACE("Processing:");
                     //mrkthr_dump(ctx);
 #endif
-
-
-                    if (ctx != NULL) {
-
-                        /* only clear_event() makes use of it */
-                        ctx->pdata._kevent = -1;
-
-                        switch (kev->filter) {
-
-                        case EVFILT_READ:
-
-                            if (ctx->co.f != NULL) {
-
-                                if (ctx->co.state != CO_STATE_READ) {
-                                    TRACE(FRED("Delivering a read event "
-                                               "that was not scheduled for!"));
-                                }
-
-                                if ((pres = poller_resume(ctx)) != 0) {
-#ifdef TRACE_VERBOSE
-                                    TRACE("Could not resume co %d "
-                                          "for read FD %08lx, discarding ...",
-                                          ctx->co.id, kev->ident);
-#endif
-                                    if ((pres & RESUME) == RESUME) {
-                                        discard_event(kev->ident, kev->filter);
-                                    }
-                                }
-
-                            } else {
-                                TRACE("co for FD %08lx NULL, "
-                                      "discarding ...", kev->ident);
-                            }
-                            break;
-
-                        case EVFILT_WRITE:
-
-                            if (ctx->co.f != NULL) {
-
-                                if (ctx->co.state != CO_STATE_WRITE) {
-                                    TRACE(FRED("Delivering a write event "
-                                               "that was not scheduled for!"));
-                                }
-
-                                if ((pres = poller_resume(ctx)) != 0) {
-#ifdef TRACE_VERBOSE
-                                    TRACE("Could not resume co %d "
-                                          "for write FD %08lx, discarding ...",
-                                          ctx->co.id, kev->ident);
-#endif
-                                    if ((pres & RESUME) == RESUME) {
-                                        discard_event(kev->ident, kev->filter);
-                                    }
-                                }
-
-                            } else {
-                                TRACE("co for FD %08lx is NULL, "
-                                      "discarding ...", kev->ident);
-                            }
-                            break;
-
-                        case EVFILT_VNODE:
-
-                            if (ctx->co.f != NULL) {
-
-                                if (ctx->co.state != CO_STATE_READ) {
-                                    TRACE(FRED("Delivering a vnode event "
-                                               "that was not scheduled for!"));
-                                }
-
-                                if ((pres = poller_resume(ctx)) != 0) {
-#ifdef TRACE_VERBOSE
-                                    TRACE("Could not resume co %d "
-                                          "for read FD %08lx, discarding ...",
-                                          ctx->co.id, kev->ident);
-#endif
-                                    if ((pres & RESUME) == RESUME) {
-                                        discard_event(kev->ident, kev->filter);
-                                    }
-                                }
-
-                            } else {
-                                TRACE("co for FD %08lx NULL, "
-                                      "discarding ...", kev->ident);
-                            }
-                            break;
-
-
-                        default:
-                            TRACE("Filter %s is not supported, discarding",
-                                  kevent_filter_str(kev->filter));
-                            discard_event(kev->ident, kev->filter);
-                        }
-
+                    if (kev->flags & EV_ERROR) {
+                        corc = CO_RC_ERROR;
                     } else {
-
+                        discard_event(kev->ident, kev->filter, ctx);
+                        corc = 0;
+                    }
+                    if (ctx != NULL) {
+                        ctx->pdata.kev.idx = it.iter;
+                        if (ctx->co.f != NULL) {
+                            ctx->co.rc = corc;
+                            if ((pres = poller_resume(ctx)) != 0) {
+#ifdef TRACE_VERBOSE
+                                TRACE("Could not resume co %d "
+                                      "for read FD %08lx (res=%d)",
+                                      ctx->co.id, kev->ident, pres);
+#endif
+                            }
+                        } else {
+                            TRACE("co for FD %08lx is NULL, "
+                                  "discarding ...", kev->ident);
+                        }
+                    } else {
                         TRACE("no thread for FD %08lx filter %s "
                               "using default [discard]...", kev->ident,
                               kevent_filter_str(kev->filter));
-                        discard_event(kev->ident, kev->filter);
                     }
-
                 } else {
                     TRACE("kevent returned ident -1");
                     KEVENT_DUMP(kev);
@@ -793,7 +610,9 @@ mrkthr_loop(void)
              */
             if (tmout != NULL) {
                 if (tmout->tv_sec != 0 || tmout->tv_nsec != 0) {
-                    //TRACE("Nothing to pass to kevent(), nanosleep ? ...");
+#ifdef TRACE_VERBOSE
+                    TRACE("Nothing to pass to kevent(), nanosleep ? ...");
+#endif
                     kevres = nanosleep(tmout, NULL);
 
                     if (kevres == -1) {
@@ -811,7 +630,6 @@ mrkthr_loop(void)
                     TRACE("tmout was zero, no nanosleep.");
 #endif
                 }
-
             } else {
 #ifdef TRACE_VERBOSE
                 TRACE("Nothing to pass to kevent(), breaking the loop ? ...");
@@ -823,9 +641,7 @@ mrkthr_loop(void)
     }
 
     PROFILE_STOP(mrkthr_sched0_p);
-
     TRACE("exiting mrkthr_loop ...");
-
     return kevres;
 }
 
@@ -833,7 +649,9 @@ mrkthr_loop(void)
 void
 poller_mrkthr_ctx_init(struct _mrkthr_ctx *ctx)
 {
-    ctx->pdata._kevent = -1;
+    ctx->pdata.kev.ident = -1;
+    ctx->pdata.kev.filter = 0;
+    ctx->pdata.kev.idx = -1;
 }
 
 
@@ -855,13 +673,13 @@ poller_init(void)
 
     if (array_init(&kevents0, sizeof(struct kevent), 0,
                    kevent_init,
-                   kevent_fini) != 0) {
+                   NULL) != 0) {
         FAIL("array_init");
     }
 
     if (array_init(&kevents1, sizeof(struct kevent), 0,
                    kevent_init,
-                   kevent_fini) != 0) {
+                   NULL) != 0) {
         FAIL("array_init");
     }
 }

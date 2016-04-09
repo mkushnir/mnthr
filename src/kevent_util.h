@@ -16,7 +16,6 @@ int kevent_dump(void *);
 
 const char * kevent_filter_str(int);
 int kevent_init(void *data);
-int kevent_fini(void *data);
 int kevent_isempty(struct kevent *);
 void kevent_copy(struct kevent *, struct kevent *);
 

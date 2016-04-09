@@ -109,12 +109,14 @@ struct _mrkthr_ctx {
 #       define CO_RC_USER_INTERRUPTED 0x02
 #       define CO_RC_TIMEDOUT 0x03
 #       define CO_RC_SIMULTANEOUS 0x04
+#       define CO_RC_ERROR 0x04
 #       define CO_RC_STR(rc) (                                         \
             (rc) == 0 ? "OK" :                                         \
             (rc) == CO_RC_EXITED ? "EXITED" :                          \
             (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :      \
             (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" :                      \
             (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :              \
+            (rc) == CO_RC_ERROR ? "ERROR" :                            \
             "UD"                                                       \
         )                                                              \
 
@@ -174,7 +176,11 @@ struct _mrkthr_ctx {
      * specifically for mrkthr_clear_event()
      */
     union {
-        int _kevent;
+        struct {
+            int ident;
+            int filter;
+            int idx;
+        } kev;
         void *_ev;
     } pdata;
 
@@ -228,6 +234,7 @@ struct _mrkthr_profile {
     long double avg;
 };
 
+#define MRKTHR_DEFAULT_WBUFLEN (1024*1024)
 
 #define CO_FLAG_INITIALIZED 0x01
 #define CO_FLAG_SHUTDOWN 0x02
