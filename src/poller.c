@@ -135,6 +135,10 @@ poller_sift_sleepq(void)
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
             btrie_remove_node(&the_sleepq, trn);
             trn = NULL;
+#ifdef TRACE_VERBOSE
+            CTRACE(FBGREEN("Put in runq:"));
+            mrkthr_dump(ctx);
+#endif
         } else {
             break;
         }
@@ -166,7 +170,7 @@ poller_sift_sleepq(void)
                  * should never occur.
                  */
 #ifdef TRACE_VERBOSE
-                TRACE(FRED("Have to deliver a %s event "
+                TRACE(FYELLOW("Have to deliver a %s event "
                            "to co.id=%d that was not scheduled for!"),
                            CO_STATE_STR(bctx->co.state),
                            bctx->co.id);
@@ -194,7 +198,7 @@ poller_sift_sleepq(void)
 #ifdef TRACE_VERBOSE
             TRACE("bctx=%p", bctx);
             TRACE("ctx=%p", ctx);
-            TRACE(FRED("Have to deliver a %s event "
+            TRACE(FYELLOW("Have to deliver a %s event "
                        "to co.id=%d that was not scheduled for!"),
                        bctx != NULL ? CO_STATE_STR(bctx->co.state) : "<bctx NULL>",
                        ctx->co.id);

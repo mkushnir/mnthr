@@ -126,12 +126,12 @@ ev_item_hash(ev_item_t *ev)
         u.i = &ev->ty;
         ev->hash = fasthash(0, u.c, sizeof(ev->ty));
         if (ev->ty == EV_TYPE_IO) {
-            int events;
+            int _events;
             u.i = &ev->ev.io.fd;
             ev->hash = fasthash(ev->hash, u.c, sizeof(ev->ev.io.fd));
-            events = ev->ev.io.events & ~EV__IOFDSET;
-            u.i = &events;
-            ev->hash = fasthash(ev->hash, u.c, sizeof(events));
+            _events = ev->ev.io.events & ~EV__IOFDSET;
+            u.i = &_events;
+            ev->hash = fasthash(ev->hash, u.c, sizeof(_events));
         } else if (ev->ty == EV_TYPE_STAT) {
             uint64_t h;
             h = bytes_hash(ev->stat_path);
@@ -227,7 +227,7 @@ ev_item_destroy(ev_item_t **ev)
             ev_io_stop(the_loop, &(*ev)->ev.io);
         } else if ((*ev)->ty == EV_TYPE_STAT) {
 #ifdef TRACE_VERBOSE
-            CTRACE(FRED("destroying ev_io %s/%d"),
+            CTRACE(FRED("destroying ev_stat %s/%d"),
                    (*ev)->ev.stat.path, (*ev)->ev.stat.wd);
 #endif
             ev_stat_stop(the_loop, &(*ev)->ev.stat);
@@ -450,14 +450,19 @@ poller_clear_event(mrkthr_ctx_t *ctx)
         ev_item_t *ev;
 
         ev = ctx->pdata._ev;
+        if (ev->ty == EV_TYPE_IO) {
 #ifdef TRACE_VERBOSE
         CTRACE(FRED("clearing ev_io %d/%s"),
                ev->ev.io.fd,
                EV_STR(ev->ev.io.events));
 #endif
-        if (ev->ty == EV_TYPE_IO) {
             ev_io_stop(the_loop, &ev->ev.io);
         } else if (ev->ty == EV_TYPE_STAT) {
+#ifdef TRACE_VERBOSE
+        CTRACE(FRED("clearing ev_stat %s/%d"),
+               ev->ev.stat.path,
+               ev->ev.stat.wd);
+#endif
             ev_stat_stop(the_loop, &ev->ev.stat);
         } else {
             FAIL("poller_clear_event");

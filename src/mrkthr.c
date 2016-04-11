@@ -229,7 +229,7 @@ mrkthr_dump_sleepq(void)
 {
     CTRACE("sleepq:");
     btrie_traverse(&the_sleepq, dump_sleepq_node, NULL);
-    CTRACE("end of sleepq");
+    TRACEC("end of sleepq\n");
 }
 
 
@@ -302,7 +302,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                  * Here we have found ctx is not in the bucket.
                  * Just ignore it.
                  */
-                //CTRACE("sle:");
+                //CTRACE("not in sleepq 0, sle:");
                 //mrkthr_dump(sle);
                 //CTRACE("ctx: %p/%p", DTQUEUE_PREV(sleepq_link, ctx), DTQUEUE_NEXT(sleepq_link, ctx));
                 //mrkthr_dump(ctx);
@@ -316,6 +316,8 @@ sleepq_remove(mrkthr_ctx_t *ctx)
             }
         }
     } else {
+        //CTRACE("not in sleepq 1:");
+        //mrkthr_dump(ctx);
     }
     //CTRACE(FBLUE("SL after removing:"));
     //mrkthr_dump_sleepq();
@@ -338,18 +340,23 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
         //TRACE("while inserting, found bucket:");
-        //mrkthr_dump(tmp);
+        //mrkthr_dump(bucket_host);
         if (DTQUEUE_HEAD(&bucket_host->sleepq_bucket) == NULL) {
             DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
         } else {
+            mrkthr_ctx_t *tmp;
+
+            //CTRACE("before:");
+            //mrkthr_dump(DTQUEUE_HEAD(&bucket_host->sleepq_bucket));
+            tmp = DTQUEUE_HEAD(&bucket_host->sleepq_bucket);
             DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
                                   sleepq_link,
-                                  DTQUEUE_HEAD(&bucket_host->sleepq_bucket),
+                                  tmp,
                                   ctx);
         }
 
         //TRACE("After adding to the bucket:");
-        //mrkthr_dump(tmp);
+        //mrkthr_dump(bucket_host);
     } else {
         trn->value = ctx;
     }
@@ -374,11 +381,11 @@ sleepq_append(mrkthr_ctx_t *ctx)
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
         //TRACE("while appending, found bucket:");
-        //mrkthr_dump(tmp);
+        //mrkthr_dump(bucket_host);
         DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
 
         //TRACE("After adding to the bucket:");
-        //mrkthr_dump(tmp);
+        //mrkthr_dump(bucket_host);
     } else {
         trn->value = ctx;
     }
@@ -597,6 +604,8 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     //DTQUEUE_FINI(&ctx->sleepq_bucket);
     //DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
     ctx->expire_ticks = 0;
+
+    ctx->sleepq_enqueue = sleepq_append;
 
     co_fini_other(&ctx->co);
 
