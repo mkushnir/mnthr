@@ -13,7 +13,7 @@ ls_platform= kevent_poller.c kevent_util.c
 PLATFORM_FLAGS=-DUSE_KEVENT
 endif
 
-noinst_HEADERS = mrkthr_private.h $(dh_platform)
+dist_HEADERS = mrkthr_private.h $(dh_platform)
 
 BUILT_SOURCES = diag.c diag.h
 EXTRA_DIST = diag.txt gen-diag

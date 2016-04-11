@@ -6,7 +6,7 @@ AM_MAKEFLAGS = -s
 noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile
 
 distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/test
-noinst_HEADERS = unittest.h
+dist_HEADERS = unittest.h
 
 BUILT_SOURCES = ../src/diag.c ../src/diag.h
 
