@@ -65,7 +65,7 @@ poller_resume(mrkthr_ctx_t *ctx)
 #endif
 
     if (errno == EINTR) {
-        perror("poller_resume(), ignoring ...");
+        CTRACE("ignoring EINTR");
 #ifdef TRACE_VERBOSE
         //mrkthr_dump(ctx);
 #endif
