@@ -593,6 +593,9 @@ mrkthr_get_wbuflen(int fd)
     me->pdata._ev = NULL;
 
     if (res != 0) {
+#ifdef TRACE_VERBOSE
+        CTRACE("yield() res=%d", res);
+#endif
         return -1;
     }
 

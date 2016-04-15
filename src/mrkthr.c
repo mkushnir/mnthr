@@ -71,6 +71,7 @@ MEMDEBUG_DECLARE(mrkthr);
 #endif
 
 //#define TRACE_VERBOSE
+//#define TRRET_DEBUG
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
 
@@ -843,11 +844,14 @@ mrkthr_id(void)
 }
 
 
-void
+int
 mrkthr_set_retval(int rv)
 {
+    int rc;
     assert(me != NULL);
+    rc = me->co.rc;
     me->co.rc = rv;
+    return rc;
 }
 
 
@@ -1655,7 +1659,7 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
 
 
 void
-mrkthr_signal_error(mrkthr_signal_t *signal, unsigned char rc)
+mrkthr_signal_error(mrkthr_signal_t *signal, int rc)
 {
     if (signal->owner != NULL) {
         if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {

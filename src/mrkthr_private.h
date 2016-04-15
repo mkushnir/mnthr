@@ -120,7 +120,7 @@ struct _mrkthr_ctx {
             "UD"                                                       \
         )                                                              \
 
-        unsigned char rc;
+        int rc;
     } co;
 
     /*

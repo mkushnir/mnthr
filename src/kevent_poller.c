@@ -561,7 +561,7 @@ mrkthr_loop(void)
                 assert(kev != NULL);
                 if (kev->ident != (uintptr_t)(-1)) {
                     ctx = kev->udata;
-                    unsigned char corc;
+                    int corc;
                     /*
                      * we first clear the event, and then the handlers/co's
                      * might re-add if needed.

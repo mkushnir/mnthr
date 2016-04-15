@@ -102,7 +102,7 @@ mrkthr_ctx_t *mrkthr_spawn_sig(const char *, cofunc, int, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
-void mrkthr_set_retval(int);
+int mrkthr_set_retval(int);
 void mrkthr_set_prio(mrkthr_ctx_t *, int);
 MRKTHR_ASYNC int mrkthr_sleep(uint64_t);
 MRKTHR_ASYNC int mrkthr_sleep_ticks(uint64_t);
@@ -158,7 +158,7 @@ MRKTHR_ASYNC int mrkthr_signal_subscribe(mrkthr_signal_t *);
 MRKTHR_ASYNC int mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *,
                                                       uint64_t);
 void mrkthr_signal_send(mrkthr_signal_t *);
-void mrkthr_signal_error(mrkthr_signal_t *, unsigned char);
+void mrkthr_signal_error(mrkthr_signal_t *, int);
 
 void mrkthr_cond_init(mrkthr_cond_t *);
 MRKTHR_ASYNC int mrkthr_cond_wait(mrkthr_cond_t *);
