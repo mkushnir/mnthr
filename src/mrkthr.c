@@ -214,9 +214,9 @@ dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
         if (key != ctx->expire_ticks) {
-            //CTRACE(FRED("trn=%p key=%016lx"), trn, key);
+            TRACEC(FRED("trn=%p key=%016lx "), trn, key);
         } else {
-            //CTRACE("trn=%p key=%016lx", trn, key);
+            TRACEC("trn=%p key=%016lx ", trn, key);
         }
         mrkthr_dump(ctx);
     }
@@ -284,6 +284,8 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 DTQUEUE_ENTRY_FINI(sleepq_link, sle);
 
                 trn->value = bucket_host_pretendent;
+                //TRACEC(FYELLOW("removeH"));
+                //mrkthr_dump(ctx);
 
             } else {
                 /* we are removing from the bucket */
@@ -292,6 +294,11 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                     //mrkthr_dump(ctx);
                     //CTRACE("-----");
                     DTQUEUE_REMOVE(&sle->sleepq_bucket, sleepq_link, ctx);
+                    //TRACEC(FYELLOW("removeB"));
+                    //mrkthr_dump(ctx);
+                } else {
+                    //TRACEC(FBLUE("?????? "));
+                    //mrkthr_dump(ctx);
                 }
             }
 
@@ -302,22 +309,26 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                  * Here we have found ctx is not in the bucket.
                  * Just ignore it.
                  */
-                //CTRACE("not in sleepq 0, sle:");
                 //mrkthr_dump(sle);
                 //CTRACE("ctx: %p/%p", DTQUEUE_PREV(sleepq_link, ctx), DTQUEUE_NEXT(sleepq_link, ctx));
+                //TRACEC(FBLUE("not in sleepq 0:"));
                 //mrkthr_dump(ctx);
                 //mrkthr_dump_sleepq();
 
                 //assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
                 //assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
             } else {
+                //TRACEC(FYELLOW("remove "));
+                //mrkthr_dump(ctx);
                 trn->value = NULL;
                 btrie_remove_node(&the_sleepq, trn);
             }
         }
     } else {
-        //CTRACE("not in sleepq 1:");
-        //mrkthr_dump(ctx);
+        //if (ctx->expire_ticks > 1) {
+        //    TRACEC(FBLUE("not in sleepq 1:"));
+        //    mrkthr_dump(ctx);
+        //}
     }
     //CTRACE(FBLUE("SL after removing:"));
     //mrkthr_dump_sleepq();
@@ -337,6 +348,10 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
+    //if (ctx->expire_ticks > 1) {
+    //    TRACEC(FRED("insert "));
+    //    mrkthr_dump(ctx);
+    //}
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
         //TRACE("while inserting, found bucket:");
@@ -378,6 +393,10 @@ sleepq_append(mrkthr_ctx_t *ctx)
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
+    //if (ctx->expire_ticks > 1) {
+    //    TRACEC(FRED("append "));
+    //    mrkthr_dump(ctx);
+    //}
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
         //TRACE("while appending, found bucket:");

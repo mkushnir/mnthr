@@ -132,9 +132,15 @@ poller_sift_sleepq(void)
         assert(ctx != NULL);
 
         if (ctx->expire_ticks < now) {
+            //if (ctx->expire_ticks > 1) {
+            //    TRACEC(FBYELLOW("remove "));
+            //    mrkthr_dump(ctx);
+            //}
+
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
             btrie_remove_node(&the_sleepq, trn);
             trn = NULL;
+            ctx->expire_ticks = 0;
 #ifdef TRACE_VERBOSE
             CTRACE(FBGREEN("Put in runq:"));
             mrkthr_dump(ctx);
