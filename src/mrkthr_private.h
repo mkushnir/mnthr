@@ -247,7 +247,6 @@ int yield(void);
 void push_free_ctx(struct _mrkthr_ctx *);
 void sleepq_remove(struct _mrkthr_ctx *);
 void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
-int dump_ctx_traverser(struct _mrkthr_ctx *, void *);
 
 uint64_t poller_msec2ticks_absolute(uint64_t);
 uint64_t poller_ticks_absolute(uint64_t);

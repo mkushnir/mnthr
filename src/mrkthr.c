@@ -76,7 +76,6 @@ MEMDEBUG_DECLARE(mrkthr);
 #include <mrkcommon/dumpm.h>
 
 #include <mrkcommon/array.h>
-#include <mrkcommon/list.h>
 #include <mrkcommon/dtqueue.h>
 #include <mrkcommon/stqueue.h>
 /* Experimental trie use */
@@ -99,7 +98,7 @@ ucontext_t main_uc;
 static char main_stack[STACKSIZE];
 
 static int co_id = 0;
-static list_t ctxes;
+static array_t ctxes;
 mrkthr_ctx_t *me;
 
 static STQUEUE(_mrkthr_ctx, free_list);
@@ -111,8 +110,8 @@ static STQUEUE(_mrkthr_ctx, free_list);
 btrie_t the_sleepq;
 
 
-static int mrkthr_ctx_init(mrkthr_ctx_t *);
-static int mrkthr_ctx_fini(mrkthr_ctx_t *);
+static int mrkthr_ctx_init(mrkthr_ctx_t **);
+static int mrkthr_ctx_fini(mrkthr_ctx_t **);
 static void co_fini_ucontext(struct _co *);
 static void co_fini_other(struct _co *);
 static void resume_waitq_all(mrkthr_waitq_t *);
@@ -427,10 +426,10 @@ mrkthr_init(void)
 
     STQUEUE_INIT(&free_list);
 
-    if (list_init(&ctxes, sizeof(mrkthr_ctx_t), 0,
-                  (list_initializer_t)mrkthr_ctx_init,
-                  (list_finalizer_t)mrkthr_ctx_fini) != 0) {
-        FAIL("list_init");
+    if (array_init(&ctxes, sizeof(mrkthr_ctx_t *), 0,
+                  (array_initializer_t)mrkthr_ctx_init,
+                  (array_finalizer_t)mrkthr_ctx_fini) != 0) {
+        FAIL("array_init");
     }
 
     poller_init();
@@ -455,7 +454,7 @@ mrkthr_fini(void)
     }
 
     me = NULL;
-    list_fini(&ctxes);
+    array_fini(&ctxes);
     STQUEUE_FINI(&free_list);
     btrie_fini(&the_sleepq);
     poller_fini();
@@ -503,11 +502,13 @@ mrkthr_get_sleepq_volume(void)
 }
 
 
-int
-dump_ctx_traverser(mrkthr_ctx_t *ctx, UNUSED void *udata)
+static int
+dump_ctx_traverser(mrkthr_ctx_t **ctx, UNUSED void *udata)
 {
-    if ((ctx)->co.id != -1) {
-        mrkthr_dump(ctx);
+    if (*ctx != NULL) {
+        if ((*ctx)->co.id != -1) {
+            mrkthr_dump(*ctx);
+        }
     }
     return 0;
 }
@@ -517,7 +518,7 @@ void
 mrkthr_dump_all_ctxes(void)
 {
     TRACEC("all ctxes:\n");
-    list_traverse(&ctxes, (list_traverser_t)dump_ctx_traverser, NULL);
+    array_traverse(&ctxes, (array_traverser_t)dump_ctx_traverser, NULL);
     TRACEC("end of all ctxes\n");
 }
 
@@ -526,8 +527,14 @@ mrkthr_dump_all_ctxes(void)
  * mrkthr_ctx management
  */
 static int
-mrkthr_ctx_init(mrkthr_ctx_t *ctx)
+mrkthr_ctx_init(mrkthr_ctx_t **pctx)
 {
+    mrkthr_ctx_t *ctx;
+
+    if ((ctx = malloc(sizeof(mrkthr_ctx_t))) == NULL) {
+        FAIL("malloc");
+    }
+
     /* co ucontext */
     ctx->co.stack = MAP_FAILED;
     ctx->co.uc.uc_link = NULL;
@@ -559,6 +566,8 @@ mrkthr_ctx_init(mrkthr_ctx_t *ctx)
     STQUEUE_ENTRY_INIT(free_link, ctx);
     STQUEUE_ENTRY_INIT(runq_link, ctx);
     poller_mrkthr_ctx_init(ctx);
+
+    *pctx = ctx;
 
     return 0;
 }
@@ -625,11 +634,15 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
 
 
 static int
-mrkthr_ctx_fini(mrkthr_ctx_t *ctx)
+mrkthr_ctx_fini(mrkthr_ctx_t **pctx)
 {
-    co_fini_ucontext(&ctx->co);
-    mrkthr_ctx_finalize(ctx);
-    ctx->co.rc = 0;
+    if (*pctx != NULL) {
+        co_fini_ucontext(&(*pctx)->co);
+        mrkthr_ctx_finalize(*pctx);
+        (*pctx)->co.rc = 0;
+        free(*pctx);
+        *pctx = NULL;
+    }
     return 0;
 }
 
@@ -649,11 +662,11 @@ _getcontext(ucontext_t *ucp)
 static mrkthr_ctx_t *
 mrkthr_ctx_new(void)
 {
-    mrkthr_ctx_t *ctx;
-    if ((ctx = list_incr(&ctxes)) == NULL) {
-        FAIL("list_incr");
+    mrkthr_ctx_t **ctx;
+    if ((ctx = array_incr(&ctxes)) == NULL) {
+        FAIL("array_incr");
     }
-    return ctx;
+    return *ctx;
 }
 
 
@@ -668,9 +681,11 @@ mrkthr_ctx_pop_free(void)
         ctx->co.rc = 0;
         //CTRACE("pop_free_ctx 0");
     } else {
-        if ((ctx = list_incr(&ctxes)) == NULL) {
-            FAIL("list_incr");
+        mrkthr_ctx_t **pctx;
+        if ((pctx = array_incr(&ctxes)) == NULL) {
+            FAIL("array_incr");
         }
+        ctx = *pctx;
         //CTRACE("pop_free_ctx 1");
     }
     //mrkthr_dump(ctx);
