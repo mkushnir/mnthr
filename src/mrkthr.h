@@ -113,6 +113,7 @@ MRKTHR_ASYNC int mrkthr_join(mrkthr_ctx_t *);
 void mrkthr_run(mrkthr_ctx_t *);
 void mrkthr_set_interrupt(mrkthr_ctx_t *);
 MRKTHR_ASYNC int mrkthr_set_interrupt_and_join(mrkthr_ctx_t *);
+MRKTHR_ASYNC int mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *, uint64_t);
 int mrkthr_is_dead(mrkthr_ctx_t *);
 
 int mrkthr_socket(const char *, const char *, int, int);

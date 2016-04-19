@@ -918,21 +918,24 @@ yield(void)
 }
 
 
+#define MRKTHR_SET_EXPIRE_TICKS(v, fn)                 \
+    if (v == MRKTHR_SLEEP_FOREVER) {                   \
+        me->expire_ticks = MRKTHR_SLEEP_FOREVER;       \
+    } else {                                           \
+        if (v == 0) {                                  \
+            me->expire_ticks = 1;                      \
+        } else {                                       \
+            me->expire_ticks = fn(v);                  \
+        }                                              \
+    }                                                  \
+
 static int
 sleepmsec(uint64_t msec)
 {
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    if (msec == MRKTHR_SLEEP_FOREVER) {
-        me->expire_ticks = MRKTHR_SLEEP_FOREVER;
-    } else {
-        if (msec == 0) {
-            me->expire_ticks = 1;
-        } else {
-            me->expire_ticks = poller_msec2ticks_absolute(msec);
-        }
-    }
+    MRKTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
 
     //CTRACE("msec=%ld expire_ticks=%ld", msec, me->expire_ticks);
 
@@ -948,15 +951,7 @@ sleepticks(uint64_t ticks)
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    if (ticks == MRKTHR_SLEEP_FOREVER) {
-        me->expire_ticks = MRKTHR_SLEEP_FOREVER;
-    } else {
-        if (ticks == 0) {
-            me->expire_ticks = 1;
-        } else {
-            me->expire_ticks = poller_ticks_absolute(ticks);
-        }
-    }
+    MRKTHR_SET_EXPIRE_TICKS(ticks, poller_ticks_absolute);
 
     //CTRACE("ticks=%ld expire_ticks=%ld", ticks, me->expire_ticks);
 
@@ -1191,13 +1186,50 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
 int
 mrkthr_set_interrupt_and_join(mrkthr_ctx_t *ctx)
 {
-    mrkthr_set_interrupt(ctx);
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
         return MRKTHR_JOIN_FAILURE;
     }
+
+    mrkthr_set_interrupt(ctx);
+
     me->co.state = CO_STATE_JOIN_INTERRUPTED;
+
     return join_waitq(&ctx->waitq);
+}
+
+
+int
+mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
+{
+    int res;
+
+    if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
+        /* dormant thread, or an attempt to join self ? */
+        return MRKTHR_JOIN_FAILURE;
+    }
+    mrkthr_set_interrupt(ctx);
+
+    me->co.state = CO_STATE_JOIN_INTERRUPTED;
+    MRKTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
+
+    append_me_to_waitq(&ctx->waitq);
+
+    res = sleepmsec(msec);
+
+    if (ctx->co.state == CO_STATE_DORMANT) {
+        sleepq_remove(me);
+        if (ctx->co.rc != CO_RC_USER_INTERRUPTED) {
+            res = ctx->co.rc;
+        }
+    } else {
+        assert(ctx->co.state & CO_STATE_RESUMABLE);
+        remove_me_from_waitq(&ctx->waitq);
+        ctx->co.rc = CO_RC_TIMEDOUT;
+        res = MRKTHR_WAIT_TIMEOUT;
+    }
+
+    return res;
 }
 
 
