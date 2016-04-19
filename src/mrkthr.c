@@ -1662,7 +1662,7 @@ mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
     //CTRACE("holding on ...");
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     res = sleepmsec(msec);
-    if (me->expire_ticks == 1) {
+    if (me->expire_ticks == 0) {
         /* I had been sleeping, but was resumed by signal_send() ... */
     } else {
         res = MRKTHR_WAIT_TIMEOUT;
