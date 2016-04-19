@@ -22,6 +22,7 @@ MEMDEBUG_DECLARE(mrkthr_ev_poller);
 #include "mrkthr_private.h"
 
 //#define TRACE_VERBOSE
+//#define TRRET_DEBUG
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
 
