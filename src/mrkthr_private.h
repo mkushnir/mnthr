@@ -38,16 +38,6 @@ extern "C" {
 
 struct _mrkthr_ctx;
 
-struct _mrkthr_ctx_list {
-    struct _mrkthr_ctx *head;
-    struct _mrkthr_ctx *tail;
-};
-
-struct _mrkthr_ctx_list_entry {
-    struct _mrkthr_ctx *prev;
-    struct _mrkthr_ctx *next;
-};
-
 typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 #define MRKTHR_WAITQ_T_DEFINED
 
@@ -143,8 +133,6 @@ struct _mrkthr_ctx {
      * the mrkthr_ctx_t structure. Any member of the sleep list can be
      * a "bucket owner", and can subsequently hold other instances under
      * the same key. This design resembles a multimap.
-     *
-     * UPD: This design can be improved by using <mrkcommon/dtqueue.h>
      */
     mrkthr_waitq_t sleepq_bucket;
 
@@ -181,7 +169,7 @@ struct _mrkthr_ctx {
             int filter;
             int idx;
         } kev;
-        void *_ev;
+        void *ev;
     } pdata;
 
 };

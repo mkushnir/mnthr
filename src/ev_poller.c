@@ -325,7 +325,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     ev_item_t *ev;
 
     assert(st->ev->ty == EV_TYPE_STAT);
-    me->pdata._ev = st->ev;
+    me->pdata.ev = st->ev;
     if (st->ev->ev.stat.data == NULL) {
         st->ev->ev.stat.data = me;
     } else if (st->ev->ev.stat.data != me) {
@@ -361,7 +361,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     assert(ev->ev.stat.data == me);
 
     ev->ev.stat.data = NULL;
-    me->pdata._ev = NULL;
+    me->pdata.ev = NULL;
 
     return res;
 }
@@ -446,10 +446,10 @@ mrkthr_get_now_ticks_precise(void)
 void
 poller_clear_event(mrkthr_ctx_t *ctx)
 {
-    if (ctx->pdata._ev != NULL) {
+    if (ctx->pdata.ev != NULL) {
         ev_item_t *ev;
 
-        ev = ctx->pdata._ev;
+        ev = ctx->pdata.ev;
         if (ev->ty == EV_TYPE_IO) {
 #ifdef TRACE_VERBOSE
         CTRACE(FRED("clearing ev_io %d/%s"),
@@ -503,7 +503,7 @@ mrkthr_get_rbuflen(int fd)
 
     ev = ev_io_item_get(fd, EV_READ);
     //ev_io_set(&ev->ev.io, fd, EV_READ);
-    me->pdata._ev = ev;
+    me->pdata.ev = ev;
 
     /*
      * check if there is another thread waiting for the same event.
@@ -535,7 +535,7 @@ mrkthr_get_rbuflen(int fd)
     assert(ev->ev.io.data == me);
 
     ev->ev.io.data = NULL;
-    me->pdata._ev = NULL;
+    me->pdata.ev = NULL;
 
     if (res != 0) {
         return -1;
@@ -560,7 +560,7 @@ mrkthr_get_wbuflen(int fd)
 
     ev = ev_io_item_get(fd, EV_WRITE);
     //ev_io_set(&ev->ev.io, fd, EV_WRITE);
-    me->pdata._ev = ev;
+    me->pdata.ev = ev;
 
     /*
      * check if there is another thread waiting for the same event.
@@ -590,7 +590,7 @@ mrkthr_get_wbuflen(int fd)
     assert(ev->ev.io.data == me);
 
     ev->ev.io.data = NULL;
-    me->pdata._ev = NULL;
+    me->pdata.ev = NULL;
 
     if (res != 0) {
 #ifdef TRACE_VERBOSE
@@ -630,12 +630,12 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
         ev_io_stop(the_loop, w);
 
     } else {
-        ev = ctx->pdata._ev;
+        ev = ctx->pdata.ev;
 
         assert(ev != NULL);
         assert(&ev->ev.io == w);
 
-        ctx->pdata._ev = NULL;
+        ctx->pdata.ev = NULL;
 
         if (ctx->co.f == NULL) {
             TRACE("co for FD %d is NULL, discarding ...", w->fd);
@@ -683,12 +683,12 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
         ev_stat_stop(the_loop, w);
 
     } else {
-        ev = ctx->pdata._ev;
+        ev = ctx->pdata.ev;
 
         assert(ev != NULL);
         assert(&ev->ev.stat == w);
 
-        ctx->pdata._ev = NULL;
+        ctx->pdata.ev = NULL;
 
         if (ctx->co.f == NULL) {
             TRACE("co for stat path %s is NULL, discarding ...", w->path);
@@ -825,7 +825,7 @@ _syserr_cb(const char *msg)
 void
 poller_mrkthr_ctx_init(struct _mrkthr_ctx *ctx)
 {
-    ctx->pdata._ev = NULL;
+    ctx->pdata.ev = NULL;
 }
 
 
