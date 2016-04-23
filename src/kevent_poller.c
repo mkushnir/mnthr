@@ -449,7 +449,7 @@ mrkthr_loop(void)
         update_now();
 
 #ifdef TRACE_VERBOSE
-        TRACE(FRED("Sifting sleepq ..."));
+        CTRACE(FRED("Sifting sleepq ..."));
 #endif
         /* this will make sure there are no expired ctxes in the sleepq */
         poller_sift_sleepq();
@@ -491,7 +491,7 @@ mrkthr_loop(void)
         }
 
 #ifdef TRACE_VERBOSE
-        TRACE(FRED("nsec_now=%ld tmout=%ld(%ld.%ld) loop..."),
+        CTRACE(FRED("nsec_now=%ld tmout=%ld(%ld.%ld) loop..."),
               nsec_now,
               tmout != NULL ?
                   tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
@@ -514,7 +514,7 @@ mrkthr_loop(void)
                             tmout);
 
 #ifdef TRACE_VERBOSE
-            TRACE(FRED("...kevres=%d kevents0.elnum=%ld kevents0_elnum=%ld"), kevres, kevents0.elnum, kevents0_elnum);
+            CTRACE(FRED("...kevres=%d kevents0.elnum=%ld kevents0_elnum=%ld"), kevres, kevents0.elnum, kevents0_elnum);
             for (tmp = array_first(&kevents1, &it);
                  tmp != NULL && (int)it.iter < kevres;
                  tmp = array_next(&kevents1, &it)) {
@@ -528,7 +528,7 @@ mrkthr_loop(void)
             if (kevres == -1) {
                 perror("kevent");
                 if (errno == EINTR) {
-                    TRACE("kevent was interrupted, redoing");
+                    CTRACE("kevent was interrupted, redoing");
                     errno = 0;
                     continue;
                 }
@@ -538,16 +538,16 @@ mrkthr_loop(void)
 
             if (kevres == 0 && kevents0_elnum == 0) {
 #ifdef TRACE_VERBOSE
-                TRACE("Nothing to process ...");
+                CTRACE("Nothing to process ...");
 #endif
                 if (tmout != NULL) {
 #ifdef TRACE_VERBOSE
-                    TRACE("Timed out.");
+                    CTRACE("Timed out.");
 #endif
                     continue;
                 } else {
 #ifdef TRACE_VERBOSE
-                    TRACE("No events, exiting.");
+                    CTRACE("No events, exiting.");
 #endif
                     break;
                 }
@@ -582,22 +582,22 @@ mrkthr_loop(void)
                             ctx->co.rc = corc;
                             if ((pres = poller_resume(ctx)) != 0) {
 #ifdef TRACE_VERBOSE
-                                TRACE("Could not resume co %d "
+                                CTRACE("Could not resume co %d "
                                       "for read FD %08lx (res=%d)",
                                       ctx->co.id, kev->ident, pres);
 #endif
                             }
                         } else {
-                            TRACE("co for FD %08lx is NULL, "
+                            CTRACE("co for FD %08lx is NULL, "
                                   "discarding ...", kev->ident);
                         }
                     } else {
-                        TRACE("no thread for FD %08lx filter %s "
+                        CTRACE("no thread for FD %08lx filter %s "
                               "using default [discard]...", kev->ident,
                               kevent_filter_str(kev->filter));
                     }
                 } else {
-                    TRACE("kevent returned ident -1");
+                    CTRACE("kevent returned ident -1");
                     KEVENT_DUMP(kev);
                     FAIL("kevent?");
                 }
@@ -611,14 +611,14 @@ mrkthr_loop(void)
             if (tmout != NULL) {
                 if (tmout->tv_sec != 0 || tmout->tv_nsec != 0) {
 #ifdef TRACE_VERBOSE
-                    TRACE("Nothing to pass to kevent(), nanosleep ? ...");
+                    CTRACE("Nothing to pass to kevent(), nanosleep ? ...");
 #endif
                     kevres = nanosleep(tmout, NULL);
 
                     if (kevres == -1) {
                         perror("nanosleep");
                         if (errno == EINTR) {
-                            TRACE("nanosleep was interrupted, redoing");
+                            CTRACE("nanosleep was interrupted, redoing");
                             errno = 0;
                             continue;
                         }
@@ -627,12 +627,12 @@ mrkthr_loop(void)
                     }
                 } else {
 #ifdef TRACE_VERBOSE
-                    TRACE("tmout was zero, no nanosleep.");
+                    CTRACE("tmout was zero, no nanosleep.");
 #endif
                 }
             } else {
 #ifdef TRACE_VERBOSE
-                TRACE("Nothing to pass to kevent(), breaking the loop ? ...");
+                CTRACE("Nothing to pass to kevent(), breaking the loop ? ...");
 #endif
                 kevres = 0;
                 break;
@@ -641,7 +641,7 @@ mrkthr_loop(void)
     }
 
     PROFILE_STOP(mrkthr_sched0_p);
-    TRACE("exiting mrkthr_loop ...");
+    CTRACE("exiting mrkthr_loop ...");
     return kevres;
 }
 

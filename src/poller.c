@@ -134,7 +134,7 @@ poller_sift_sleepq(void)
 
         if (ctx->expire_ticks < now) {
             //if (ctx->expire_ticks > 1) {
-            //    TRACEC(FBYELLOW("remove "));
+            //    CTRACEC(FBYELLOW("remove "));
             //    mrkthr_dump(ctx);
             //}
 
@@ -177,7 +177,7 @@ poller_sift_sleepq(void)
                  * should never occur.
                  */
 #ifdef TRACE_VERBOSE
-                TRACE(FYELLOW("Have to deliver a %s event "
+                CTRACE(FYELLOW("Have to deliver a %s event "
                            "to co.id=%d that was not scheduled for!"),
                            CO_STATE_STR(bctx->co.state),
                            bctx->co.id);
@@ -187,7 +187,7 @@ poller_sift_sleepq(void)
 
             if (poller_resume(bctx) != 0) {
 #ifdef TRACE_VERBOSE
-                TRACE("Could not resume co %d, discarding ...",
+                CTRACE("Could not resume co %d, discarding ...",
                       bctx->co.id);
 #endif
             }
@@ -203,9 +203,9 @@ poller_sift_sleepq(void)
              * should never occur.
              */
 #ifdef TRACE_VERBOSE
-            TRACE("bctx=%p", bctx);
-            TRACE("ctx=%p", ctx);
-            TRACE(FYELLOW("Have to deliver a %s event "
+            CTRACE("bctx=%p", bctx);
+            CTRACE("ctx=%p", ctx);
+            CTRACE(FYELLOW("Have to deliver a %s event "
                        "to co.id=%d that was not scheduled for!"),
                        bctx != NULL ? CO_STATE_STR(bctx->co.state) : "<bctx NULL>",
                        ctx->co.id);
@@ -220,7 +220,7 @@ poller_sift_sleepq(void)
 #endif
         if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
-            TRACE("Could not resume co %d, discarding ...",
+            CTRACE("Could not resume co %d, discarding ...",
                   ctx->co.id);
 #endif
         }

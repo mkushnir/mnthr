@@ -139,7 +139,7 @@ ev_item_hash(ev_item_t *ev)
             u.h = &h;
             ev->hash = fasthash(ev->hash, u.c, sizeof(u.h));
         } else {
-            TRACE("ev->ty=%d", ev->ty);
+            CTRACE("ev->ty=%d", ev->ty);
             FAIL("ev_item_hash");
         }
     }
@@ -625,9 +625,9 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
     ctx = w->data;
 
     if (ctx == NULL) {
-        TRACE("no thread for FD %d filter %s "
-              "using default [discard]...", w->fd,
-              EV_STR(w->events));
+        CTRACE("no thread for FD %d filter %s "
+               "using default [discard]...", w->fd,
+               EV_STR(w->events));
         ev_io_stop(the_loop, w);
 
     } else {
@@ -639,31 +639,31 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
         ctx->pdata.ev = NULL;
 
         if (ctx->co.f == NULL) {
-            TRACE("co for FD %d is NULL, discarding ...", w->fd);
+            CTRACE("co for FD %d is NULL, discarding ...", w->fd);
             clear_event_io(ev);
 
         } else {
             if (w->events == EV_READ) {
                 if (ctx->co.state != CO_STATE_READ) {
-                    TRACE(FRED("Delivering a read event "
-                               "that was not scheduled for!"));
+                    CTRACE(FRED("Delivering a read event "
+                                "that was not scheduled for!"));
                 }
             } else if (w->events == EV_WRITE) {
                 if (ctx->co.state != CO_STATE_WRITE) {
-                    TRACE(FRED("Delivering a read event "
-                               "that was not scheduled for!"));
+                    CTRACE(FRED("Delivering a read event "
+                                "that was not scheduled for!"));
                 }
             } else {
-                TRACE("filter %s is not supporting", EV_STR(w->events));
+                CTRACE("filter %s is not supporting", EV_STR(w->events));
             }
 
             clear_event_io(ev);
 
             if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
-                TRACE("Could not resume co %d "
-                      "for FD %d, discarding ...",
-                      ctx->co.id, w->fd);
+                CTRACE("Could not resume co %d "
+                       "for FD %d, discarding ...",
+                       ctx->co.id, w->fd);
 #endif
             }
         }
@@ -680,7 +680,7 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
     ctx = w->data;
 
     if (ctx == NULL) {
-        TRACE("no thread for stat path %s using default [discard]...", w->path);
+        CTRACE("no thread for stat path %s using default [discard]...", w->path);
         ev_stat_stop(the_loop, w);
 
     } else {
@@ -692,7 +692,7 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
         ctx->pdata.ev = NULL;
 
         if (ctx->co.f == NULL) {
-            TRACE("co for stat path %s is NULL, discarding ...", w->path);
+            CTRACE("co for stat path %s is NULL, discarding ...", w->path);
             clear_event_stat(ev);
 
         } else {
@@ -704,7 +704,7 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
 
             if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
-                TRACE("Could not resume co %d "
+                CTRACE("Could not resume co %d "
                       "for stat path %s, discarding ...",
                       ctx->co.id, w->path);
 #endif
