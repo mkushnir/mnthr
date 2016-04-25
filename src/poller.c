@@ -78,7 +78,7 @@ poller_resume(mrkthr_ctx_t *ctx)
     me = NULL;
 
     if (ctx->co.state & CO_STATE_RESUMABLE) {
-        return res;
+        return ctx->co.rc;
 
     } else if (ctx->co.state == CO_STATE_RESUMED) {
         /*
@@ -92,7 +92,7 @@ poller_resume(mrkthr_ctx_t *ctx)
         push_free_ctx(ctx);
         //TRRET(RESUME + 2);
         //return CO_RC_EXITED;
-        return 0;
+        return ctx->co.rc;
 
     } else {
         CTRACE("Unknown case:");
