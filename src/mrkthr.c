@@ -1736,6 +1736,21 @@ mrkthr_signal_error(mrkthr_signal_t *signal, int rc)
 }
 
 
+int
+mrkthr_signal_error_and_join(mrkthr_signal_t *signal, int rc)
+{
+    if (signal->owner != NULL) {
+        if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {
+            signal->owner->co.rc = rc;
+            set_resume(signal->owner);
+            me->co.state = CO_STATE_JOIN_INTERRUPTED;
+            return join_waitq(&signal->owner->waitq);
+        }
+    }
+    return 0;
+}
+
+
 /**
  * Condition Variable Primitive.
  */

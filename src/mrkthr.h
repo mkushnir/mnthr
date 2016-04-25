@@ -160,6 +160,7 @@ MRKTHR_CPOINT int mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *,
                                                       uint64_t);
 void mrkthr_signal_send(mrkthr_signal_t *);
 void mrkthr_signal_error(mrkthr_signal_t *, int);
+MRKTHR_CPOINT int mrkthr_signal_error_and_join(mrkthr_signal_t *, int);
 
 void mrkthr_cond_init(mrkthr_cond_t *);
 MRKTHR_CPOINT int mrkthr_cond_wait(mrkthr_cond_t *);
