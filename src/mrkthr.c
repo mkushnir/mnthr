@@ -1813,10 +1813,11 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
         --(sema->i);
 
     } else {
-        if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
-            return res;
+        while (sema->i == 0) {
+            if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
+                return res;
+            }
         }
-
         assert((sema->i > 0) && (sema->i <= sema->n));
         --(sema->i);
     }
