@@ -1807,7 +1807,8 @@ mrkthr_sema_init(mrkthr_sema_t *sema, int n)
 int
 mrkthr_sema_acquire(mrkthr_sema_t *sema)
 {
-    int res = me->co.rc;
+    //int res = me->co.rc;
+    int res = 0;
 
     if (sema->i > 0) {
         --(sema->i);
@@ -1829,6 +1830,9 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
 void
 mrkthr_sema_release(mrkthr_sema_t *sema)
 {
+    if (!((sema->i >= 0) && (sema->i < sema->n))) {
+        CTRACE("i=%d n=%d", sema->i, sema->n);
+    }
     assert((sema->i >= 0) && (sema->i < sema->n));
     mrkthr_cond_signal_one(&sema->cond);
     ++(sema->i);
@@ -1859,7 +1863,8 @@ mrkthr_rwlock_init(mrkthr_rwlock_t *lock)
 int
 mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
 {
-    int res = me->co.rc;
+    //int res = me->co.rc;
+    int res = 0;
 
     if (lock->fwriter) {
         if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
@@ -1905,7 +1910,8 @@ mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
 int
 mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
 {
-    int res = me->co.rc;
+    //int res = me->co.rc;
+    int res = 0;
 
     if (lock->fwriter || (lock->nreaders > 0)) {
 
