@@ -1675,11 +1675,14 @@ mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 int
 mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 {
-    assert(signal->owner == me);
+    int res;
 
     //CTRACE("holding on ...");
+    signal->owner = me;
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
-    return yield();
+    res = yield();
+    signal->owner = NULL;
+    return res;
 }
 
 
@@ -1689,9 +1692,8 @@ mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
 {
     int res;
 
-    assert(signal->owner == me);
-
     //CTRACE("holding on ...");
+    signal->owner = me;
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     res = sleepmsec(msec);
     if (me->expire_ticks == 0) {
@@ -1699,6 +1701,7 @@ mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
     } else {
         res = MRKTHR_WAIT_TIMEOUT;
     }
+    signal->owner = NULL;
     return res;
 }
 
