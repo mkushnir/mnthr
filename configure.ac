@@ -17,6 +17,7 @@ then
             exit 1
         fi
     fi
+    AC_SUBST(CLANG_DEBUG, [''])
 else
     if which clang >/dev/null
     then
@@ -37,6 +38,7 @@ else
         CC="cc"
         CXX="c++"
         CPP="cpp"
+        AC_SUBST(CLANG_DEBUG, [''])
     fi
 fi
 
