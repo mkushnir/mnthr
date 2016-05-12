@@ -1869,7 +1869,7 @@ mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
     //int res = me->co.rc;
     int res = 0;
 
-    if (lock->fwriter) {
+    while (lock->fwriter) {
         if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
             return res;
         }
@@ -1916,7 +1916,7 @@ mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
     //int res = me->co.rc;
     int res = 0;
 
-    if (lock->fwriter || (lock->nreaders > 0)) {
+    while (lock->fwriter || (lock->nreaders > 0)) {
 
         if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
             return res;
