@@ -1858,8 +1858,8 @@ void
 mrkthr_rwlock_init(mrkthr_rwlock_t *lock)
 {
     mrkthr_cond_init(&lock->cond);
-    lock->fwriter = 0;
     lock->nreaders = 0;
+    lock->fwriter = false;
 }
 
 
@@ -1925,7 +1925,7 @@ mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
 
     assert(!(lock->fwriter || (lock->nreaders > 0)));
 
-    lock->fwriter = 1;
+    lock->fwriter = true;
 
     return res;
 }
@@ -1940,7 +1940,7 @@ mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
 
     assert(!(lock->fwriter || (lock->nreaders > 0)));
 
-    lock->fwriter = 1;
+    lock->fwriter = true;
 
     return 0;
 }
@@ -1951,7 +1951,7 @@ mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
 {
     assert(lock->fwriter && (lock->nreaders == 0));
 
-    lock->fwriter = 0;
+    lock->fwriter = false;
     mrkthr_cond_signal_all(&lock->cond);
 }
 
@@ -1959,9 +1959,9 @@ mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
 void
 mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
 {
-    lock->fwriter = 0;
-    lock->nreaders = 0;
     mrkthr_cond_fini(&lock->cond);
+    lock->nreaders = 0;
+    lock->fwriter = false;
 }
 
 

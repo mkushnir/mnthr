@@ -1,6 +1,7 @@
 #ifndef MRKTHR_H
 #define MRKTHR_H
 
+#include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -80,8 +81,8 @@ typedef struct _mrkthr_sema {
 
 typedef struct _mrkthr_rwlock {
     mrkthr_cond_t cond;
-    int fwriter:1;
     unsigned nreaders;
+    bool fwriter;
 } mrkthr_rwlock_t;
 
 int mrkthr_init(void);
