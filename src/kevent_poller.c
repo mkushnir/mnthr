@@ -390,6 +390,44 @@ mrkthr_get_rbuflen(int fd)
 }
 
 
+int
+mrkthr_wait_for_read(int fd)
+{
+    int res;
+    struct kevent *kev;
+
+    kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
+
+    me->pdata.kev.ident = fd;
+    me->pdata.kev.filter = EVFILT_READ;
+
+    /* wait for an event */
+    me->co.state = CO_STATE_READ;
+    res = yield();
+    if (res != 0) {
+        return res;
+    }
+
+    if (me->pdata.kev.ident == -1) {
+        /*
+         * we haven't got to kevent() call
+         */
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
+            FAIL("result_event");
+        }
+        poller_mrkthr_ctx_init(me);
+        res = 0;
+    }
+
+    return res;
+}
+
+
 ssize_t
 mrkthr_get_wbuflen(int fd)
 {

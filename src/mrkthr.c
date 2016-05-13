@@ -1344,8 +1344,20 @@ mrkthr_socket_bind(const char *hostname,
 
     fd = -1;
     for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
-        if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
+        int optval;
+        if ((fd = socket(ai->ai_family,
+                         ai->ai_socktype,
+                         ai->ai_protocol)) == -1) {
             continue;
+        }
+
+        optval = 1;
+        if (setsockopt(fd,
+                       SOL_SOCKET,
+                       SO_REUSEADDR,
+                       &optval,
+                       sizeof(optval)) != 0) {
+            perror("setsockopt");
         }
 
         if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
@@ -1445,6 +1457,46 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     }
 
     *offset += nread;
+
+    return 0;
+}
+
+
+int
+mrkthr_accept_all2(int fd, mrkthr_socket_t **buf, off_t *offset)
+{
+    mrkthr_socket_t *tmp;
+    ssize_t navail;
+
+    assert(me != NULL);
+
+    if (mrkthr_wait_for_read(fd) != 0) {
+        TRRET(MRKTHR_ACCEPT_ALL + 1);
+    }
+
+    navail = 0;
+    for (navail = 0; ; ++navail) {
+        if ((tmp = realloc(*buf,
+                           (*offset + navail + 1) *
+                                sizeof(mrkthr_socket_t))) == NULL) {
+            FAIL("realloc");
+        }
+        *buf = tmp;
+        tmp = *buf + (*offset + navail);
+        tmp->addrlen = sizeof(union _mrkthr_addr);
+        if ((tmp->fd = accept(fd, &tmp->addr.sa, &tmp->addrlen)) == -1) {
+            perror("accept");
+            break;
+        }
+    }
+
+
+    if (navail == 0) {
+        /* EOF ? */
+        TRRET(MRKTHR_ACCEPT_ALL + 2);
+    }
+
+    *offset += navail;
 
     return 0;
 }

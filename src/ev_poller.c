@@ -552,6 +552,52 @@ mrkthr_get_rbuflen(int fd)
 }
 
 
+int
+mrkthr_wait_for_read(int fd)
+{
+    int res;
+    ev_item_t *ev, *ev1;
+
+    ev = ev_io_item_get(fd, EV_READ);
+    //ev_io_set(&ev->ev.io, fd, EV_READ);
+    me->pdata.ev = ev;
+
+    /*
+     * check if there is another thread waiting for the same event.
+     */
+    if (ev->ev.io.data == NULL) {
+        ev->ev.io.data = me;
+    } else if (ev->ev.io.data != me) {
+        /*
+         * in this case we are not allowed to wait for this event,
+         * sorry.
+         */
+        me->co.rc = CO_RC_SIMULTANEOUS;
+        return -1;
+    }
+
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+#endif
+    ev_io_start(the_loop, &ev->ev.io);
+
+    /* wait for an event */
+    me->co.state = CO_STATE_READ;
+    res = yield();
+
+    ev1 = ev_io_item_get(fd, EV_READ);
+
+    assert(ev == ev1);
+
+    assert(ev->ev.io.data == me);
+
+    ev->ev.io.data = NULL;
+    me->pdata.ev = NULL;
+
+    return res;
+}
+
+
 ssize_t
 mrkthr_get_wbuflen(int fd)
 {
