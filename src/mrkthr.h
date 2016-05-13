@@ -118,6 +118,7 @@ MRKTHR_CPOINT int mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *, uin
 int mrkthr_is_dead(mrkthr_ctx_t *);
 
 int mrkthr_socket(const char *, const char *, int, int);
+int mrkthr_socket_bind(const char *, const char *, int);
 MRKTHR_CPOINT int mrkthr_socket_connect(const char *, const char *, int);
 MRKTHR_CPOINT int mrkthr_connect(int, const struct sockaddr *, socklen_t);
 MRKTHR_CPOINT ssize_t mrkthr_get_rbuflen(int);

@@ -1326,6 +1326,52 @@ mrkthr_socket_connect(const char *hostname,
 
 
 int
+mrkthr_socket_bind(const char *hostname,
+                   const char *servname,
+                   int family)
+{
+    struct addrinfo hints, *ainfos, *ai;
+    int fd;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = family;
+    hints.ai_socktype = SOCK_STREAM;
+    ainfos = NULL;
+
+    if (getaddrinfo(hostname, servname, &hints, &ainfos) != 0) {
+        FAIL("getaddrinfo");
+    }
+
+    fd = -1;
+    for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
+        if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
+            continue;
+        }
+
+        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+            perror("fcntl");
+            close(fd);
+            fd = -1;
+        }
+
+        if (bind(fd, ai->ai_addr, ai->ai_addrlen) != 0) {
+            perror("bind");
+            close(fd);
+            fd = -1;
+        }
+
+        break;
+    }
+
+    if (ainfos != NULL) {
+        freeaddrinfo(ainfos);
+    }
+
+    return fd;
+}
+
+
+int
 mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int res = 0;
