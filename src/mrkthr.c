@@ -1339,7 +1339,7 @@ mrkthr_socket_bind(const char *hostname,
     ainfos = NULL;
 
     if (getaddrinfo(hostname, servname, &hints, &ainfos) != 0) {
-        FAIL("getaddrinfo");
+        return -1;
     }
 
     fd = -1;
