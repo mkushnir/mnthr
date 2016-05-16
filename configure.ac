@@ -135,7 +135,12 @@ fi
 
 if test "$with_ev" = "yes"
 then
-    AC_CHECK_LIB(ev, ev_run, [], [AC_MSG_FAILURE(libev.so is required.)])
+    #AC_CHECK_LIB(ev, ev_run, [], [AC_MSG_FAILURE(libev.so is required.)])
+    AC_SUBST(LIBEV_CFLAGS, [''])
+    AC_SUBST(LIBEV_LDFLAGS, ['-lev'])
+else
+    AC_SUBST(LIBEV_CFLAGS, [''])
+    AC_SUBST(LIBEV_LDFLAGS, [''])
 fi
 
 AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 

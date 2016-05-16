@@ -39,9 +39,9 @@ else
 RDTSC_FLAGS =
 endif
 
-libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) $(PLATFORM_FLAGS) @_GNU_SOURCE_MACRO@ -Wall -Wextra -Werror -std=c99
+libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) $(PLATFORM_FLAGS) @_GNU_SOURCE_MACRO@ -Wall -Wextra -Werror -std=c99 @LIBEV_CFLAGS@
 
-libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon
+libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon @LIBEV_LDFLAGS@
 
 diag.c diag.h: diag.txt
 	$(AM_V_GEN) /bin/sh ./gen-diag mrkthr
