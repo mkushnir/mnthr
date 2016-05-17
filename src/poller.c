@@ -21,7 +21,9 @@ MEMDEBUG_DECLARE(mrkthr_poller);
 #include "diag.h"
 #include <mrkcommon/dumpm.h>
 
+#ifdef __clang__
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 extern const profile_t *mrkthr_user_p;
 extern const profile_t *mrkthr_swap_p;
