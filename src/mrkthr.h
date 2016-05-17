@@ -79,6 +79,12 @@ typedef struct _mrkthr_sema {
     int i;
 } mrkthr_sema_t;
 
+typedef struct _mrkthr_inverted_sema {
+    mrkthr_cond_t cond;
+    int n;
+    int i;
+} mrkthr_inverted_sema_t;
+
 typedef struct _mrkthr_rwlock {
     mrkthr_cond_t cond;
     unsigned nreaders;
@@ -176,6 +182,12 @@ void mrkthr_sema_init(mrkthr_sema_t *, int);
 MRKTHR_CPOINT int mrkthr_sema_acquire(mrkthr_sema_t *);
 void mrkthr_sema_release(mrkthr_sema_t *);
 void mrkthr_sema_fini(mrkthr_sema_t *);
+
+void mrkthr_inverted_sema_init(mrkthr_inverted_sema_t *, int);
+void mrkthr_inverted_sema_acquire(mrkthr_inverted_sema_t *);
+MRKTHR_CPOINT int mrkthr_inverted_sema_wait(mrkthr_inverted_sema_t *);
+void mrkthr_inverted_sema_release(mrkthr_inverted_sema_t *);
+void mrkthr_inverted_sema_fini(mrkthr_inverted_sema_t *);
 
 void mrkthr_rwlock_init(mrkthr_rwlock_t *);
 MRKTHR_CPOINT int mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *);

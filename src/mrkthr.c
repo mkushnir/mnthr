@@ -1953,6 +1953,62 @@ mrkthr_sema_fini(mrkthr_sema_t *sema)
 
 
 /**
+ * Inverted Semaphore
+ */
+void
+mrkthr_inverted_sema_init(mrkthr_inverted_sema_t *sema, int n)
+{
+    mrkthr_cond_init(&sema->cond);
+    sema->n = n;
+    sema->i = 0;
+}
+
+
+void
+mrkthr_inverted_sema_acquire(mrkthr_inverted_sema_t *sema)
+{
+    assert((sema->i >= 0) && (sema->i <= sema->n));
+    ++sema->i;
+    mrkthr_cond_signal_one(&sema->cond);
+}
+
+
+void
+mrkthr_inverted_sema_release(mrkthr_inverted_sema_t *sema)
+{
+    --sema->i;
+    assert((sema->i >= 0) && (sema->i <= sema->n));
+}
+
+
+int
+mrkthr_inverted_sema_wait(mrkthr_inverted_sema_t *sema)
+{
+    int res;
+
+    assert((sema->i >= 0) && (sema->i <= sema->n));
+    res = 0;
+    while (sema->i < sema->n) {
+        if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
+            return res;
+        }
+    }
+
+    return res;
+}
+
+
+void
+mrkthr_inverted_sema_fini(mrkthr_inverted_sema_t *sema)
+{
+    mrkthr_cond_fini(&sema->cond);
+    sema->n = -1;
+    sema->i = -1;
+}
+
+
+
+/**
  * Readers-writer Lock Primitive.
  */
 void
