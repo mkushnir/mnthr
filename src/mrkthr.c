@@ -83,7 +83,9 @@ MEMDEBUG_DECLARE(mrkthr);
 
 #include "mrkthr_private.h"
 
+#ifdef __clang__
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 const profile_t *mrkthr_user_p;
 const profile_t *mrkthr_swap_p;
