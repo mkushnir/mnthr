@@ -70,6 +70,8 @@ dnl AM_MAINTAINER_MODE
 AC_CONFIG_FILES([Makefile src/Makefile man/Makefile test/Makefile])
 AC_CONFIG_HEADERS(config.h)
 
+AC_CHECK_HEADER_STDBOOL
+
 AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limits.h sys/user.h fcntl.h netdb.h sys/ioctl.h])
 
 AC_C_CONST
@@ -81,7 +83,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_CHECK_FUNCS([clock_gettime munmap strerror gettimeofday memset socket])
+AC_CHECK_FUNCS([clock_gettime munmap strerror gettimeofday memset socket strdup])
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_MMAP
@@ -105,11 +107,10 @@ if test "$with_rdtsc" = "yes"
 then
     AC_LANG(C)
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <sys/types.h>
-static inline uint64_t
+static inline unsigned long long
 rdtsc(void)
 {
-  uint64_t res;
+  unsigned long long res;
   __asm __volatile ("rdtsc; shl \$32,%%rdx; or %%rdx,%%rax"
                     : "=a"(res)
                     :
@@ -143,6 +144,6 @@ else
     AC_SUBST(LIBEV_LDFLAGS, [''])
 fi
 
-AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
+#AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 
 AC_OUTPUT

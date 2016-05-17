@@ -4,6 +4,7 @@
 #include <limits.h> /* ULONG_MAX*/
 
 #include <netinet/in.h>
+#define _XOPEN_SOURCE
 #include <ucontext.h>
 
 #ifdef HAVE_CONFIG_H

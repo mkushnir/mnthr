@@ -83,6 +83,7 @@ MEMDEBUG_DECLARE(mrkthr);
 
 #include "mrkthr_private.h"
 
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 const profile_t *mrkthr_user_p;
 const profile_t *mrkthr_swap_p;
@@ -214,9 +215,9 @@ dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
         if (key != ctx->expire_ticks) {
-            TRACEC(FRED("trn=%p key=%016lx "), trn, key);
+            TRACEC(FRED("trn=%p key=%016lx "), trn, (long)key);
         } else {
-            TRACEC("trn=%p key=%016lx ", trn, key);
+            TRACEC("trn=%p key=%016lx ", trn, (long)key);
         }
         mrkthr_dump(ctx);
     }
@@ -817,7 +818,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
            ctx->co.f,
            CO_STATE_STR(ctx->co.state),
            CO_RC_STR(ctx->co.rc),
-           ctx->expire_ticks
+           (long)ctx->expire_ticks
     );
 
     uc = ctx->co.uc;
@@ -835,7 +836,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
                    CO_RC_STR(tmp->co.rc),
-                   tmp->expire_ticks
+                   (long)tmp->expire_ticks
             );
         }
     }

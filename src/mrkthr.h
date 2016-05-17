@@ -31,7 +31,7 @@ const char *mrkthr_diag_str(int);
                  _mrkthr_tm);                                  \
         TRACE("%s.%06ld [% 4d] " s,                            \
               _mrkthr_ss,                                      \
-              _mrkthr_ts.tv_usec,                              \
+              (long)_mrkthr_ts.tv_usec,                        \
               mrkthr_id(), ##__VA_ARGS__);                     \
     } while (0)                                                \
 

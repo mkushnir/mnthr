@@ -1,4 +1,5 @@
 #include <signal.h>
+#define _XOPEN_SOURCE
 #include <ucontext.h>
 
 #include "mrkthr.h"
@@ -9,7 +10,6 @@
 
 //static int read_pipe[2];
 //static int write_pipe[2];
-
 
 static mrkthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
