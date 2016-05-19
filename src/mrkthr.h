@@ -200,9 +200,19 @@ void mrkthr_rwlock_fini(mrkthr_rwlock_t *);
 
 
 uint64_t mrkthr_get_now(void);
+#define MRKTHR_GET_NOW_SEC() (mrkthr_get_now() / 1000000000)
+#define MRKTHR_GET_NOW_FSEC() ((double)MRKTHR_GET_NOW_SEC())
 uint64_t mrkthr_get_now_precise(void);
+#define MRKTHR_GET_NOW_PRECISE_SEC() (mrkthr_get_now_precise() / 1000000000)
+#define MRKTHR_GET_NOW_PRECISE_FSEC() ((double)MRKTHR_GET_NOW_PRECISE_SEC())
 uint64_t mrkthr_get_now_ticks(void);
+#define MRKTHR_GET_NOW_TICKS_SEC() (mrkthr_get_now_ticks() / 1000000000)
+#define MRKTHR_GET_NOW_TICKS_FSEC() ((double)MRKTHR_GET_NOW_TICKS_SEC())
 uint64_t mrkthr_get_now_ticks_precise(void);
+#define MRKTHR_GET_NOW_TICKS_PRECISE_SEC() \
+    (mrkthr_get_now_ticks_precise() / 1000000000)
+#define MRKTHR_GET_NOW_TICKS_PRECISE_FSEC() \
+    ((double)MRKTHR_GET_NOW_TICKS_PRECISE_SEC())
 
 MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 
