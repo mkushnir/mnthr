@@ -48,7 +48,7 @@ struct _mrkthr_ctx {
     struct _co {
         ucontext_t uc;
         char *stack;
-        int id;
+        int64_t id;
         char name[8];
         int (*f)(int, void *[]);
         int argc;

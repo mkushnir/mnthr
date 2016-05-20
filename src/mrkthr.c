@@ -813,10 +813,10 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     UNUSED ucontext_t uc;
     mrkthr_ctx_t *tmp;
 
-    TRACEC("mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx\n",
+    TRACEC("mrkthr %p/%s id=%lld f=%p st=%s rc=%s exp=%016lx\n",
            ctx,
            ctx->co.name,
-           ctx->co.id,
+           (long long)ctx->co.id,
            ctx->co.f,
            CO_STATE_STR(ctx->co.state),
            CO_RC_STR(ctx->co.rc),
@@ -831,10 +831,10 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
              tmp != NULL;
              tmp = DTQUEUE_NEXT(sleepq_link, tmp)) {
 
-            TRACEC(" +mrkthr %p/%s id=%d f=%p st=%s rc=%s exp=%016lx\n",
+            TRACEC(" +mrkthr %p/%s id=%lld f=%p st=%s rc=%s exp=%016lx\n",
                    tmp,
                    tmp->co.name,
-                   tmp->co.id,
+                   (long long)tmp->co.id,
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
                    CO_RC_STR(tmp->co.rc),
@@ -1206,6 +1206,7 @@ int
 mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
 {
     int res;
+    int64_t id;
 
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
@@ -1217,10 +1218,11 @@ mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
     MRKTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
 
     append_me_to_waitq(&ctx->waitq);
+    id = ctx->co.id;
 
     res = sleepmsec(msec);
 
-    if (ctx->co.state == CO_STATE_DORMANT) {
+    if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         sleepq_remove(me);
         if (ctx->co.rc != CO_RC_USER_INTERRUPTED) {
             res = ctx->co.rc;
@@ -2132,6 +2134,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     va_list ap;
     int res;
     mrkthr_ctx_t *ctx;
+    int64_t id;
 
     assert(me != NULL);
 
@@ -2147,6 +2150,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     /* XXX put myself into both ctx->waitq and sleepq(WAITFOR) */
     append_me_to_waitq(&ctx->waitq);
     set_resume(ctx);
+    id = ctx->co.id;
 
     //CTRACE("before sleep:");
     //mrkthr_dump_sleepq();
@@ -2158,7 +2162,7 @@ mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
     //CTRACE("after sleep:");
     //mrkthr_dump_sleepq();
 
-    if (ctx->co.state == CO_STATE_DORMANT) {
+    if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         /* I had been sleeping, but by their exit I was resumed ... */
 
         //CTRACE("removing me:");
