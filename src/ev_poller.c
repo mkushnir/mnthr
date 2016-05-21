@@ -206,7 +206,7 @@ ev_item_new_stat(const char *path, UNUSED int event)
     BYTES_INCREF(res->stat_path);
     ev_stat_init(&res->ev.stat,
                  ev_stat_cb,
-                 BDATA(res->stat_path), 0.0);
+                 (char *)BDATA(res->stat_path), 0.0);
     res->ev.stat.data = NULL;
     res->hash = 0;
     res->ty = EV_TYPE_STAT;

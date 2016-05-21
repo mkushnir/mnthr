@@ -1393,11 +1393,6 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int res = 0;
 
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-        perror("fcntl");
-        TRRET(MRKTHR_CONNECT + 1);
-    }
-
     if ((res = connect(fd, addr, addrlen)) != 0) {
         perror("connect");
         if (errno == EINPROGRESS) {
@@ -1416,6 +1411,12 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             res = optval;
         }
     }
+
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        perror("fcntl");
+        TRRET(MRKTHR_CONNECT + 1);
+    }
+
     return res;
 }
 
