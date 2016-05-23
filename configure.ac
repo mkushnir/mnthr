@@ -91,6 +91,9 @@ AC_FUNC_MMAP
 
 AC_PRESERVE_HELP_ORDER
 
+AC_SUBST(MRKCOMMON_LOCAL_CFLAGS, [''])
+AC_SUBST(MRKCOMMON_LOCAL_LDFLAGS, [''])
+
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--enable-debug],
                              [Enable debug build (default=no)]),
