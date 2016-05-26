@@ -76,7 +76,9 @@ ev_str(int e)
 
 #define EV_STR(e) ev_str(e)
 
+#if GCC_VERSION >= 40200
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
 
 typedef struct _ev_item {
     union {
@@ -181,11 +183,13 @@ static ev_item_t *
 ev_item_new_io(int fd, int event)
 {
     ev_item_t *res;
+    ev_io *p;
 
     if ((res = malloc(sizeof(ev_item_t))) == NULL) {
         FAIL("malloc");
     }
-    ev_io_init(&res->ev.io, ev_io_cb, fd, event);
+    p = &res->ev.io;
+    ev_io_init(p, ev_io_cb, fd, event);
     res->ev.io.data = NULL;
     res->hash = 0;
     res->ty = EV_TYPE_IO;
@@ -198,13 +202,15 @@ static ev_item_t *
 ev_item_new_stat(const char *path, UNUSED int event)
 {
     ev_item_t *res;
+    ev_stat *p;
 
     if ((res = malloc(sizeof(ev_item_t))) == NULL) {
         FAIL("malloc");
     }
+    p = &res->ev.stat;
     res->stat_path = bytes_new_from_str(path);
     BYTES_INCREF(res->stat_path);
-    ev_stat_init(&res->ev.stat,
+    ev_stat_init(p,
                  ev_stat_cb,
                  (char *)BDATA(res->stat_path), 0.0);
     res->ev.stat.data = NULL;
@@ -879,6 +885,11 @@ poller_mrkthr_ctx_init(struct _mrkthr_ctx *ctx)
 void
 poller_init(void)
 {
+    ev_idle *idle = &eidle;
+    ev_timer *timer = &etimer;
+    ev_prepare *prepare = &eprepare;
+    ev_check *check = &echeck;
+
     the_loop = ev_loop_new(EVFLAG_NOSIGMASK);
     //CTRACE("v %d.%d", ev_version_major(), ev_version_minor());
     //CTRACE("ev_supported_backends=%08x", ev_supported_backends());
@@ -893,13 +904,13 @@ poller_init(void)
     ev_now_update(the_loop);
     timecounter_now = (uint64_t)(ev_now(the_loop) * 1000000000.);
 
-    ev_idle_init(&eidle, _idle_cb);
-    ev_timer_init(&etimer, _timer_cb, 0.0, 0.0);
-    ev_timer_again(the_loop, &etimer);
-    ev_prepare_init(&eprepare, _prepare_cb);
-    ev_prepare_start(the_loop, &eprepare);
-    ev_check_init(&echeck, _check_cb);
-    ev_check_start(the_loop, &echeck);
+    ev_idle_init(idle, _idle_cb);
+    ev_timer_init(timer, _timer_cb, 0.0, 0.0);
+    ev_timer_again(the_loop, timer);
+    ev_prepare_init(prepare, _prepare_cb);
+    ev_prepare_start(the_loop, prepare);
+    ev_check_init(check, _check_cb);
+    ev_check_start(the_loop, check);
     ev_set_syserr_cb(_syserr_cb);
 
     hash_init(&events,
