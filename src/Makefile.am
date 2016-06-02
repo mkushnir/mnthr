@@ -1,8 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 AM_MAKEFLAGS = -s
 
-distdir = $(top_srcdir)/$(PACKAGE)-$(VERSION)/src
-
 if USE_EV
 dh_platform=
 ls_platform= ev_poller.c
@@ -13,7 +11,7 @@ ls_platform= kevent_poller.c kevent_util.c
 PLATFORM_FLAGS=-DUSE_KEVENT
 endif
 
-dist_HEADERS = mrkthr_private.h $(dh_platform)
+noinst_HEADERS = mrkthr_private.h $(dh_platform)
 
 BUILT_SOURCES = diag.c diag.h
 EXTRA_DIST = diag.txt gen-diag
