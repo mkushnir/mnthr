@@ -703,15 +703,43 @@ mrkthr_ctx_pop_free(void)
         ctx->co.rc = 0;
         //CTRACE("pop_free_ctx 0");
     } else {
-        mrkthr_ctx_t **pctx;
-        if ((pctx = array_incr(&ctxes)) == NULL) {
-            FAIL("array_incr");
-        }
-        ctx = *pctx;
+        ctx = mrkthr_ctx_new();
         //CTRACE("pop_free_ctx 1");
     }
     //mrkthr_dump(ctx);
     return ctx;
+}
+
+
+
+size_t
+mrkthr_gc(void)
+{
+    size_t res;
+    mrkthr_ctx_t *ctx;
+
+    res = 0;
+    while ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
+        STQUEUE_DEQUEUE(&free_list, free_link);
+        STQUEUE_ENTRY_FINI(free_link, ctx);
+        mrkthr_ctx_t **pctx;
+        array_iter_t it;
+        for (pctx = array_first(&ctxes, &it);
+             pctx != NULL;
+             pctx = array_next(&ctxes, &it)) {
+            if (*pctx == ctx) {
+                ++res;
+                (void)array_clear_item(&ctxes, it.iter);
+                break;
+            }
+        }
+        if (pctx == NULL) {
+            CTRACE("could not collect ctx:");
+            mrkthr_dump(ctx);
+            mrkthr_ctx_fini(&ctx);
+        }
+    }
+    return res;
 }
 
 
