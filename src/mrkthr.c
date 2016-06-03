@@ -716,29 +716,46 @@ size_t
 mrkthr_gc(void)
 {
     size_t res;
-    mrkthr_ctx_t *ctx;
+    mrkthr_ctx_t **pctx0, **pctx1;
+    array_iter_t it0, it1;
 
     res = 0;
-    while ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
-        STQUEUE_DEQUEUE(&free_list, free_link);
-        STQUEUE_ENTRY_FINI(free_link, ctx);
-        mrkthr_ctx_t **pctx;
-        array_iter_t it;
-        for (pctx = array_first(&ctxes, &it);
-             pctx != NULL;
-             pctx = array_next(&ctxes, &it)) {
-            if (*pctx == ctx) {
-                ++res;
-                (void)array_clear_item(&ctxes, it.iter);
+    for (pctx0 = array_first(&ctxes, &it0);
+         pctx0 != NULL;
+         pctx0 = array_next(&ctxes, &it0)) {
+        if (!STQUEUE_ORPHAN(&free_list, free_link, *pctx0)) {
+            ++res;
+            assert((*pctx0)->co.id == -1);
+            (void)array_clear_item(&ctxes, it0.iter);
+        }
+    }
+
+    /*
+     * compact ctxes
+     */
+    for (pctx0 = array_first(&ctxes, &it0);
+         pctx0 != NULL;
+         pctx0 = array_next(&ctxes, &it0)) {
+        if (*pctx0 == NULL) {
+            it1 = it0;
+            for (pctx1 = array_next(&ctxes, &it1);
+                 pctx1 != NULL;
+                 pctx1 = array_next(&ctxes, &it1)) {
+                if (*pctx1 != NULL) {
+                    *pctx0 = *pctx1;
+                    *pctx1 = NULL;
+                    break;
+                }
+            }
+            if (*pctx0 == NULL) {
+                (void)array_ensure_len_dirty(&ctxes, it0.iter, ARRAY_FLAG_SAVE);
                 break;
             }
         }
-        if (pctx == NULL) {
-            CTRACE("could not collect ctx:");
-            mrkthr_dump(ctx);
-            mrkthr_ctx_fini(&ctx);
-        }
     }
+
+    STQUEUE_INIT(&free_list);
+
     return res;
 }
 
