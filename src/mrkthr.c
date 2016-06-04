@@ -1979,6 +1979,22 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
 }
 
 
+int
+mrkthr_sema_try_acquire(mrkthr_sema_t *sema)
+{
+    //int res = me->co.rc;
+    int res = 0;
+
+    if (sema->i > 0) {
+        --(sema->i);
+    } else {
+        res = MRKTHR_SEMA_TRY_ACQUIRE_FAIL;
+    }
+
+    return res;
+}
+
+
 void
 mrkthr_sema_release(mrkthr_sema_t *sema)
 {

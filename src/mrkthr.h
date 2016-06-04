@@ -50,6 +50,7 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 #define MRKTHR_JOIN_FAILURE (-2)
 #define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL (-3)
 #define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL (-4)
+#define MRKTHR_SEMA_TRY_ACQUIRE_FAIL (-5)
 
 /* These calls are cancellation points */
 #define MRKTHR_CPOINT
@@ -181,6 +182,7 @@ void mrkthr_cond_fini(mrkthr_cond_t *);
 
 void mrkthr_sema_init(mrkthr_sema_t *, int);
 MRKTHR_CPOINT int mrkthr_sema_acquire(mrkthr_sema_t *);
+int mrkthr_sema_try_acquire(mrkthr_sema_t *);
 void mrkthr_sema_release(mrkthr_sema_t *);
 void mrkthr_sema_fini(mrkthr_sema_t *);
 
