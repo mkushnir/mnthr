@@ -230,6 +230,7 @@ test0(void)
 int
 main(UNUSED int argc, UNUSED char *argv[])
 {
+    TRACE("size of mrkthr_ctx_t is %ld", (long)mrkthr_ctx_sizeof());
     test0();
     return 0;
 }

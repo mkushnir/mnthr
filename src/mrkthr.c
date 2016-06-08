@@ -211,6 +211,12 @@ dump_ucontext (UNUSED ucontext_t *uc)
 }
 
 
+size_t
+mrkthr_ctx_sizeof(void)
+{
+    return sizeof(mrkthr_ctx_t);
+}
+
 static int
 dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
