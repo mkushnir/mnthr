@@ -857,12 +857,26 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
 {
     UNUSED ucontext_t uc;
     mrkthr_ctx_t *tmp;
+    ssize_t ssz;
 
-    TRACEC("mrkthr %p/%s id=%lld f=%p st=%s rc=%s exp=%016lx\n",
+#ifdef __FreeBSD__
+#ifdef __amd64__
+    ssz = (uintptr_t)ctx->co.stack +
+          (uintptr_t)ctx->co.uc.uc_stack.ss_size -
+          (uintptr_t)ctx->co.uc.uc_mcontext.mc_rsp;
+#else
+    ssz = -1;
+#endif
+#else
+    ssz = -1;
+#endif
+
+    TRACEC("mrkthr %p/%s id=%lld f=%p ssz=%ld st=%s rc=%s exp=%016lx\n",
            ctx,
            ctx->co.name,
            (long long)ctx->co.id,
            ctx->co.f,
+           (long)ssz,
            CO_STATE_STR(ctx->co.state),
            CO_RC_STR(ctx->co.rc),
            (long)ctx->expire_ticks
