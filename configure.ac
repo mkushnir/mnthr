@@ -77,6 +77,7 @@ AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limi
 AC_C_CONST
 AC_C_INLINE
 AC_C_RESTRICT
+AC_C_FLEXIBLE_ARRAY_MEMBER
 AC_TYPE_INT64_T
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
@@ -106,9 +107,10 @@ AC_ARG_WITH(rdtsc,
             [AM_CONDITIONAL([RDTSC], [with_rdtsc=yes])],
             [AM_CONDITIONAL([RDTSC], [test "$with_rdtsc" = "yes"])])
 
+AC_LANG(C)
+
 if test "$with_rdtsc" = "yes"
 then
-    AC_LANG(C)
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 static inline unsigned long long
 rdtsc(void)
@@ -123,6 +125,19 @@ rdtsc(void)
 } ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))
 fi
 
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/param.h> /* PAGE_SIZE */
+#ifndef PAGE_SIZE
+#   ifdef HAVE_SYS_USER_H
+#       include <sys/user.h>
+#   else
+#       error "PAGE_SIZE cannot be defined"
+#   endif
+#endif
+char x[PAGE_SIZE];
+]], [
+])], [AC_DEFINE([HAVE_PAGE_SIZE_CONSTANT], [], [Define is PAGE_SIZE is a constant value])], [])
+
 if echo $build_os | grep linux >/dev/null
 then
    with_ev=yes
@@ -135,6 +150,8 @@ else
                [AM_CONDITIONAL([USE_EV], [test "$with_ev" = "yes"])])
     
 fi
+
+
 
 
 if test "$with_ev" = "yes"

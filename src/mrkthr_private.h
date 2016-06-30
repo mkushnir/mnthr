@@ -35,6 +35,16 @@
 extern "C" {
 #endif
 
+/*
+ * PAGE_SIZE is known to be defined using sysconf on some systems
+ */
+#ifndef HAVE_PAGE_SIZE_CONSTANT
+#   ifdef PAGE_SIZE
+#       undef PAGE_SIZE
+#   endif
+#   define PAGE_SIZE 4096
+#endif
+
 #ifndef STACKSIZE
 #   define STACKSIZE (PAGE_SIZE * 1024)
 #endif
