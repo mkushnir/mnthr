@@ -132,6 +132,10 @@ MRKTHR_CPOINT int mrkthr_socket_connect(const char *, const char *, int);
 MRKTHR_CPOINT int mrkthr_connect(int, const struct sockaddr *, socklen_t);
 MRKTHR_CPOINT ssize_t mrkthr_get_rbuflen(int);
 MRKTHR_CPOINT int mrkthr_wait_for_read(int);
+MRKTHR_CPOINT int mrkthr_wait_for_write(int);
+#define MRKTHR_WAIT_EVENT_READ (0x01)
+#define MRKTHR_WAIT_EVENT_WRITE (0x02)
+MRKTHR_CPOINT int mrkthr_wait_for_events(int, int *);
 MRKTHR_CPOINT int mrkthr_accept_all(int, mrkthr_socket_t **, off_t *);
 MRKTHR_CPOINT int mrkthr_accept_all2(int, mrkthr_socket_t **, off_t *);
 MRKTHR_CPOINT int mrkthr_read_all(int, char **, off_t *);

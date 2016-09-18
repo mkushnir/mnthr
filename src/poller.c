@@ -144,7 +144,6 @@ poller_sift_sleepq(void)
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
             btrie_remove_node(&the_sleepq, trn);
             trn = NULL;
-            ctx->expire_ticks = 0;
 #ifdef TRACE_VERBOSE
             CTRACE(FBGREEN("Put in runq:"));
             mrkthr_dump(ctx);
@@ -159,42 +158,7 @@ poller_sift_sleepq(void)
 
         STQUEUE_DEQUEUE(&runq, runq_link);
         STQUEUE_ENTRY_FINI(runq_link, ctx);
-
-        while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
-
-#ifdef TRACE_VERBOSE
-            CTRACE(FBGREEN("Resuming expired thread (from bucket) >>>"));
-            mrkthr_dump(bctx);
-            CTRACE(FBGREEN("<<<"));
-#endif
-            DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
-            DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
-
-            if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
-                /*
-                 * We cannot resume events here that can only be
-                 * resumed from within other places of mrkthr_loop().
-                 *
-                 * All other events not included here are
-                 * CO_STATE_READ and CO_STATE_WRITE. This
-                 * should never occur.
-                 */
-#ifdef TRACE_VERBOSE
-                CTRACE(FYELLOW("Have to deliver a %s event "
-                           "to co.id=%d that was not scheduled for!"),
-                           CO_STATE_STR(bctx->co.state),
-                           bctx->co.id);
-                mrkthr_dump(bctx);
-#endif
-            }
-
-            if (poller_resume(bctx) != 0) {
-#ifdef TRACE_VERBOSE
-                CTRACE("Could not resume co %d, discarding ...",
-                      bctx->co.id);
-#endif
-            }
-        }
+        ctx->expire_ticks = 0;
 
         if (!(ctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
             /*
@@ -202,7 +166,7 @@ poller_sift_sleepq(void)
              * resumed from within other places of mrkthr_loop().
              *
              * All other events not included here are
-             * CO_STATE_READ and CO_STATE_WRITE. This
+             * CO_STATE_READ, CO_STATE_WRITE, CO_STATE_OTHER_POLLER. This
              * should never occur.
              */
 #ifdef TRACE_VERBOSE
@@ -226,6 +190,42 @@ poller_sift_sleepq(void)
             CTRACE("Could not resume co %d, discarding ...",
                   ctx->co.id);
 #endif
+        }
+
+        while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
+#ifdef TRACE_VERBOSE
+            CTRACE(FBGREEN("Resuming expired thread (from bucket) >>>"));
+            mrkthr_dump(bctx);
+            CTRACE(FBGREEN("<<<"));
+#endif
+            DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
+            DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
+            bctx->expire_ticks = 0;
+
+            if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
+                /*
+                 * We cannot resume events here that can only be
+                 * resumed from within other places of mrkthr_loop().
+                 *
+                 * All other events not included here are
+                 * CO_STATE_READ, CO_STATE_WRITE, CO_STATE_OTHER_POLLER. This
+                 * should never occur.
+                 */
+#ifdef TRACE_VERBOSE
+                CTRACE(FYELLOW("Have to deliver a %s event "
+                           "to co.id=%d that was not scheduled for!"),
+                           CO_STATE_STR(bctx->co.state),
+                           bctx->co.id);
+                mrkthr_dump(bctx);
+#endif
+            }
+
+            if (poller_resume(bctx) != 0) {
+#ifdef TRACE_VERBOSE
+                CTRACE("Could not resume co %d, discarding ...",
+                      bctx->co.id);
+#endif
+            }
         }
     }
 }

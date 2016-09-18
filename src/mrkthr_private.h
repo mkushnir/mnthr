@@ -68,13 +68,14 @@ struct _mrkthr_ctx {
 #       define CO_STATE_READ 0x04
 #       define CO_STATE_WRITE 0x08
 #       define CO_STATE_SLEEP 0x10
-#       define CO_STATE_SET_RESUME 0x20
-#       define CO_STATE_SET_INTERRUPT 0x40
-#       define CO_STATE_SIGNAL_SUBSCRIBE 0x80
-#       define CO_STATE_JOIN 0x100
-#       define CO_STATE_JOIN_INTERRUPTED 0x200
-#       define CO_STATE_CONDWAIT 0x400
-#       define CO_STATE_WAITFOR 0x800
+#       define CO_STATE_OTHER_POLLER 0x20
+#       define CO_STATE_SET_RESUME 0x40
+#       define CO_STATE_SET_INTERRUPT 0x80
+#       define CO_STATE_SIGNAL_SUBSCRIBE 0x100
+#       define CO_STATE_JOIN 0x200
+#       define CO_STATE_JOIN_INTERRUPTED 0x400
+#       define CO_STATE_CONDWAIT 0x800
+#       define CO_STATE_WAITFOR 0x1000
 
 #       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP |                \
                                                CO_STATE_SET_RESUME |           \
@@ -88,6 +89,7 @@ struct _mrkthr_ctx {
 
 #       define CO_STATE_RESUMABLE (CO_STATE_READ |                     \
                                    CO_STATE_WRITE |                    \
+                                   CO_STATE_OTHER_POLLER |             \
                                    CO_STATES_RESUMABLE_EXTERNALLY)     \
 
 
@@ -96,6 +98,7 @@ struct _mrkthr_ctx {
             (st) == CO_STATE_RESUMED ? "RESUMED" :                     \
             (st) == CO_STATE_READ ? "READ" :                           \
             (st) == CO_STATE_WRITE ? "WRITE" :                         \
+            (st) == CO_STATE_OTHER_POLLER ? "OTHER_POLLER" :           \
             (st) == CO_STATE_SLEEP ? "SLEEP" :                         \
             (st) == CO_STATE_SET_RESUME ? "SET_RESUME" :               \
             (st) == CO_STATE_SET_INTERRUPT ? "SET_INTERRUPT" :         \
@@ -179,7 +182,7 @@ struct _mrkthr_ctx {
     union {
         struct {
             int ident;
-            int filter;
+            int filter; /* special case CO_STATE_OTHER_POLLER */
             int idx;
         } kev;
         void *ev;
@@ -247,6 +250,7 @@ extern btrie_t the_sleepq;
 int yield(void);
 void push_free_ctx(struct _mrkthr_ctx *);
 void sleepq_remove(struct _mrkthr_ctx *);
+void set_resume_fast(struct _mrkthr_ctx *);
 void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
 
 uint64_t poller_msec2ticks_absolute(uint64_t);

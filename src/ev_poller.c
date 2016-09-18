@@ -43,15 +43,17 @@ ev_str(int e)
     } else if (e == EV_UNDEF) {
         snprintf(buf, sizeof(buf), "UNDEF");
     } else {
-#define EV_STR_CASE(E) if (e & EV_##E) nwritten += snprintf(buf + nwritten, sizeof(buf) - nwritten, "|" #E)
-
         int nwritten;
 
         nwritten = 0;
-
         if (e & EV_READ) {
-            nwritten += snprintf(buf + nwritten, sizeof(buf) - nwritten, "READ");
+            nwritten += snprintf(buf + nwritten,
+                                 sizeof(buf) - nwritten,
+                                 "READ");
         }
+
+#define EV_STR_CASE(E) if (e & EV_##E) nwritten += snprintf(buf + nwritten, sizeof(buf) - nwritten, "|" #E)
+
         EV_STR_CASE(WRITE);
         EV_STR_CASE(_IOFDSET);
         EV_STR_CASE(TIMER);
@@ -527,7 +529,9 @@ mrkthr_get_rbuflen(int fd)
     }
 
 #ifdef TRACE_VERBOSE
-    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+    CTRACE(FBBLUE("starting ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
 #endif
     ev_io_start(the_loop, &ev->ev.io);
 
@@ -583,7 +587,9 @@ mrkthr_wait_for_read(int fd)
     }
 
 #ifdef TRACE_VERBOSE
-    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+    CTRACE(FBBLUE("starting ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
 #endif
     ev_io_start(the_loop, &ev->ev.io);
 
@@ -630,7 +636,9 @@ mrkthr_get_wbuflen(int fd)
     }
 
 #ifdef TRACE_VERBOSE
-    CTRACE(FBBLUE("starting ev_io %d/%s"), ev->ev.io.fd, EV_STR(ev->ev.io.events));
+    CTRACE(FBBLUE("starting ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
 #endif
     ev_io_start(the_loop, &ev->ev.io);
 
@@ -665,6 +673,106 @@ mrkthr_get_wbuflen(int fd)
 }
 
 
+int
+mrkthr_wait_for_write(int fd)
+{
+    int res;
+    ev_item_t *ev;
+
+    ev = ev_io_item_get(fd, EV_WRITE);
+    //ev_io_set(&ev->ev.io, fd, EV_WRITE);
+    me->pdata.ev = ev;
+
+    /*
+     * check if there is another thread waiting for the same event.
+     */
+    if (ev->ev.io.data == NULL) {
+        ev->ev.io.data = me;
+    } else if (ev->ev.io.data != me) {
+        /*
+         * in this case we are not allowed to wait for this event,
+         * sorry.
+         */
+        me->co.rc = CO_RC_SIMULTANEOUS;
+        return -1;
+    }
+
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
+#endif
+    ev_io_start(the_loop, &ev->ev.io);
+
+    /* wait for an event */
+    me->co.state = CO_STATE_WRITE;
+    res = yield();
+
+    ev = ev_io_item_get(fd, EV_WRITE);
+
+    assert(ev->ev.io.data == me);
+
+    ev->ev.io.data = NULL;
+    me->pdata.ev = NULL;
+
+    return res;
+}
+
+
+int
+mrkthr_wait_for_events(int fd, int *events)
+{
+    int res;
+    ev_item_t *ev, *ev1;
+
+    ev = ev_io_item_get(fd, EV_READ|EV_WRITE);
+    me->pdata.ev = ev;
+
+    /*
+     * check if there is another thread waiting for the same event.
+     */
+    if (ev->ev.io.data == NULL) {
+        ev->ev.io.data = me;
+    } else if (ev->ev.io.data != me) {
+        /*
+         * in this case we are not allowed to wait for this event,
+         * sorry.
+         */
+        me->co.rc = CO_RC_SIMULTANEOUS;
+        return -1;
+    }
+
+#ifdef TRACE_VERBOSE
+    CTRACE(FBBLUE("starting ev_io %d/%s"),
+           ev->ev.io.fd,
+           EV_STR(ev->ev.io.events));
+#endif
+    ev_io_start(the_loop, &ev->ev.io);
+
+    /* wait for an event */
+    me->co.state = CO_STATE_OTHER_POLLER;
+    res = yield();
+
+    ev1 = ev_io_item_get(fd, EV_READ|WRITE);
+
+    assert(ev == ev1);
+
+    assert(ev->ev.io.data == me);
+
+    ev->ev.io.data = NULL;
+    me->pdata.ev = NULL;
+
+    if (ev->ev.io.events & EV_READ) {
+        *events |= MRKTHR_WAIT_EVENT_READ;
+    }
+    if (ev->ev.io.events & EV_WRITE) {
+        *events |= MRKTHR_WAIT_EVENT_WRITE;
+    }
+
+    return res;
+}
+
+
 /**
  * Event loop
  */
@@ -696,14 +804,22 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 
         } else {
             if (w->events == EV_READ) {
-                if (ctx->co.state != CO_STATE_READ) {
+                if (ctx->co.state &
+                        (CO_STATE_READ | CO_STATE_OTHER_POLLER) == 0) {
                     CTRACE(FRED("Delivering a read event "
                                 "that was not scheduled for!"));
                 }
             } else if (w->events == EV_WRITE) {
-                if (ctx->co.state != CO_STATE_WRITE) {
+                if (ctx->co.state &
+                        (CO_STATE_WRITE | CO_STATE_OTHER_POLLER) == 0) {
                     CTRACE(FRED("Delivering a read event "
                                 "that was not scheduled for!"));
+                }
+            } else if (w->events & EV_READ|EV_WRITE) {
+                if (ctx->co.state != CO_STATE_OTHER_POLLER) {
+                    CTRACE(FRED("Delivering other poller events (%d) "
+                                "that were not scheduled for!",
+                                w->events));
                 }
             } else {
                 CTRACE("filter %s is not supporting", EV_STR(w->events));

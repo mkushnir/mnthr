@@ -363,19 +363,19 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     //}
     bucket_host = (mrkthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
+        mrkthr_ctx_t *head;
+
         //TRACE("while inserting, found bucket:");
         //mrkthr_dump(bucket_host);
-        if (DTQUEUE_HEAD(&bucket_host->sleepq_bucket) == NULL) {
+        if ((head = DTQUEUE_HEAD(&bucket_host->sleepq_bucket)) == NULL) {
             DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
         } else {
-            mrkthr_ctx_t *tmp;
 
             //CTRACE("before:");
             //mrkthr_dump(DTQUEUE_HEAD(&bucket_host->sleepq_bucket));
-            tmp = DTQUEUE_HEAD(&bucket_host->sleepq_bucket);
             DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
                                   sleepq_link,
-                                  tmp,
+                                  head,
                                   ctx);
         }
 
@@ -387,6 +387,39 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     //CTRACE(FGREEN("SL after inserting:"));
     //mrkthr_dump_sleepq();
     //CTRACE(FGREEN("---"));
+}
+
+
+static void
+sleepq_insert_once(mrkthr_ctx_t *ctx)
+{
+    btrie_node_t *trn;
+    if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
+        mrkthr_ctx_t *bucket_host;
+
+        bucket_host = trn->value;
+        assert(bucket_host != NULL);
+
+        if (bucket_host == ctx) {
+            /*
+             * we are done
+             */
+        } else {
+            mrkthr_ctx_t *head;
+
+            if ((head = DTQUEUE_HEAD(&bucket_host->sleepq_bucket)) == NULL) {
+                DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
+            } else {
+                DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
+                                      sleepq_link,
+                                      head,
+                                      ctx);
+            }
+        }
+
+    } else {
+        sleepq_insert(ctx);
+    }
 }
 
 
@@ -1179,7 +1212,6 @@ mrkthr_spawn_sig(const char *name, cofunc f, int argc, ...)
 }
 
 
-
 static void
 set_resume(mrkthr_ctx_t *ctx)
 {
@@ -1202,6 +1234,30 @@ set_resume(mrkthr_ctx_t *ctx)
     ctx->co.state = CO_STATE_SET_RESUME;
     ctx->expire_ticks = 1;
     ctx->sleepq_enqueue(ctx);
+}
+
+
+void
+set_resume_fast(mrkthr_ctx_t *ctx)
+{
+    assert(ctx != me);
+
+    //CTRACE("Setting for resume: ---");
+    //mrkthr_dump(ctx);
+    //CTRACE("---");
+
+    //assert(ctx->co.f != NULL);
+    if (ctx->co.f == NULL) {
+        CTRACE("Will not resume this ctx:");
+        mrkthr_dump(ctx);
+        return;
+    }
+
+    assert(ctx->expire_ticks == 1 || ctx->expire_ticks == 0);
+
+    ctx->co.state = CO_STATE_SET_RESUME;
+    ctx->expire_ticks = 1;
+    sleepq_insert_once(ctx);
 }
 
 
@@ -1237,9 +1293,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     sleepq_remove(ctx);
 
     /* clear event */
-    if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
-        poller_clear_event(ctx);
-    }
+    poller_clear_event(ctx);
 
     /*
      * We are ignoring all event management rules here.

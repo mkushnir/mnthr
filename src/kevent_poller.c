@@ -269,7 +269,12 @@ void
 poller_clear_event(mrkthr_ctx_t *ctx)
 {
     if (ctx->pdata.kev.ident != -1) {
-        discard_event(ctx->pdata.kev.ident, ctx->pdata.kev.filter, ctx);
+        if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
+            discard_event(ctx->pdata.kev.ident, ctx->pdata.kev.filter, ctx);
+        } else if (ctx->co.state == CO_STATE_OTHER_POLLER) {
+            discard_event(ctx->pdata.kev.ident, EVFILT_READ, ctx);
+            discard_event(ctx->pdata.kev.ident, EVFILT_WRITE, ctx);
+        }
     }
 }
 
@@ -487,6 +492,84 @@ mrkthr_get_wbuflen(int fd)
 }
 
 
+int
+mrkthr_wait_for_write(int fd)
+{
+    int res;
+    struct kevent *kev;
+
+    kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
+
+    me->pdata.kev.ident = fd;
+    me->pdata.kev.filter = EVFILT_WRITE;
+
+    /* wait for an event */
+    me->co.state = CO_STATE_WRITE;
+    res = yield();
+
+    if (res != 0) {
+        return -1;
+    }
+
+    if (me->pdata.kev.ident == -1) {
+        /*
+         * we haven't got to kevent() call
+         */
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
+            FAIL("result_event");
+        }
+        poller_mrkthr_ctx_init(me);
+        res = 0;
+    }
+
+    return res;
+}
+
+
+int
+mrkthr_wait_for_events(int fd, int *events)
+{
+    int res;
+    struct kevent *rkev, *wkev;
+
+    rkev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
+    wkev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    ++kevents0_elnum;
+
+    me->pdata.kev.ident = fd;
+    me->pdata.kev.filter = 0; /* special case */
+
+    /* wait for an event */
+    me->co.state = CO_STATE_OTHER_POLLER;
+    res = yield();
+
+    if (res != 0) {
+        return -1;
+    }
+
+    if (me->pdata.kev.ident == -1) {
+        /*
+         * we haven't got to kevent() call
+         */
+        me->co.rc = CO_RC_USER_INTERRUPTED;
+        res = -1;
+
+    } else {
+        *events = me->pdata.kev.filter; /* special case */
+        poller_mrkthr_ctx_init(me);
+        res = 0;
+    }
+
+    return res;
+}
+
+
 /**
  * Event loop
  */
@@ -618,8 +701,9 @@ mrkthr_loop(void)
 
                 assert(kev != NULL);
                 if (kev->ident != (uintptr_t)(-1)) {
-                    ctx = kev->udata;
                     int corc;
+
+                    ctx = kev->udata;
                     /*
                      * we first clear the event, and then the handlers/co's
                      * might re-add if needed.
@@ -635,19 +719,39 @@ mrkthr_loop(void)
                         corc = 0;
                     }
                     if (ctx != NULL) {
-                        ctx->pdata.kev.idx = it.iter;
-                        if (ctx->co.f != NULL) {
-                            ctx->co.rc = corc;
-                            if ((pres = poller_resume(ctx)) != 0) {
-#ifdef TRACE_VERBOSE
-                                CTRACE("Could not resume co %d "
-                                      "for read FD %08lx (res=%d)",
-                                      ctx->co.id, kev->ident, pres);
-#endif
+                        if (ctx->co.state == CO_STATE_OTHER_POLLER) {
+                            /*
+                             * special case for mrkthr_wait_for_event(),
+                             * defer resume
+                             */
+                            ctx->pdata.kev.idx = -1;
+                            if (kev->filter == EVFILT_READ) {
+                                ctx->pdata.kev.filter |=
+                                    MRKTHR_WAIT_EVENT_READ;
+                            } else if (kev->filter == EVFILT_WRITE) {
+                                ctx->pdata.kev.filter |=
+                                    MRKTHR_WAIT_EVENT_WRITE;
+                            } else {
+                                /**/
+                                FAIL("mrkthr_loop");
                             }
+                            set_resume_fast(ctx);
+
                         } else {
-                            CTRACE("co for FD %08lx is NULL, "
-                                  "discarding ...", kev->ident);
+                            ctx->pdata.kev.idx = it.iter;
+                            if (ctx->co.f != NULL) {
+                                ctx->co.rc = corc;
+                                if ((pres = poller_resume(ctx)) != 0) {
+#ifdef TRACE_VERBOSE
+                                    CTRACE("Could not resume co %d "
+                                          "for read FD %08lx (res=%d)",
+                                          ctx->co.id, kev->ident, pres);
+#endif
+                                }
+                            } else {
+                                CTRACE("co for FD %08lx is NULL, "
+                                      "discarding ...", kev->ident);
+                            }
                         }
                     } else {
                         CTRACE("no thread for FD %08lx filter %s "
