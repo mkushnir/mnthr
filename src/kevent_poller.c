@@ -585,7 +585,7 @@ mrkthr_loop(void)
 
     PROFILE_START(mrkthr_sched0_p);
 
-    while (!(mflags & CO_FLAG_SHUTDOWN)) {
+    while (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
         //sleep(1);
         update_now();
 

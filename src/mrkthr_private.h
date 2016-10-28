@@ -242,7 +242,7 @@ struct _mrkthr_profile {
 
 #define CO_FLAG_INITIALIZED 0x01
 #define CO_FLAG_SHUTDOWN 0x02
-extern int mflags;
+extern int mrkthr_flags;
 extern struct _mrkthr_ctx *me;
 extern ucontext_t main_uc;
 extern btrie_t the_sleepq;

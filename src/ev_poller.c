@@ -914,7 +914,7 @@ _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
     btrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
 
-    if (!(mflags & CO_FLAG_SHUTDOWN)) {
+    if (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
         timecounter_now = (uint64_t)(ev_now(the_loop) * 1000000000.);
 
 #ifdef TRACE_VERBOSE

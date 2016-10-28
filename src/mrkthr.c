@@ -95,7 +95,7 @@ const profile_t *mrkthr_sched1_p;
 
 typedef int (*writer_t) (int, int, int);
 
-int mflags = 0;
+int mrkthr_flags = 0;
 
 ucontext_t main_uc;
 static char main_stack[STACKSIZE];
@@ -471,7 +471,7 @@ mrkthr_init(void)
 {
     UNUSED size_t sz;
 
-    if (mflags & CO_FLAG_INITIALIZED) {
+    if (mrkthr_flags & CO_FLAG_INITIALIZED) {
         return 0;
     }
 
@@ -501,7 +501,7 @@ mrkthr_init(void)
     me = NULL;
     btrie_init(&the_sleepq);
 
-    mflags |= CO_FLAG_INITIALIZED;
+    mrkthr_flags |= CO_FLAG_INITIALIZED;
 
     return 0;
 }
@@ -510,7 +510,7 @@ mrkthr_init(void)
 int
 mrkthr_fini(void)
 {
-    if (!(mflags & CO_FLAG_INITIALIZED)) {
+    if (!(mrkthr_flags & CO_FLAG_INITIALIZED)) {
         return 0;
     }
 
@@ -523,7 +523,7 @@ mrkthr_fini(void)
     PROFILE_REPORT_SEC();
     PROFILE_FINI_MODULE();
 
-    mflags &= ~CO_FLAG_INITIALIZED;
+    mrkthr_flags &= ~CO_FLAG_INITIALIZED;
 
     return 0;
 }
@@ -532,7 +532,7 @@ mrkthr_fini(void)
 void
 mrkthr_shutdown(void)
 {
-    mflags |= CO_FLAG_SHUTDOWN;
+    mrkthr_flags |= CO_FLAG_SHUTDOWN;
 }
 
 
@@ -806,7 +806,7 @@ mrkthr_gc(void)
  */
 #define VNEW_BODY(get_ctx_fn)                                                  \
     int i;                                                                     \
-    assert(mflags & CO_FLAG_INITIALIZED);                                      \
+    assert(mrkthr_flags & CO_FLAG_INITIALIZED);                                \
     ctx = get_ctx_fn();                                                        \
     assert(ctx!= NULL);                                                        \
     if (ctx->co.id != -1) {                                                    \

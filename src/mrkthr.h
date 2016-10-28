@@ -236,6 +236,49 @@ MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);
 
+
+
+#define MRKTHR_RETRY(_mrkthr_shutting_down,                            \
+                     _n,                                               \
+                     _interval,                                        \
+                     _expr,                                            \
+                     _eexpr)                                           \
+do {                                                                   \
+    intmax_t _mrkthr_retry_count = n;                                  \
+    while (_mrkthr_retry_count-- > 0) {                                \
+        if (_mrkthr_shutting_down) {                                   \
+/*            CTRACE("MRKTHR_RETRY: shutting_down"); */                \
+            break;                                                     \
+        }                                                              \
+        if (!(_expr)) {                                                \
+            int _mrkthr_retry_res;                                     \
+            _eexpr;                                                    \
+            if ((_mrkthr_retry_res = mrkthr_sleep(                     \
+                            _interval * 1000)) != 0) {                 \
+                if (_mrkthr_retry_res == MRKAMQP_STOP_THREADS ||       \
+                    _mrkthr_retry_res == MRKAMQP_PROTOCOL_ERROR) {     \
+                    mrkthr_set_retval(0);                              \
+/*                                                                     \
+                    CTRACE("interval error: %d with res=%d",           \
+                           interval,                                   \
+                           _mrkthr_retry_res);                         \
+ */                                                                    \
+                } else {                                               \
+                    break;                                             \
+                }                                                      \
+            } else {                                                   \
+/*                CTRACE("interval again: %d", interval); */           \
+            }                                                          \
+            continue;                                                  \
+        }                                                              \
+/*        CTRACE("breaking %s", #expr); */                             \
+        break;                                                         \
+    }                                                                  \
+} while (false)                                                        \
+
+
+
+
 #ifdef __cplusplus
 }
 #endif
