@@ -36,7 +36,7 @@ const char *mrkthr_diag_str(int);
     } while (0)                                                \
 
 
-typedef int (*cofunc)(int, void *[]);
+typedef int (*mrkthr_cofunc_t)(int, void *[]);
 typedef struct _mrkthr_ctx mrkthr_ctx_t;
 
 #ifndef MRKTHR_WAITQ_T_DEFINED
@@ -105,10 +105,10 @@ size_t mrkthr_gc(void);
 size_t mrkthr_ctx_sizeof(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
-mrkthr_ctx_t *mrkthr_new(const char *, cofunc, int, ...);
-mrkthr_ctx_t *mrkthr_spawn(const char *name, cofunc f, int argc, ...);
-mrkthr_ctx_t *mrkthr_new_sig(const char *, cofunc, int, ...);
-mrkthr_ctx_t *mrkthr_spawn_sig(const char *, cofunc, int, ...);
+mrkthr_ctx_t *mrkthr_new(const char *, mrkthr_cofunc_t, int, ...);
+mrkthr_ctx_t *mrkthr_spawn(const char *name, mrkthr_cofunc_t, int, ...);
+mrkthr_ctx_t *mrkthr_new_sig(const char *, mrkthr_cofunc_t, int, ...);
+mrkthr_ctx_t *mrkthr_spawn_sig(const char *, mrkthr_cofunc_t, int, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
@@ -233,7 +233,7 @@ uint64_t mrkthr_get_now_ticks_precise(void);
 #define MRKTHR_GET_NOW_TICKS_PRECISE_FSEC() \
     ((double)mrkthr_get_now_ticks_precise() / 1000000000.0)
 
-MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, cofunc, int, ...);
+MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, mrkthr_cofunc_t, int, ...);
 
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more(bytestream_t *, int, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write(bytestream_t *, int, size_t);

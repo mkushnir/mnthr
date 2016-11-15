@@ -884,7 +884,7 @@ vnew_body_end:                                                                 \
 
 
 mrkthr_ctx_t *
-mrkthr_new(const char *name, cofunc f, int argc, ...)
+mrkthr_new(const char *name, mrkthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     mrkthr_ctx_t *ctx = NULL;
@@ -900,7 +900,7 @@ mrkthr_new(const char *name, cofunc f, int argc, ...)
 
 
 mrkthr_ctx_t *
-mrkthr_new_sig(const char *name, cofunc f, int argc, ...)
+mrkthr_new_sig(const char *name, mrkthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     mrkthr_ctx_t *ctx = NULL;
@@ -1218,7 +1218,7 @@ mrkthr_run(mrkthr_ctx_t *ctx)
 
 
 mrkthr_ctx_t *
-mrkthr_spawn(const char *name, cofunc f, int argc, ...)
+mrkthr_spawn(const char *name, mrkthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     mrkthr_ctx_t *ctx = NULL;
@@ -1235,7 +1235,7 @@ mrkthr_spawn(const char *name, cofunc f, int argc, ...)
 
 
 mrkthr_ctx_t *
-mrkthr_spawn_sig(const char *name, cofunc f, int argc, ...)
+mrkthr_spawn_sig(const char *name, mrkthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     mrkthr_ctx_t *ctx = NULL;
@@ -1649,11 +1649,12 @@ mrkthr_accept_all2(int fd, mrkthr_socket_t **buf, off_t *offset)
         tmp = *buf + (*offset + navail);
         tmp->addrlen = sizeof(union _mrkthr_addr);
         if ((tmp->fd = accept(fd, &tmp->addr.sa, &tmp->addrlen)) == -1) {
-            perror("accept");
+            if (errno != EAGAIN) {
+                perror("accept");
+            }
             break;
         }
     }
-
 
     if (navail == 0) {
         /* EOF ? */
@@ -2304,7 +2305,7 @@ mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
  * specified inverval of time.
  */
 int
-mrkthr_wait_for(uint64_t msec, const char *name, cofunc f, int argc, ...)
+mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     int res;
