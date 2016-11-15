@@ -61,8 +61,9 @@ struct _mrkthr_ctx {
         int64_t id;
         char name[8];
         int (*f)(int, void *[]);
-        int argc;
         void **argv;
+        int argc;
+        unsigned abac;
 #       define CO_STATE_DORMANT 0x01
 #       define CO_STATE_RESUMED 0x02
 #       define CO_STATE_READ 0x04
@@ -168,7 +169,7 @@ struct _mrkthr_ctx {
     /*
      * Membership of this ctx in free_ctxes.
      */
-    STQUEUE_ENTRY(_mrkthr_ctx, free_link);
+    DTQUEUE_ENTRY(_mrkthr_ctx, free_link);
 
     /*
      * Membership of this ctx in runq.

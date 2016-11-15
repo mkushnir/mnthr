@@ -104,7 +104,7 @@ static int co_id = 0;
 static array_t ctxes;
 mrkthr_ctx_t *me;
 
-static STQUEUE(_mrkthr_ctx, free_list);
+static DTQUEUE(_mrkthr_ctx, free_list);
 
 /*
  * Sleep list holds threads that are waiting for resume
@@ -129,7 +129,7 @@ push_free_ctx(mrkthr_ctx_t *ctx)
     //CTRACE("push_free_ctx");
     //mrkthr_dump(ctx);
     mrkthr_ctx_finalize(ctx);
-    STQUEUE_ENQUEUE(&free_list, free_link, ctx);
+    DTQUEUE_ENQUEUE(&free_list, free_link, ctx);
 }
 
 
@@ -485,7 +485,7 @@ mrkthr_init(void)
     MEMDEBUG_REGISTER(mrkthr);
 #endif
 
-    STQUEUE_INIT(&free_list);
+    DTQUEUE_INIT(&free_list);
 
     if (array_init(&ctxes, sizeof(mrkthr_ctx_t *), 0,
                   (array_initializer_t)mrkthr_ctx_init,
@@ -516,7 +516,7 @@ mrkthr_fini(void)
 
     me = NULL;
     array_fini(&ctxes);
-    STQUEUE_FINI(&free_list);
+    DTQUEUE_FINI(&free_list);
     btrie_fini(&the_sleepq);
     poller_fini();
 
@@ -609,6 +609,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
     ctx->co.f = NULL;
     ctx->co.argc = 0;
     ctx->co.argv = NULL;
+    ctx->co.abac = 0;
     ctx->co.state = CO_STATE_DORMANT;
     ctx->co.rc = 0;
 
@@ -624,7 +625,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
     DTQUEUE_ENTRY_INIT(waitq_link, ctx);
     ctx->hosting_waitq = NULL;
 
-    STQUEUE_ENTRY_INIT(free_link, ctx);
+    DTQUEUE_ENTRY_INIT(free_link, ctx);
     STQUEUE_ENTRY_INIT(runq_link, ctx);
     poller_mrkthr_ctx_init(ctx);
 
@@ -658,6 +659,7 @@ co_fini_other(struct _co *co)
         free(co->argv);
         co->argv = NULL;
     }
+    //co->abac = 0; /* cannot zero it here */
     co->state = CO_STATE_DORMANT;
     // XXX let it stay for a while, and clear later ...
     //co->rc = 0;
@@ -736,16 +738,19 @@ mrkthr_ctx_pop_free(void)
 {
     mrkthr_ctx_t *ctx;
 
-    if ((ctx = STQUEUE_HEAD(&free_list)) != NULL) {
-        STQUEUE_DEQUEUE(&free_list, free_link);
-        STQUEUE_ENTRY_FINI(free_link, ctx);
-        ctx->co.rc = 0;
-        //CTRACE("pop_free_ctx 0");
-    } else {
-        ctx = mrkthr_ctx_new();
-        //CTRACE("pop_free_ctx 1");
+    for (ctx = DTQUEUE_HEAD(&free_list);
+         ctx != NULL;
+         ctx = DTQUEUE_NEXT(free_link, ctx)) {
+        if (ctx->co.abac == 0) {
+            DTQUEUE_REMOVE(&free_list, free_link, ctx);
+            ctx->co.rc = 0;
+            goto end;
+        }
     }
-    //mrkthr_dump(ctx);
+
+    ctx = mrkthr_ctx_new();
+
+end:
     return ctx;
 }
 
@@ -755,17 +760,27 @@ size_t
 mrkthr_gc(void)
 {
     size_t res;
-    mrkthr_ctx_t **pctx0, **pctx1;
+    mrkthr_ctx_t **pctx0, **pctx1, *tmp;
     array_iter_t it0, it1;
+    DTQUEUE(_mrkthr_ctx, tmp_list);
 
     res = 0;
+    DTQUEUE_INIT(&tmp_list);
     for (pctx0 = array_first(&ctxes, &it0);
          pctx0 != NULL;
          pctx0 = array_next(&ctxes, &it0)) {
-        if (!STQUEUE_ORPHAN(&free_list, free_link, *pctx0)) {
-            ++res;
-            assert((*pctx0)->co.id == -1);
-            (void)array_clear_item(&ctxes, it0.iter);
+        if (!DTQUEUE_ORPHAN(&free_list, free_link, *pctx0)) {
+            if ((*pctx0)->co.abac > 0) {
+                CTRACE("co.abac not clear during gc (keeping):");
+                mrkthr_dump(*pctx0);
+                assert((*pctx0)->co.id == -1);
+                DTQUEUE_ENTRY_INIT(free_link, *pctx0);
+                DTQUEUE_ENQUEUE(&tmp_list, free_link, *pctx0);
+            } else {
+                ++res;
+                assert((*pctx0)->co.id == -1);
+                (void)array_clear_item(&ctxes, it0.iter);
+            }
         }
     }
 
@@ -793,7 +808,16 @@ mrkthr_gc(void)
         }
     }
 
-    STQUEUE_INIT(&free_list);
+    DTQUEUE_INIT(&free_list);
+
+    for (tmp = DTQUEUE_HEAD(&tmp_list);
+         tmp != NULL;
+         tmp = DTQUEUE_NEXT(free_link, tmp)) {
+        DTQUEUE_DEQUEUE(&tmp_list, free_link);
+        DTQUEUE_ENTRY_FINI(free_link, tmp);
+        DTQUEUE_ENQUEUE(&free_list, free_link, tmp);
+    }
+    DTQUEUE_FINI(&tmp_list);
 
     return res;
 }
@@ -987,6 +1011,21 @@ mrkthr_set_retval(int rv)
     rc = me->co.rc;
     me->co.rc = rv;
     return rc;
+}
+
+
+void
+mrkthr_incabac(mrkthr_ctx_t *ctx)
+{
+    ++ctx->co.abac;
+}
+
+
+void
+mrkthr_decabac(mrkthr_ctx_t *ctx)
+{
+    assert(ctx->co.abac > 0);
+    --ctx->co.abac;
 }
 
 
