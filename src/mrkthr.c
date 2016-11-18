@@ -59,6 +59,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <time.h>
 #include <netdb.h>
 
@@ -1909,6 +1910,45 @@ mrkthr_sendto_all(int fd,
     }
     return 0;
 }
+
+
+int
+mrkthr_sendfile(int fd,
+                int s,
+                off_t offset,
+                size_t nbytes,
+                struct sf_hdtr *hdtr,
+                off_t *sbytes,
+                int flags)
+{
+    off_t _sbytes;
+
+    flags |= SF_NODISKIO; // sanity
+    _sbytes = 0;
+
+    while (_sbytes == 0) {
+        if (mrkthr_get_wbuflen(s) <= 0) {
+            TRRET(MRKTHR_SENDFILE + 1);
+        }
+        if (sendfile(fd, s, offset, nbytes, hdtr, &_sbytes, flags) == -1) {
+            if (errno == EBUSY) {
+                if (mrkthr_get_rbuflen(fd) <= 0) {
+                    TRRET(MRKTHR_SENDFILE + 2);
+                }
+                continue;
+
+            } else {
+                TRRET(MRKTHR_SENDFILE + 3);
+            }
+        }
+        break;
+    }
+
+    *sbytes = _sbytes;
+
+    return 0;
+}
+
 
 
 /**

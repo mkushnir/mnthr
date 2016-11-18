@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <time.h>
 #include <netdb.h>
 
@@ -158,6 +160,13 @@ MRKTHR_CPOINT int mrkthr_sendto_all(int,
                                    int,
                                    const struct sockaddr *,
                                    socklen_t);
+MRKTHR_CPOINT int mrkthr_sendfile(int,
+                                  int,
+                                  off_t,
+                                  size_t,
+                                  struct sf_hdtr *,
+                                  off_t *,
+                                  int);
 
 /*
  *
