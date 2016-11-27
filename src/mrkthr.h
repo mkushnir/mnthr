@@ -108,9 +108,15 @@ size_t mrkthr_ctx_sizeof(void);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
 mrkthr_ctx_t *mrkthr_new(const char *, mrkthr_cofunc_t, int, ...);
+#define MRKTHR_NEW(name, f, ...)    \
+    mrkthr_new(name, f, MRKASZ(__VA_ARGS__), ##__VA_ARGS__)
 mrkthr_ctx_t *mrkthr_spawn(const char *name, mrkthr_cofunc_t, int, ...);
+#define MRKTHR_SPAWN(name, f, ...)  \
+    mrkthr_spawn(name, f, MRKASZ(__VA_ARGS__), ##__VA_ARGS__)
 mrkthr_ctx_t *mrkthr_new_sig(const char *, mrkthr_cofunc_t, int, ...);
 mrkthr_ctx_t *mrkthr_spawn_sig(const char *, mrkthr_cofunc_t, int, ...);
+#define MRKTHR_SPAWN_SIG(name, f, ...)  \
+    mrkthr_spawn_sig(name, f, MRKASZ(__VA_ARGS__), ##__VA_ARGS__)
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);

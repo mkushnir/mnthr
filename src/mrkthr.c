@@ -530,10 +530,19 @@ mrkthr_fini(void)
 }
 
 
+
+static int
+uyuyuy(UNUSED int argc, UNUSED void **argv)
+{
+    return 0;
+}
+
+
 void
 mrkthr_shutdown(void)
 {
     mrkthr_flags |= CO_FLAG_SHUTDOWN;
+    mrkthr_spawn("uyuyuy", uyuyuy, 0);
 }
 
 
@@ -853,7 +862,7 @@ mrkthr_gc(void)
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
                                   0)) == MAP_FAILED) {                         \
-            TR(MRKTHR_NEW + 1);                                                \
+            TR(_MRKTHR_NEW + 1);                                               \
             ctx = NULL;                                                        \
             goto vnew_body_end;                                                \
         }                                                                      \
