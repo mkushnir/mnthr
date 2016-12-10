@@ -22,7 +22,7 @@ const char *_malloc_options = "AJ";
 static int
 _bytestream_consume_data(UNUSED int argc, void **argv)
 {
-    bytestream_t *bs;
+    mnbytestream_t *bs;
     int fd;
     int res;
 
@@ -36,7 +36,7 @@ _bytestream_consume_data(UNUSED int argc, void **argv)
 }
 
 static int
-bytestream_consume_data_with_timeout(bytestream_t *bs, int fd, uint64_t tmout)
+bytestream_consume_data_with_timeout(mnbytestream_t *bs, int fd, uint64_t tmout)
 {
     return mrkthr_wait_for(tmout,
                            NULL,
@@ -50,7 +50,7 @@ UNUSED static int
 run0(UNUSED int argc, UNUSED void **argv)
 {
     int fdin, fdout;
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     if ((fdin = open("qwe", O_RDONLY|O_NONBLOCK)) == -1) {
         perror("open 1");
@@ -87,7 +87,7 @@ run1(UNUSED int argc, UNUSED void **argv)
 {
     int res;
     int fdin, fdout;
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     if ((fdin = open("qwe", O_RDONLY|O_NONBLOCK)) == -1) {
         perror("open 1");
@@ -130,7 +130,7 @@ run2(UNUSED int argc, UNUSED void **argv)
 {
     int res;
     int fdin, fdout;
-    bytestream_t bs;
+    mnbytestream_t bs;
 
     if ((fdin = mrkthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
         perror("mrkthr_socket_connect");

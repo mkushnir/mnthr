@@ -10,7 +10,7 @@
 #endif
 
 ssize_t
-mrkthr_bytestream_read_more(bytestream_t *stream, int fd, ssize_t sz)
+mrkthr_bytestream_read_more(mnbytestream_t *stream, int fd, ssize_t sz)
 {
     ssize_t nread;
     ssize_t need;
@@ -33,7 +33,7 @@ mrkthr_bytestream_read_more(bytestream_t *stream, int fd, ssize_t sz)
 }
 
 ssize_t
-mrkthr_bytestream_write(bytestream_t *stream, int fd, size_t sz)
+mrkthr_bytestream_write(mnbytestream_t *stream, int fd, size_t sz)
 {
     ssize_t nwritten;
 

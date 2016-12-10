@@ -102,7 +102,7 @@ ucontext_t main_uc;
 static char main_stack[STACKSIZE];
 
 static int co_id = 0;
-static array_t ctxes;
+static mnarray_t ctxes;
 mrkthr_ctx_t *me;
 
 static DTQUEUE(_mrkthr_ctx, free_list);
@@ -111,7 +111,7 @@ static DTQUEUE(_mrkthr_ctx, free_list);
  * Sleep list holds threads that are waiting for resume
  * in the future. It's prioritized by the thread's expire_ticks.
  */
-btrie_t the_sleepq;
+mnbtrie_t the_sleepq;
 
 
 static int mrkthr_ctx_init(mrkthr_ctx_t **);
@@ -219,7 +219,7 @@ mrkthr_ctx_sizeof(void)
 }
 
 static int
-dump_sleepq_node(btrie_node_t *trn, uint64_t key, UNUSED void *udata)
+dump_sleepq_node(mnbtrie_node_t *trn, uint64_t key, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
@@ -248,7 +248,7 @@ mrkthr_dump_sleepq(void)
 void
 sleepq_remove(mrkthr_ctx_t *ctx)
 {
-    btrie_node_t *trn;
+    mnbtrie_node_t *trn;
 
     //CTRACE(FBLUE("SL removing"));
     //mrkthr_dump(ctx);
@@ -349,7 +349,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
 static void
 sleepq_insert(mrkthr_ctx_t *ctx)
 {
-    btrie_node_t *trn;
+    mnbtrie_node_t *trn;
     mrkthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL inserting"));
@@ -394,7 +394,7 @@ sleepq_insert(mrkthr_ctx_t *ctx)
 static void
 sleepq_insert_once(mrkthr_ctx_t *ctx)
 {
-    btrie_node_t *trn;
+    mnbtrie_node_t *trn;
     if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
         mrkthr_ctx_t *bucket_host;
 
@@ -427,7 +427,7 @@ sleepq_insert_once(mrkthr_ctx_t *ctx)
 static void
 sleepq_append(mrkthr_ctx_t *ctx)
 {
-    btrie_node_t *trn;
+    mnbtrie_node_t *trn;
     mrkthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL appending"));
@@ -771,7 +771,7 @@ mrkthr_gc(void)
 {
     size_t res;
     mrkthr_ctx_t **pctx0, **pctx1, *tmp;
-    array_iter_t it0, it1;
+    mnarray_iter_t it0, it1;
     DTQUEUE(_mrkthr_ctx, tmp_list);
 
     res = 0;
@@ -1441,11 +1441,11 @@ mrkthr_socket(const char *hostname,
             continue;
         }
 
-        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-            perror("fcntl");
-            close(fd);
-            fd = -1;
-        }
+        //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        //    perror("fcntl");
+        //    close(fd);
+        //    fd = -1;
+        //}
 
         break;
     }
@@ -1533,11 +1533,11 @@ mrkthr_socket_bind(const char *hostname,
             perror("setsockopt");
         }
 
-        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-            perror("fcntl");
-            close(fd);
-            fd = -1;
-        }
+        //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        //    perror("fcntl");
+        //    close(fd);
+        //    fd = -1;
+        //}
 
         if (bind(fd, ai->ai_addr, ai->ai_addrlen) != 0) {
             perror("bind");
@@ -1561,10 +1561,10 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int res = 0;
 
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-        perror("fcntl");
-        TRRET(MRKTHR_CONNECT + 1);
-    }
+    //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+    //    perror("fcntl");
+    //    TRRET(MRKTHR_CONNECT + 1);
+    //}
 
     if ((res = connect(fd, addr, addrlen)) != 0) {
         perror("connect");

@@ -118,7 +118,7 @@ void
 poller_sift_sleepq(void)
 {
     STQUEUE(_mrkthr_ctx, runq);
-    btrie_node_t *trn;
+    mnbtrie_node_t *trn;
     mrkthr_ctx_t *ctx;
     uint64_t now;
 

@@ -33,8 +33,8 @@ extern const profile_t *mrkthr_sched0_p;
 extern const profile_t *mrkthr_sched1_p;
 
 static int q0 = -1;
-static array_t kevents0;
-static array_t kevents1;
+static mnarray_t kevents0;
+static mnarray_t kevents1;
 static ssize_t kevents0_elnum = 0;
 static ssize_t kevents1_elnum = 0;
 
@@ -579,9 +579,9 @@ mrkthr_loop(void)
     int kevres = 0;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
-    btrie_node_t *node;
+    mnbtrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
-    array_iter_t it;
+    mnarray_iter_t it;
 
     PROFILE_START(mrkthr_sched0_p);
 

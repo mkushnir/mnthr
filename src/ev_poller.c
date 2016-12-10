@@ -87,7 +87,7 @@ typedef struct _ev_item {
         ev_io io;
         ev_stat stat;
     } ev;
-    bytes_t *stat_path;
+    mnbytes_t *stat_path;
     /*
      * ev.io->fd, ev.io->events
      * ev.stat->wd, ev.stat->path
@@ -98,7 +98,7 @@ typedef struct _ev_item {
     int ty;
 } ev_item_t;
 
-hash_t events;
+mnhash_t events;
 
 static struct ev_loop *the_loop;
 
@@ -262,7 +262,7 @@ static ev_item_t *
 ev_io_item_get(int fd, int event)
 {
     ev_item_t probe, *ev;
-    hash_item_t *dit;
+    mnhash_item_t *dit;
 
     probe.ev.io.fd = fd;
     probe.ev.io.events = event;
@@ -282,7 +282,7 @@ static ev_item_t *
 ev_stat_item_get(const char *path, UNUSED int event)
 {
     ev_item_t probe, *ev;
-    hash_item_t *dit;
+    mnhash_item_t *dit;
 
     probe.stat_path = bytes_new_from_str(path);
     probe.hash = 0;
@@ -315,7 +315,7 @@ void
 mrkthr_stat_destroy(mrkthr_stat_t **st)
 {
     if (*st != NULL) {
-        hash_item_t *hit;
+        mnhash_item_t *hit;
 
         if ((hit = hash_get_item(&events, (*st)->ev)) == NULL) {
             FAIL("mrkthr_stat_destroy");
@@ -330,7 +330,7 @@ int
 mrkthr_stat_wait(mrkthr_stat_t *st)
 {
     int res;
-    hash_item_t *hit;
+    mnhash_item_t *hit;
     ev_item_t *ev;
 
     assert(st->ev->ty == EV_TYPE_STAT);
@@ -911,7 +911,7 @@ _timer_cb(UNUSED EV_P_ UNUSED ev_timer *w, UNUSED int revents)
 static void
 _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
 {
-    btrie_node_t *node;
+    mnbtrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
 
     if (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {

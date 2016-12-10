@@ -246,7 +246,7 @@ struct _mrkthr_profile {
 extern int mrkthr_flags;
 extern struct _mrkthr_ctx *me;
 extern ucontext_t main_uc;
-extern btrie_t the_sleepq;
+extern mnbtrie_t the_sleepq;
 
 int yield(void);
 void push_free_ctx(struct _mrkthr_ctx *);
