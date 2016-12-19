@@ -72,7 +72,7 @@ AC_CONFIG_HEADERS(config.h)
 
 AC_CHECK_HEADER_STDBOOL
 
-AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/socket.h sys/time.h limits.h sys/user.h fcntl.h netdb.h sys/ioctl.h])
+AC_CHECK_HEADERS([syslog.h netinet/in.h sys/param.h sys/types.h sys/socket.h sys/uio.h sys/time.h sys/sendfile.h limits.h sys/user.h fcntl.h netdb.h sys/ioctl.h])
 
 AC_C_CONST
 AC_C_INLINE
@@ -84,11 +84,20 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_CHECK_FUNCS([clock_gettime munmap strerror gettimeofday memset socket strdup])
+AC_CHECK_FUNCS([clock_gettime munmap strerror gettimeofday memset socket strdup sendfile])
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_MMAP
 
+AC_CHECK_TYPE([struct sf_hdtr],
+                [AC_MSG_NOTICE([struct sf_hdtr is defined])
+                 AC_DEFINE([HAVE_SF_HDTR], [1], [Define to 1 if struct sf_hdtr is defined])
+                ],
+                [ ], [[
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+]])
 
 AC_PRESERVE_HELP_ORDER
 

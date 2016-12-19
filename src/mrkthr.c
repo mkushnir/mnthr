@@ -88,6 +88,12 @@ MEMDEBUG_DECLARE(mrkthr);
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
+#include "config.h"
+
+#ifdef HAVE_SYS_SENDFILE_H
+#include <sys/sendfile.h>
+#endif
+
 const profile_t *mrkthr_user_p;
 const profile_t *mrkthr_swap_p;
 const profile_t *mrkthr_sched0_p;
@@ -1441,11 +1447,11 @@ mrkthr_socket(const char *hostname,
             continue;
         }
 
-        //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-        //    perror("fcntl");
-        //    close(fd);
-        //    fd = -1;
-        //}
+        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+            perror("fcntl");
+            close(fd);
+            fd = -1;
+        }
 
         break;
     }
@@ -1472,7 +1478,8 @@ mrkthr_socket_connect(const char *hostname,
     ainfos = NULL;
 
     if (getaddrinfo(hostname, servname, &hints, &ainfos) != 0) {
-        FAIL("getaddrinfo");
+        perror("getaddrinfo");
+        return -1;
     }
 
     fd = -1;
@@ -1533,11 +1540,11 @@ mrkthr_socket_bind(const char *hostname,
             perror("setsockopt");
         }
 
-        //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-        //    perror("fcntl");
-        //    close(fd);
-        //    fd = -1;
-        //}
+        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+            perror("fcntl");
+            close(fd);
+            fd = -1;
+        }
 
         if (bind(fd, ai->ai_addr, ai->ai_addrlen) != 0) {
             perror("bind");
@@ -1561,10 +1568,10 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int res = 0;
 
-    //if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-    //    perror("fcntl");
-    //    TRRET(MRKTHR_CONNECT + 1);
-    //}
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        perror("fcntl");
+        TRRET(MRKTHR_CONNECT + 1);
+    }
 
     if ((res = connect(fd, addr, addrlen)) != 0) {
         perror("connect");
@@ -1921,6 +1928,7 @@ mrkthr_sendto_all(int fd,
 }
 
 
+#ifdef HAVE_SF_HDTR
 int
 mrkthr_sendfile(int fd,
                 int s,
@@ -1957,6 +1965,35 @@ mrkthr_sendfile(int fd,
 
     return 0;
 }
+#else
+int
+mrkthr_sendfile(int fd,
+                int s,
+                off_t offset,
+                size_t nbytes,
+                UNUSED struct sf_hdtr *hdtr,
+                UNUSED off_t *sbytes,
+                UNUSED int flags)
+{
+    ssize_t nread;
+
+    if (mrkthr_get_wbuflen(s) <= 0) {
+        TRRET(MRKTHR_SENDFILE + 1);
+    }
+
+    nread = 0;
+    while (nbytes > 0) {
+        if ((nread = sendfile(s, fd, &offset, nbytes)) == -1) {
+        }
+        if (nread  == 0) {
+            break;
+        }
+        nbytes -= nread;
+    }
+
+    return 0;
+}
+#endif
 
 
 

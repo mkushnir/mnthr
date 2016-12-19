@@ -15,6 +15,15 @@
 #include "mrkcommon/util.h"
 #include "mrkcommon/bytestream.h"
 
+#ifndef HAVE_SF_HDTR
+struct sf_hdtr {
+    struct iovec *headers;
+    int hdr_cnt;
+    struct iovec *trailers;
+    int trl_cnt;
+};
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -753,7 +753,7 @@ mrkthr_wait_for_events(int fd, int *events)
     me->co.state = CO_STATE_OTHER_POLLER;
     res = yield();
 
-    ev1 = ev_io_item_get(fd, EV_READ|WRITE);
+    ev1 = ev_io_item_get(fd, EV_READ|EV_WRITE);
 
     assert(ev == ev1);
 
@@ -804,22 +804,22 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 
         } else {
             if (w->events == EV_READ) {
-                if (ctx->co.state &
-                        (CO_STATE_READ | CO_STATE_OTHER_POLLER) == 0) {
+                if ((ctx->co.state &
+                        (CO_STATE_READ | CO_STATE_OTHER_POLLER)) == 0) {
                     CTRACE(FRED("Delivering a read event "
                                 "that was not scheduled for!"));
                 }
             } else if (w->events == EV_WRITE) {
-                if (ctx->co.state &
-                        (CO_STATE_WRITE | CO_STATE_OTHER_POLLER) == 0) {
+                if ((ctx->co.state &
+                        (CO_STATE_WRITE | CO_STATE_OTHER_POLLER)) == 0) {
                     CTRACE(FRED("Delivering a read event "
                                 "that was not scheduled for!"));
                 }
-            } else if (w->events & EV_READ|EV_WRITE) {
+            } else if (w->events & (EV_READ|EV_WRITE)) {
                 if (ctx->co.state != CO_STATE_OTHER_POLLER) {
                     CTRACE(FRED("Delivering other poller events (%d) "
-                                "that were not scheduled for!",
-                                w->events));
+                                "that were not scheduled for!"),
+                                w->events);
                 }
             } else {
                 CTRACE("filter %s is not supporting", EV_STR(w->events));
