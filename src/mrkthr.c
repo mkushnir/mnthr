@@ -1961,7 +1961,9 @@ mrkthr_sendfile(int fd,
         break;
     }
 
-    *sbytes = _sbytes;
+    if (sbytes != NULL) {
+        *sbytes = _sbytes;
+    }
 
     return 0;
 }

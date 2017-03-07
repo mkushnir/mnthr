@@ -749,8 +749,8 @@ mrkthr_loop(void)
 #endif
                                 }
                             } else {
-                                CTRACE("co for FD %08lx is NULL, "
-                                      "discarding ...", kev->ident);
+                                //CTRACE("co for FD %08lx is NULL, "
+                                //      "discarding ...", kev->ident);
                             }
                         }
                     } else {

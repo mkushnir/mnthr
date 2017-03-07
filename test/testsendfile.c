@@ -151,7 +151,7 @@ run01(UNUSED int argc, UNUSED void **argv)
             goto err;
         }
 
-        CTRACE("opening %ld", offset);
+        //CTRACE("opening %ld", offset);
 
         for (i = 0; i < offset; ++i) {
             int fd;

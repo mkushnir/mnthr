@@ -15,6 +15,10 @@
 #include "mrkcommon/util.h"
 #include "mrkcommon/bytestream.h"
 
+#if 0
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #ifndef HAVE_SF_HDTR
 struct sf_hdtr {
     struct iovec *headers;
@@ -22,6 +26,7 @@ struct sf_hdtr {
     struct iovec *trailers;
     int trl_cnt;
 };
+#endif
 #endif
 
 #ifdef __cplusplus
