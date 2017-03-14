@@ -49,6 +49,17 @@ extern "C" {
 #   define STACKSIZE (PAGE_SIZE * 1024)
 #endif
 
+
+#ifndef HAVE_SF_HDTR
+struct sf_hdtr {
+    struct iovec *headers;
+    int hdr_cnt;
+    struct iovec *trailers;
+    int trl_cnt;
+};
+#endif
+
+
 struct _mrkthr_ctx;
 
 typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);

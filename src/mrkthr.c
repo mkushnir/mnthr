@@ -1928,15 +1928,14 @@ mrkthr_sendto_all(int fd,
 }
 
 
-#ifdef HAVE_SF_HDTR
 int
-mrkthr_sendfile(int fd,
-                int s,
-                off_t offset,
-                size_t nbytes,
-                struct sf_hdtr *hdtr,
-                off_t *sbytes,
-                int flags)
+mrkthr_sendfile_np(int fd,
+                   int s,
+                   off_t offset,
+                   size_t nbytes,
+                   UNUSED struct sf_hdtr *hdtr,
+                   UNUSED off_t *sbytes,
+                   UNUSED int flags)
 {
     off_t _sbytes;
 
@@ -1947,7 +1946,13 @@ mrkthr_sendfile(int fd,
         if (mrkthr_get_wbuflen(s) <= 0) {
             TRRET(MRKTHR_SENDFILE + 1);
         }
-        if (sendfile(fd, s, offset, nbytes, hdtr, &_sbytes, flags) == -1) {
+        if (
+#ifndef HAVE_SF_HDTR
+            sendfile(fd, s, &offset, nbytes)
+#else
+            sendfile(fd, s, offset, nbytes, hdtr, &_sbytes, flags)
+#endif
+            == -1) {
             if (errno == EBUSY) {
                 if (mrkthr_get_rbuflen(fd) <= 0) {
                     TRRET(MRKTHR_SENDFILE + 2);
@@ -1967,15 +1972,13 @@ mrkthr_sendfile(int fd,
 
     return 0;
 }
-#else
+
+
 int
 mrkthr_sendfile(int fd,
                 int s,
-                off_t offset,
-                size_t nbytes,
-                UNUSED struct sf_hdtr *hdtr,
-                UNUSED off_t *sbytes,
-                UNUSED int flags)
+                off_t *offset,
+                size_t nbytes)
 {
     ssize_t nread;
 
@@ -1985,8 +1988,13 @@ mrkthr_sendfile(int fd,
 
     nread = 0;
     while (nbytes > 0) {
-        if ((nread = sendfile(s, fd, &offset, nbytes)) == -1) {
+#ifndef HAVE_SF_HDTR
+        if ((nread = sendfile(s, fd, offset, nbytes)) == -1) {
         }
+#else
+        if ((nread = sendfile(s, fd, *offset, nbytes, NULL, NULL ,0)) == -1) {
+        }
+#endif
         if (nread  == 0) {
             break;
         }
@@ -1995,7 +2003,6 @@ mrkthr_sendfile(int fd,
 
     return 0;
 }
-#endif
 
 
 

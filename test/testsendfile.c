@@ -74,6 +74,7 @@ run11(UNUSED int argc, void **argv)
     mnbytes_t *fpath, *sport;
     int sock, fd;
     struct stat sb;
+    off_t offset;
 
     assert(argc == 1);
 
@@ -84,6 +85,7 @@ run11(UNUSED int argc, void **argv)
     sock = -1;
     fd = -1;
     sport = bytes_printf("%d", port);
+    offset = 0;
 
     if ((sock = mrkthr_socket_connect(host, (char *)BDATA(sport), AF_INET)) == -1) {
         goto err;
@@ -96,7 +98,7 @@ run11(UNUSED int argc, void **argv)
         goto err;
     }
 
-    if (mrkthr_sendfile(fd, sock, 0, sb.st_size, NULL, NULL, 0) != 0) {
+    if (mrkthr_sendfile(fd, sock, &offset, sb.st_size) != 0) {
         goto err;
     }
 

@@ -24,6 +24,7 @@ const char *_malloc_options = "AJ";
 static int develop = 0;
 static int check_config = 0;
 
+
 #define FOO_OPT_DEFAULT_CONFIG_FILE "/usr/local/etc/foo.conf"
 static char *configfile = NULL;
 
@@ -48,20 +49,20 @@ static struct option optinfo[] = {
 static void
 usage(char *p)
 {
-    printf(
-"Usage: %s OPTIONS\n"
-"\n"
-"Options:\n"
-"  --help|-h                    Show this message and exit.\n"
-"  --file=FPATH|-f FPATH        Configuration file (default\n"
-"                               %s).\n"
-"  --version|-V                 Print version and exit.\n"
-"  --develop                    Run in develop mode.\n"
-"  --check-config               Check config and exit.\n"
-"  --print-config=PREFIX        multiple times.  Passing 'all' will show all\n"
-"                               configuration.\n",
-           basename(p),
-           FOO_OPT_DEFAULT_CONFIG_FILE);
+    printf("Usage: %s OPTIONS\n"
+        "\n"
+        "Options:\n"
+        "  --help|-h                    Show this message and exit.\n"
+        "  --file=FPATH|-f FPATH        Configuration file (default\n"
+        "                               %s).\n"
+        "  --version|-V                 Print version and exit.\n"
+        "  --develop                    Run in develop mode.\n"
+        "  --check-config               Check config and exit.\n"
+        "  --print-config=PREFIX        multiple times.\n"
+        "                               Passing 'all' will show all\n"
+        "                               configuration.\n",
+        basename(p),
+        FOO_OPT_DEFAULT_CONFIG_FILE);
 }
 
 
@@ -210,10 +211,10 @@ main(int argc, char **argv)
         //daemon_ize();
     }
 
-    mrkthr_init();
+    (void)mrkthr_init();
     (void)MRKTHR_SPAWN("run0", run0, argc, argv);
-    mrkthr_loop();
-    mrkthr_fini();
+    (void)mrkthr_loop();
+    (void)mrkthr_fini();
 
 end:
 

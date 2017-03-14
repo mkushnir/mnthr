@@ -145,7 +145,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #endif
 char x[PAGE_SIZE];
 ]], [
-])], [AC_DEFINE([HAVE_PAGE_SIZE_CONSTANT], [], [Define is PAGE_SIZE is a constant value])], [])
+])], [AC_DEFINE([HAVE_PAGE_SIZE_CONSTANT], [], [Define if PAGE_SIZE is a constant value])], [])
 
 if echo $build_os | grep linux >/dev/null
 then

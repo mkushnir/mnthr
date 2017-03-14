@@ -15,19 +15,6 @@
 #include "mrkcommon/util.h"
 #include "mrkcommon/bytestream.h"
 
-#if 0
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-#ifndef HAVE_SF_HDTR
-struct sf_hdtr {
-    struct iovec *headers;
-    int hdr_cnt;
-    struct iovec *trailers;
-    int trl_cnt;
-};
-#endif
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,13 +167,21 @@ MRKTHR_CPOINT int mrkthr_sendto_all(int,
                                    int,
                                    const struct sockaddr *,
                                    socklen_t);
+#if 0
+MRKTHR_CPOINT int mrkthr_sendfile_np(int,
+                                     int,
+                                     off_t,
+                                     size_t,
+                                     struct sf_hdtr *,
+                                     off_t *,
+                                     int);
+#else
 MRKTHR_CPOINT int mrkthr_sendfile(int,
                                   int,
-                                  off_t,
-                                  size_t,
-                                  struct sf_hdtr *,
                                   off_t *,
-                                  int);
+                                  size_t);
+
+#endif
 
 /*
  *
