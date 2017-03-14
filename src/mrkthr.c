@@ -1939,7 +1939,9 @@ mrkthr_sendfile_np(int fd,
 {
     off_t _sbytes;
 
+#ifdef HAVE_SF_HDTR
     flags |= SF_NODISKIO; // sanity
+#endif
     _sbytes = 0;
 
     while (_sbytes == 0) {

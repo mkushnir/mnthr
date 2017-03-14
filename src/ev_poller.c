@@ -508,7 +508,7 @@ mrkthr_get_rbuflen(int fd)
 {
     ssize_t sz;
     int res;
-    ev_item_t *ev, *ev1;
+    UNUSED ev_item_t *ev, *ev1;
 
     ev = ev_io_item_get(fd, EV_READ);
     //ev_io_set(&ev->ev.io, fd, EV_READ);
@@ -566,7 +566,7 @@ int
 mrkthr_wait_for_read(int fd)
 {
     int res;
-    ev_item_t *ev, *ev1;
+    UNUSED ev_item_t *ev, *ev1;
 
     ev = ev_io_item_get(fd, EV_READ);
     //ev_io_set(&ev->ev.io, fd, EV_READ);
@@ -723,7 +723,7 @@ int
 mrkthr_wait_for_events(int fd, int *events)
 {
     int res;
-    ev_item_t *ev, *ev1;
+    UNUSED ev_item_t *ev, *ev1;
 
     ev = ev_io_item_get(fd, EV_READ|EV_WRITE);
     me->pdata.ev = ev;
