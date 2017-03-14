@@ -3,7 +3,7 @@ CLEANFILES = *.core
 #CLEANFILES += *.in
 AM_MAKEFLAGS = -s
 
-noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile
+noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch
 
 noinst_HEADERS = unittest.h
 
@@ -73,6 +73,11 @@ nodist_testsendfile_SOURCES = ../src/diag.c
 testsendfile_SOURCES = testsendfile.c
 testsendfile_CFLAGS = $(common_cflags)
 testsendfile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+
+nodist_testswitch_SOURCES = ../src/diag.c
+testswitch_SOURCES = testswitch.c
+testswitch_CFLAGS = $(common_cflags)
+testswitch_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
 	$(AM_V_GEN) /bin/sh ../src/gen-diag mrkthr
