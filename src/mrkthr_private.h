@@ -127,7 +127,7 @@ struct _mrkthr_ctx {
 #       define CO_RC_USER_INTERRUPTED 0x02
 #       define CO_RC_TIMEDOUT 0x03
 #       define CO_RC_SIMULTANEOUS 0x04
-#       define CO_RC_ERROR 0x04
+#       define CO_RC_ERROR 0x05
 #       define CO_RC_STR(rc) (                                         \
             (rc) == 0 ? "OK" :                                         \
             (rc) == CO_RC_EXITED ? "EXITED" :                          \

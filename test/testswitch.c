@@ -6,11 +6,15 @@
 static int
 s(UNUSED int argc, UNUSED void **argv)
 {
-    int i = 1000000;
+    int i;
+
+    i = (int)(intptr_t)argv[0];
+
     while (i--) {
         (void)mrkthr_sleep(0);
     }
-    return 0;
+    argv[0] = (void *)(intptr_t)i;
+    return i;
 }
 
 static int
@@ -19,7 +23,7 @@ run0(UNUSED int argc, UNUSED void **argv)
     int i;
 
     for (i = 0; i < 2; ++i) {
-        (void)MRKTHR_SPAWN("s", s);
+        (void)MRKTHR_SPAWN("s", s, 10);
     }
     return 0;
 }
