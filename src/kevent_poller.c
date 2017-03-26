@@ -272,6 +272,9 @@ poller_clear_event(mrkthr_ctx_t *ctx)
         if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
             discard_event(ctx->pdata.kev.ident, ctx->pdata.kev.filter, ctx);
         } else if (ctx->co.state == CO_STATE_OTHER_POLLER) {
+            /*
+             * special case for mrkthr_wait_for_event()
+             */
             discard_event(ctx->pdata.kev.ident, EVFILT_READ, ctx);
             discard_event(ctx->pdata.kev.ident, EVFILT_WRITE, ctx);
         }
@@ -713,6 +716,10 @@ mrkthr_loop(void)
                     //mrkthr_dump(ctx);
 #endif
                     if (kev->flags & EV_ERROR) {
+                        /*
+                         * do not tell kqueue to discard event, let the thread get away
+                         * with it
+                         */
                         corc = CO_RC_ERROR;
                     } else {
                         discard_event(kev->ident, kev->filter, ctx);
@@ -743,7 +750,7 @@ mrkthr_loop(void)
                                 ctx->co.rc = corc;
                                 if ((pres = poller_resume(ctx)) != 0) {
 #ifdef TRACE_VERBOSE
-                                    CTRACE("Could not resume co %d "
+                                    CTRACE("Could not resume co %ld "
                                           "for read FD %08lx (res=%d)",
                                           ctx->co.id, kev->ident, pres);
 #endif
