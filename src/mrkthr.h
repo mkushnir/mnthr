@@ -278,6 +278,7 @@ uint64_t mrkthr_get_now_ticks_precise(void);
     ((double)mrkthr_get_now_ticks_precise() / 1000000000.0)
 
 MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, mrkthr_cofunc_t, int, ...);
+MRKTHR_CPOINT int mrkthr_peek(mrkthr_ctx_t *, uint64_t);
 
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more(mnbytestream_t *, int, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write(mnbytestream_t *, int, size_t);

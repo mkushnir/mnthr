@@ -2519,3 +2519,44 @@ mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ..
     return res;
 }
 
+
+/*
+ * Returns as mrkthr_wait_for(), except it does not interrupt the target
+ * thread.
+ */
+int
+mrkthr_peek(mrkthr_ctx_t *ctx, uint64_t msec)
+{
+    int res;
+    int64_t id;
+
+    me->co.state = CO_STATE_PEEK;
+    append_me_to_waitq(&ctx->waitq);
+    id = ctx->co.id;
+    res = sleepmsec(msec);
+    if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
+        /* I had been sleeping, but by their exit I was resumed ... */
+
+        //CTRACE("removing me:");
+        //mrkthr_dump(me);
+
+        sleepq_remove(me);
+
+        res = ctx->co.rc;
+
+    } else {
+        /* it's timeout, we have to interrupt it */
+        assert(ctx->co.state & CO_STATE_RESUMABLE);
+
+        remove_me_from_waitq(&ctx->waitq);
+#ifndef NDEBUG
+        if (ctx == me) {
+            CTRACE("self-interrupting from within mrkthr_peek:");
+            mrkthr_dump(ctx);
+        }
+#endif
+        res = MRKTHR_WAIT_TIMEOUT;
+    }
+
+    return res;
+}

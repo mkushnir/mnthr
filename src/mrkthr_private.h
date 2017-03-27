@@ -89,6 +89,7 @@ struct _mrkthr_ctx {
 #       define CO_STATE_JOIN_INTERRUPTED 0x400
 #       define CO_STATE_CONDWAIT 0x800
 #       define CO_STATE_WAITFOR 0x1000
+#       define CO_STATE_PEEK 0x2000
 
 #       define CO_STATES_RESUMABLE_EXTERNALLY (CO_STATE_SLEEP |                \
                                                CO_STATE_SET_RESUME |           \
@@ -97,7 +98,8 @@ struct _mrkthr_ctx {
                                                CO_STATE_JOIN |                 \
                                                CO_STATE_JOIN_INTERRUPTED |     \
                                                CO_STATE_CONDWAIT |             \
-                                               CO_STATE_WAITFOR)               \
+                                               CO_STATE_WAITFOR  |             \
+                                               CO_STATE_PEEK)                  \
 
 
 #       define CO_STATE_RESUMABLE (CO_STATE_READ |                     \
@@ -120,6 +122,7 @@ struct _mrkthr_ctx {
             (st) == CO_STATE_JOIN_INTERRUPTED ? "JOIN_INTERRUPTED" :   \
             (st) == CO_STATE_CONDWAIT ? "CONDWAIT" :                   \
             (st) == CO_STATE_WAITFOR ? "WAITFOR" :                     \
+            (st) == CO_STATE_PEEK ? "PEEK" :                           \
             "<unknown>")                                               \
 
 
