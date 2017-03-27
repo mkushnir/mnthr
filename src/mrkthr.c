@@ -1030,6 +1030,14 @@ mrkthr_set_retval(int rv)
 }
 
 
+int
+mrkthr_get_retval(void)
+{
+    assert(me != NULL);
+    return me->co.rc;
+}
+
+
 void
 mrkthr_incabac(mrkthr_ctx_t *ctx)
 {
@@ -2425,8 +2433,10 @@ mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
 
 /**
  * Wait for another thread, and time it out if not completed within the
- * specified inverval of time.  Return either thread's return ode,
- * or MRKTHR_WAIT_TIMEOUT.
+ * specified inverval of time.
+ *
+ * Return either thread's return code (typically >= 0), or
+ * MRKTHR_WAIT_TIMEOUT.
  */
 int
 mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ...)

@@ -137,6 +137,7 @@ int mrkthr_id(void);
      "UD"                                                      \
  )                                                             \
 
+int mrkthr_get_retval(void);
 int mrkthr_set_retval(int);
 
 void mrkthr_set_prio(mrkthr_ctx_t *, int);
@@ -295,17 +296,17 @@ do {                                                                   \
             break;                                                     \
         }                                                              \
         if (!(_expr)) {                                                \
-            int _mrkthr_retry_res;                                     \
+            int _mrkthr_retry_rc;                                      \
             _eexpr;                                                    \
-            if ((_mrkthr_retry_res = mrkthr_sleep(                     \
+            if ((_mrkthr_retry_rc = mrkthr_sleep(                      \
                             _interval * 1000)) != 0) {                 \
-                if (_mrkthr_retry_res == MRKAMQP_STOP_THREADS ||       \
-                    _mrkthr_retry_res == MRKAMQP_PROTOCOL_ERROR) {     \
+                if (_mrkthr_retry_rc == MRKAMQP_STOP_THREADS ||        \
+                    _mrkthr_retry_rc == MRKAMQP_PROTOCOL_ERROR) {      \
                     mrkthr_set_retval(0);                              \
 /*                                                                     \
                     CTRACE("interval error: %d with res=%d",           \
                            interval,                                   \
-                           _mrkthr_retry_res);                         \
+                           _mrkthr_retry_rc);                          \
  */                                                                    \
                 } else {                                               \
                     break;                                             \

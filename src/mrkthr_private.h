@@ -136,14 +136,38 @@ struct _mrkthr_ctx {
          * values in order to prevent clashing with library's error codes
          * (which are all negative).
          *
-         * This code is the return value of all
+         * This code is the return value of the following:
+         *  - mrkthr_signal_subscribe()
+         *  - mrkthr_join() + library code MRKTHR_JOIN_FAILURE
+         *  - mrkthr_set_interrupt_and_join() + library code
+         *    MRKTHR_JOIN_FAILURE
+         *  - mrkthr_signal_error_and_join()
+         *  - mrkthr_cond_wait()
+         *  - mrkthr_yield()
+         *  - mrkthr_sleep_ticks()
+         *  - mrkthr_sleep()
+         *  - mrkthr_set_interrupt_and_join_with_timeout() + library codes
+         *      MRKTHR_JOIN_FAILURE, MRKTHR_WAIT_TIMEOUT
+         *  - mrkthr_signal_subscribe_with_timeout() + library codes
+         *      MRKTHR_WAIT_TIMEOUT
+         *  - mrkthr_wait_for() + library code MRKTHR_WAIT_TIMEOUT
+         *
+         * The following finctions return -1 on error, so the thread
+         * return code can only be expected using mrkthr_get_retval():
+         *  - mrkthr_stat_wait()
+         *  - mrkthr_get_rbuflen()
+         *  - mrkthr_wait_for_read()
+         *  - mrkthr_get_wbuflen()
+         *  - mrkthr_wait_for_write()
+         *  - mrkthr_wait_for_events()
+         *
          */
         int rc;
     } co;
 
     /*
      * Expiration timestamp in the nsecs from the Epoch.
-     * ULONG_MAX if forever. 0 - resume now.
+     * ULONG_MAX if forever. 0 - polling, 1 - resume now.
      */
      uint64_t expire_ticks;
 #   define MRKTHR_SLEEP_FOREVER (ULONG_MAX)
