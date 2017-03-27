@@ -1117,6 +1117,22 @@ sleepticks(uint64_t ticks)
 }
 
 
+static int
+sleepticks_absolute(uint64_t ticks)
+{
+    /* first remove an old reference (if any) */
+    sleepq_remove(me);
+
+    me.expire_tocks = ticks;
+
+    //CTRACE("ticks=%ld expire_ticks=%ld", ticks, me->expire_ticks);
+
+    me->sleepq_enqueue(me);
+
+    return yield();
+}
+
+
 int
 mrkthr_sleep(uint64_t msec)
 {
@@ -1134,6 +1150,13 @@ mrkthr_sleep_ticks(uint64_t ticks)
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
     return sleepticks(ticks);
+}
+
+
+int
+mrkthr_yield(void)
+{
+    return sleepticks_absolute(1);
 }
 
 
