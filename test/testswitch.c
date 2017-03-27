@@ -11,7 +11,7 @@ s(UNUSED int argc, UNUSED void **argv)
     i = (int)(intptr_t)argv[0];
 
     while (i--) {
-        (void)mrkthr_sleep(0);
+        (void)mrkthr_yield();
     }
     argv[0] = (void *)(intptr_t)i;
     return i;

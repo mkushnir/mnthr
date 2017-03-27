@@ -53,7 +53,7 @@ r(int n)
             //CTRACE(">>>");
             //mrkthr_sleep(100);
             //now1 = mrkthr_get_now_precise();
-            mrkthr_sleep(0);
+            mrkthr_yield();
             //CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
             //mrkthr_ctx_dump(me);

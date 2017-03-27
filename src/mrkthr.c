@@ -1123,7 +1123,7 @@ sleepticks_absolute(uint64_t ticks)
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    me.expire_tocks = ticks;
+    me->expire_ticks = ticks;
 
     //CTRACE("ticks=%ld expire_ticks=%ld", ticks, me->expire_ticks);
 

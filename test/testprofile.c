@@ -28,7 +28,7 @@ run(UNUSED int argc, void **argv)
         if (j == 0) {
             PROFILE_START(s0_p);
         }
-        mrkthr_sleep(0);
+        mrkthr_yield();
         if (j == 0) {
             PROFILE_STOP(s0_p);
         }
