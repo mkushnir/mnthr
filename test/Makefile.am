@@ -80,7 +80,7 @@ testswitch_CFLAGS = $(common_cflags)
 testswitch_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
-	$(AM_V_GEN) /bin/sh ../src/gen-diag mrkthr
+	$(AM_V_GEN) cat ../src/diag.txt | sort -u | /bin/sh ../src/gen-diag mrkthr ../src
 
 testrun: all
 	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

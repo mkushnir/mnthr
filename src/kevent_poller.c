@@ -720,7 +720,7 @@ mrkthr_loop(void)
                          * do not tell kqueue to discard event, let the thread get away
                          * with it
                          */
-                        corc = CO_RC_ERROR;
+                        corc = CO_RC_POLLER;
                     } else {
                         discard_event(kev->ident, kev->filter, ctx);
                         corc = 0;

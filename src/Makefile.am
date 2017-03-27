@@ -42,7 +42,7 @@ libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) $(PLATFORM_FLAGS) -Wall -Wex
 libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon @MRKCOMMON_LOCAL_LDFLAGS@ @LIBEV_LDFLAGS@
 
 diag.c diag.h: diag.txt
-	$(AM_V_GEN) /bin/sh ./gen-diag mrkthr
+	$(AM_V_GEN) cat diag.txt | sort -u | /bin/sh ./gen-diag mrkthr
 
 run: all
 	for i in $(bin_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

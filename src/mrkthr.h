@@ -121,7 +121,24 @@ mrkthr_ctx_t *mrkthr_spawn_sig(const char *, mrkthr_cofunc_t, int, ...);
 PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
+
+#define CO_RC_EXITED 0x01
+#define CO_RC_USER_INTERRUPTED 0x02
+#define CO_RC_TIMEDOUT 0x03
+#define CO_RC_SIMULTANEOUS 0x04
+#define CO_RC_POLLER 0x05
+#define CO_RC_STR(rc) (                                        \
+     (rc) == 0 ? "OK" :                                        \
+     (rc) == CO_RC_EXITED ? "EXITED" :                         \
+     (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :     \
+     (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" :                     \
+     (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :             \
+     (rc) == CO_RC_POLLER ? "POLLER" :                         \
+     "UD"                                                      \
+ )                                                             \
+
 int mrkthr_set_retval(int);
+
 void mrkthr_set_prio(mrkthr_ctx_t *, int);
 void mrkthr_incabac(mrkthr_ctx_t *);
 void mrkthr_decabac(mrkthr_ctx_t *);

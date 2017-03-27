@@ -75,6 +75,7 @@ struct _mrkthr_ctx {
         void **argv;
         int argc;
         unsigned abac;
+
 #       define CO_STATE_DORMANT 0x01
 #       define CO_STATE_RESUMED 0x02
 #       define CO_STATE_READ 0x04
@@ -123,21 +124,20 @@ struct _mrkthr_ctx {
 
 
         unsigned int state;
-#       define CO_RC_EXITED 0x01
-#       define CO_RC_USER_INTERRUPTED 0x02
-#       define CO_RC_TIMEDOUT 0x03
-#       define CO_RC_SIMULTANEOUS 0x04
-#       define CO_RC_ERROR 0x05
-#       define CO_RC_STR(rc) (                                         \
-            (rc) == 0 ? "OK" :                                         \
-            (rc) == CO_RC_EXITED ? "EXITED" :                          \
-            (rc) == CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :      \
-            (rc) == CO_RC_TIMEDOUT ? "TIMEDOUT" :                      \
-            (rc) == CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :              \
-            (rc) == CO_RC_ERROR ? "ERROR" :                            \
-            "UD"                                                       \
-        )                                                              \
 
+        /*
+         * Thread return code, CO_RC_* or user-defined, can be set
+         * publicly using:
+         *  - mrkthr_set_retval()
+         *  - mrkthr_signal_error()
+         *  - mrkthr_signal_error_and_join()
+         *
+         * When setting, it is recommended to restrict to non-negative
+         * values in order to prevent clashing with library's error codes
+         * (which are all negative).
+         *
+         * This code is the return value of all
+         */
         int rc;
     } co;
 

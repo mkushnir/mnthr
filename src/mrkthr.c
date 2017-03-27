@@ -1045,6 +1045,9 @@ mrkthr_decabac(mrkthr_ctx_t *ctx)
 }
 
 
+/*
+ * Internal "yield"
+ */
 int
 yield(void)
 {
@@ -2422,7 +2425,8 @@ mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
 
 /**
  * Wait for another thread, and time it out if not completed within the
- * specified inverval of time.
+ * specified inverval of time.  Return either thread's return ode,
+ * or MRKTHR_WAIT_TIMEOUT.
  */
 int
 mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ...)
