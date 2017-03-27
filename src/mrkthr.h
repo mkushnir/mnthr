@@ -146,6 +146,7 @@ void mrkthr_decabac(mrkthr_ctx_t *);
 MRKTHR_CPOINT int mrkthr_sleep(uint64_t);
 MRKTHR_CPOINT int mrkthr_sleep_ticks(uint64_t);
 MRKTHR_CPOINT int mrkthr_yield(void);
+MRKTHR_CPOINT int mrkthr_giveup(void);
 long double mrkthr_ticks2sec(uint64_t);
 long double mrkthr_ticksdiff2sec(int64_t);
 uint64_t mrkthr_msec2ticks(uint64_t);

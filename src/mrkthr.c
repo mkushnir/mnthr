@@ -1167,7 +1167,20 @@ mrkthr_sleep_ticks(uint64_t ticks)
 int
 mrkthr_yield(void)
 {
+    assert(me != NULL);
+    /* put into sleepq(SLEEP) */
+    me->co.state = CO_STATE_SLEEP;
     return sleepticks_absolute(1);
+}
+
+
+int
+mrkthr_giveup(void)
+{
+    assert(me != NULL);
+    /* put into sleepq(SLEEP) */
+    me->co.state = CO_STATE_SLEEP;
+    return sleepticks_absolute(MRKTHR_SLEEP_FOREVER);
 }
 
 
