@@ -2080,7 +2080,7 @@ mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 
 
 int
-mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
+mrkthr_signal_subscribe(mrkthr_signal_t *signal)
 {
     int res;
 
@@ -2094,7 +2094,7 @@ mrkthr_signal_subscribe(UNUSED mrkthr_signal_t *signal)
 
 
 int
-mrkthr_signal_subscribe_with_timeout(UNUSED mrkthr_signal_t *signal,
+mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal,
                                      uint64_t msec)
 {
     int res;

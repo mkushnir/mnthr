@@ -216,6 +216,7 @@ void mrkthr_stat_destroy(mrkthr_stat_t **);
 MRKTHR_CPOINT int mrkthr_stat_wait(mrkthr_stat_t *);
 
 void mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
+#define MRKTHR_SIGNAL_INIT(signal) mrkthr_signal_init((signal), NULL)
 void mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_has_owner(mrkthr_signal_t *);
 MRKTHR_CPOINT int mrkthr_signal_subscribe(mrkthr_signal_t *);
@@ -224,6 +225,7 @@ MRKTHR_CPOINT int mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *,
 void mrkthr_signal_send(mrkthr_signal_t *);
 void mrkthr_signal_error(mrkthr_signal_t *, int);
 MRKTHR_CPOINT int mrkthr_signal_error_and_join(mrkthr_signal_t *, int);
+#define mrkthr_signal_unsubscribe(signal) mrkthr_signal_fini((signal));
 
 void mrkthr_cond_init(mrkthr_cond_t *);
 MRKTHR_CPOINT int mrkthr_cond_wait(mrkthr_cond_t *);
