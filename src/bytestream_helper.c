@@ -1,6 +1,6 @@
-#include "mrkcommon/bytestream.h"
-#include "mrkcommon/util.h"
-#include "mrkthr.h"
+#include <mrkcommon/bytestream.h>
+#include <mrkcommon/util.h>
+#include <mrkthr.h>
 
 #define BLOCKSZ 4096
 
@@ -10,10 +10,11 @@
 #endif
 
 ssize_t
-mrkthr_bytestream_read_more(mnbytestream_t *stream, int fd, ssize_t sz)
+mrkthr_bytestream_read_more(mnbytestream_t *stream, void *in, ssize_t sz)
 {
     ssize_t nread;
     ssize_t need;
+    int fd = (intptr_t)in;
 
     need = (stream->eod + sz) - stream->buf.sz;
 
@@ -33,9 +34,10 @@ mrkthr_bytestream_read_more(mnbytestream_t *stream, int fd, ssize_t sz)
 }
 
 ssize_t
-mrkthr_bytestream_write(mnbytestream_t *stream, int fd, size_t sz)
+mrkthr_bytestream_write(mnbytestream_t *stream, void *out, size_t sz)
 {
     ssize_t nwritten;
+    int fd = (intptr_t)out;
 
     if ((stream->pos + (ssize_t)sz) > stream->eod) {
         return -1;

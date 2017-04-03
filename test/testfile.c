@@ -29,21 +29,23 @@ _bytestream_consume_data(UNUSED int argc, void **argv)
     bs = argv[0];
     fd = (int)(uintptr_t)argv[1];
 
-    res = bytestream_consume_data(bs, fd);
+    res = bytestream_consume_data(bs, (void *)(intptr_t)fd);
     //mrkthr_set_retval(res);
     //return res;
     MRKTHRET(res);
 }
 
 static int
-bytestream_consume_data_with_timeout(mnbytestream_t *bs, int fd, uint64_t tmout)
+bytestream_consume_data_with_timeout(mnbytestream_t *bs,
+                                     void *fd,
+                                     uint64_t tmout)
 {
     return mrkthr_wait_for(tmout,
                            NULL,
                            _bytestream_consume_data,
                            2,
                            bs,
-                           (void *)(uintptr_t)fd);
+                           fd);
 }
 
 UNUSED static int
@@ -66,12 +68,12 @@ run0(UNUSED int argc, UNUSED void **argv)
 
     bs.read_more = mrkthr_bytestream_read_more;
     bs.write = mrkthr_bytestream_write;
-    while (bytestream_consume_data_with_timeout(&bs, fdin, 1000) == 0) {
+    while (bytestream_consume_data_with_timeout(&bs, (void *)(intptr_t)fdin, 1000) == 0) {
         SPOS(&bs) = SEOD(&bs);
     }
 
     SPOS(&bs) = 0;
-    if (bytestream_produce_data(&bs, fdout) != 0) {
+    if (bytestream_produce_data(&bs, (void *)(intptr_t)fdout) != 0) {
         return 1;
     }
 
@@ -103,9 +105,12 @@ run1(UNUSED int argc, UNUSED void **argv)
 
     bs.read_more = mrkthr_bytestream_read_more;
     bs.write = mrkthr_bytestream_write;
-    while ((res = bytestream_consume_data_with_timeout(&bs, fdin, 1000)) == 0) {
+    while ((res = bytestream_consume_data_with_timeout(
+                &bs,
+                (void *)(intptr_t)fdin,
+                1000)) == 0) {
         //TRACE("res=%d", res);
-        if (bytestream_produce_data(&bs, fdout) != 0) {
+        if (bytestream_produce_data(&bs, (void *)(intptr_t)fdout) != 0) {
             return 1;
         }
         bytestream_rewind(&bs);
@@ -146,8 +151,11 @@ run2(UNUSED int argc, UNUSED void **argv)
 
     bs.read_more = mrkthr_bytestream_read_more;
     bs.write = mrkthr_bytestream_write;
-    while ((res = bytestream_consume_data_with_timeout(&bs, fdin, 5000)) == 0) {
-        if (bytestream_produce_data(&bs, fdout) != 0) {
+    while ((res = bytestream_consume_data_with_timeout(
+                    &bs,
+                    (void *)(intptr_t)fdin,
+                    5000)) == 0) {
+        if (bytestream_produce_data(&bs, (void *)(intptr_t)fdout) != 0) {
             return 1;
         }
         //D8(SDATA(&bs, 0), SEOD(&bs));
