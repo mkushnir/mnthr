@@ -670,9 +670,16 @@ mrkthr_loop(void)
             update_now();
 
             if (kevres == -1) {
-                perror("kevent");
                 if (errno == EINTR) {
+#ifdef TRACE_VERBOSE
                     CTRACE("kevent was interrupted, redoing");
+#endif
+                    errno = 0;
+                    continue;
+                } else if (kevents0_elnum == 0) {
+#ifdef TRACE_VERBOSE
+                    CTRACE("kevent0 was not quite meaningful");
+#endif
                     errno = 0;
                     continue;
                 }
@@ -859,4 +866,5 @@ poller_fini(void)
     array_fini(&kevents0);
     array_fini(&kevents1);
     close(q0);
+    q0 = -1;
 }
