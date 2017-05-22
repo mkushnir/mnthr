@@ -174,7 +174,7 @@ poller_sift_sleepq(void)
             CTRACE(FYELLOW("Have to deliver a %s event "
                        "to co.id=%ld that was not scheduled for!"),
                        CO_STATE_STR(ctx->co.state),
-                       ctx->co.id);
+                       (long)ctx->co.id);
             mrkthr_dump(ctx);
 #endif
         }
@@ -187,7 +187,7 @@ poller_sift_sleepq(void)
         if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
             CTRACE("Could not resume co %ld, discarding ...",
-                  ctx->co.id);
+                   (long)ctx->co.id);
 #endif
         }
 
@@ -214,7 +214,7 @@ poller_sift_sleepq(void)
                 CTRACE(FYELLOW("Have to deliver a %s event "
                            "to co.id=%ld that was not scheduled for!"),
                            CO_STATE_STR(bctx->co.state),
-                           bctx->co.id);
+                           (long)bctx->co.id);
                 mrkthr_dump(bctx);
 #endif
             }
@@ -222,7 +222,7 @@ poller_sift_sleepq(void)
             if (poller_resume(bctx) != 0) {
 #ifdef TRACE_VERBOSE
                 CTRACE("Could not resume co %ld, discarding ...",
-                      bctx->co.id);
+                       (long)bctx->co.id);
 #endif
             }
         }

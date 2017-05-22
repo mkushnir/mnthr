@@ -53,6 +53,15 @@ case "$target_os" in
     ;;
 esac
 
+case "$target_os" in
+    *darwin*)
+        AC_SUBST(_XOPEN_SOURCE_MACRO, ['-D_XOPEN_SOURCE'])
+    ;;
+    *)
+        AC_SUBST(_XOPEN_SOURCE_MACRO)
+    ;;
+esac
+
 AC_PREREQ
 
 AC_PROG_CC

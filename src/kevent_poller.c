@@ -641,11 +641,11 @@ mrkthr_loop(void)
 
 #ifdef TRACE_VERBOSE
         CTRACE(FRED("nsec_now=%ld tmout=%ld(%ld.%ld) loop..."),
-              nsec_now,
-              tmout != NULL ?
-                  tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1,
-              tmout != NULL ? tmout->tv_sec : -1,
-              tmout != NULL ? tmout->tv_nsec : -1);
+              (long)nsec_now,
+              (long)(tmout != NULL ?
+                  tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1),
+              (long)(tmout != NULL ? tmout->tv_sec : -1),
+              (long)(tmout != NULL ? tmout->tv_nsec : -1));
         array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
 #endif
 
@@ -764,7 +764,7 @@ mrkthr_loop(void)
 #ifdef TRACE_VERBOSE
                                     CTRACE("Could not resume co %ld "
                                           "for read FD %08lx (res=%d)",
-                                          ctx->co.id, kev->ident, pres);
+                                          (long)ctx->co.id, kev->ident, pres);
 #endif
                                 }
                             } else {

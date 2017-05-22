@@ -861,6 +861,11 @@ mrkthr_gc(void)
     } else {                                                                   \
         ctx->co.name[0] = '\0';                                                \
     }                                                                          \
+    if (_getcontext(&ctx->co.uc) != 0) {                                       \
+        TR(MRKTHR_CTX_NEW + 1);                                                \
+        ctx = NULL;                                                            \
+        goto vnew_body_end;                                                    \
+    }                                                                          \
     if (ctx->co.stack == MAP_FAILED) {                                         \
         if ((ctx->co.stack = mmap(NULL,                                        \
                                   STACKSIZE,                                   \
@@ -868,16 +873,16 @@ mrkthr_gc(void)
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
                                   0)) == MAP_FAILED) {                         \
-            TR(_MRKTHR_NEW + 1);                                               \
+            TR(_MRKTHR_NEW + 2);                                               \
             ctx = NULL;                                                        \
             goto vnew_body_end;                                                \
         }                                                                      \
         if (mprotect(ctx->co.stack, PAGE_SIZE, PROT_NONE) != 0) {              \
             FAIL("mprotect");                                                  \
         }                                                                      \
-        ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;                             \
-        ctx->co.uc.uc_stack.ss_size = STACKSIZE;                               \
     }                                                                          \
+    ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;                                 \
+    ctx->co.uc.uc_stack.ss_size = STACKSIZE;                                   \
     ctx->co.uc.uc_link = &main_uc;                                             \
     ctx->co.f = f;                                                             \
     if (argc > 0) {                                                            \
@@ -888,11 +893,6 @@ mrkthr_gc(void)
         for (i = 0; i < ctx->co.argc; ++i) {                                   \
             ctx->co.argv[i] = va_arg(ap, void *);                              \
         }                                                                      \
-    }                                                                          \
-    if (_getcontext(&ctx->co.uc) != 0) {                                       \
-        TR(MRKTHR_CTX_NEW + 2);                                                \
-        ctx = NULL;                                                            \
-        goto vnew_body_end;                                                    \
     }                                                                          \
     makecontext(&ctx->co.uc, (void(*)(void))f, 2, ctx->co.argc, ctx->co.argv); \
 vnew_body_end:                                                                 \

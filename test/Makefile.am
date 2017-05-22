@@ -3,7 +3,7 @@ CLEANFILES = *.core
 #CLEANFILES += *.in
 AM_MAKEFLAGS = -s
 
-noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch
+noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch testucontext
 
 noinst_HEADERS = unittest.h
 
@@ -32,7 +32,7 @@ endif
 
 base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
 
-common_cflags = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
+common_cflags = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
 nodist_testco_SOURCES = ../src/diag.c
 testco_SOURCES = testco.c
@@ -78,6 +78,11 @@ nodist_testswitch_SOURCES = ../src/diag.c
 testswitch_SOURCES = testswitch.c
 testswitch_CFLAGS = $(common_cflags)
 testswitch_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+
+nodist_testucontext_SOURCES = ../src/diag.c
+testucontext_SOURCES = testucontext.c
+testucontext_CFLAGS = $(common_cflags)
+testucontext_LDFLAGS = -L$(libdir) -lmrkcommon
 
 ../src/diag.c ../src/diag.h: ../src/diag.txt
 	$(AM_V_GEN) cat ../src/diag.txt | sort -u | /bin/sh ../src/gen-diag mrkthr ../src

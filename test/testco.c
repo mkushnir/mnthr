@@ -1,7 +1,4 @@
 #include <signal.h>
-#ifndef _XOPEN_SOURCE
-#define _XOPEN_SOURCE
-#endif
 #include <ucontext.h>
 
 #include "mrkthr.h"
