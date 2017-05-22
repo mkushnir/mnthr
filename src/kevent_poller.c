@@ -48,6 +48,7 @@ static uint64_t timecounter_freq;
 #endif
 
 #include "config.h"
+
 #ifndef HAVE_CLOCK_GETTIME
 #include <sys/time.h>
 #define CLOCK_REALTIME 0
@@ -65,8 +66,12 @@ clock_gettime(UNUSED int id, struct timespec *ts)
     ts->tv_nsec = tv.tv_usec * 1000;
     return 0;
 }
-
 #endif
+
+#ifndef CLOCK_REALTIME_PRECISE
+#define CLOCK_REALTIME_PRECISE CLOCK_REALTIME
+#endif
+
 /**
  *
  * The kevent (direct) backend.

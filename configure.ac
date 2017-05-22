@@ -99,6 +99,19 @@ AC_CHECK_TYPE([struct sf_hdtr],
 #include <sys/uio.h>
 ]])
 
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#ifdef HAVE_SYS_SENDFILE_H
+#include <sys/sendfile.h>
+#endif
+]], [[ (void)sendfile(-1, -1, 0, (void*)0, (void*)0, 0); ]])],
+    [AC_DEFINE([SENDFILE_DARWIN_STYLE], [], [Define if the sendfile is a Darwin-style call])],
+    [])
+
+
 AC_PRESERVE_HELP_ORDER
 
 AC_SUBST(MRKCOMMON_LOCAL_CFLAGS, [''])

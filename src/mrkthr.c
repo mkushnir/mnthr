@@ -1987,7 +1987,7 @@ mrkthr_sendfile_np(int fd,
     off_t _sbytes;
 
 #ifdef HAVE_SF_HDTR
-    flags |= SF_NODISKIO; // sanity
+    //flags |= SF_NODISKIO; // sanity
 #endif
     _sbytes = 0;
 
@@ -1995,11 +1995,18 @@ mrkthr_sendfile_np(int fd,
         if (mrkthr_get_wbuflen(s) <= 0) {
             TRRET(MRKTHR_SENDFILE + 1);
         }
+#ifdef SENDFILE_DARWIN_STYLE
+        _sbytes = nbytes;
+#endif
         if (
 #ifndef HAVE_SF_HDTR
             sendfile(fd, s, &offset, nbytes)
 #else
+#ifdef SENDFILE_DARWIN_STYLE
+            sendfile(fd, s, offset, &_sbytes, hdtr, flags)
+#else
             sendfile(fd, s, offset, nbytes, hdtr, &_sbytes, flags)
+#endif
 #endif
             == -1) {
             if (errno == EBUSY) {
@@ -2041,8 +2048,15 @@ mrkthr_sendfile(int fd,
         if ((nread = sendfile(s, fd, offset, nbytes)) == -1) {
         }
 #else
-        if ((nread = sendfile(s, fd, *offset, nbytes, NULL, NULL ,0)) == -1) {
+#ifdef SENDFILE_DARWIN_STYLE
+        off_t len;
+        len = nbytes;
+        if ((nread = sendfile(s, fd, *offset, &len, NULL, 0)) == -1) {
         }
+#else
+        if ((nread = sendfile(s, fd, *offset, nbytes, NULL, NULL, 0)) == -1) {
+        }
+#endif
 #endif
         if (nread  == 0) {
             break;
