@@ -108,11 +108,8 @@ poller_resume(mrkthr_ctx_t *ctx)
 
 
 /**
- * Combined threads and events loop.
- *
- * The loop processes first threads, then events. It sleeps until the
- * earliest thread resume time, or an I/O event occurs.
- *
+ * Give a single slice to those threads that have their sleep time
+ * expired.
  */
 void
 poller_sift_sleepq(void)

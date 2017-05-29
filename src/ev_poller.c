@@ -33,6 +33,12 @@ extern const profile_t *mrkthr_swap_p;
 extern const profile_t *mrkthr_sched0_p;
 extern const profile_t *mrkthr_sched1_p;
 
+/**
+ *
+ * The ev backend.
+ *
+ */
+
 static const char *
 ev_str(int e)
 {
@@ -375,12 +381,6 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     return res;
 }
 
-
-/**
- *
- * The ev backend.
- *
- */
 
 /**
  * Time bookkeeping
@@ -882,6 +882,14 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
 }
 
 
+/**
+ * Combined threads and events loop.
+ *
+ * The loop processes first threads (_prepare_cb), then events
+ * (ev_stat_cb, ev_io_cb). It sleeps until the earliest thread resume
+ * time, or an I/O event occurs.
+ *
+ */
 int
 mrkthr_loop(void)
 {

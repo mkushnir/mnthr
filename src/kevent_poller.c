@@ -32,11 +32,29 @@ extern const profile_t *mrkthr_swap_p;
 extern const profile_t *mrkthr_sched0_p;
 extern const profile_t *mrkthr_sched1_p;
 
+/**
+ *
+ * The kevent (direct) backend.
+ *
+ */
+
 static int q0 = -1;
+/*
+ * kevent bookkeeping
+ */
 static mnarray_t kevents0;
 static mnarray_t kevents1;
-static ssize_t kevents0_elnum = 0;
-static ssize_t kevents1_elnum = 0;
+/*
+ * event_count holds the number of what we call "real" events.  Any
+ * EV_ADD kevent counts towards real events.  While any EV_DELETE kevent
+ * decrements it.
+ */
+static ssize_t event_count = 0;
+/*
+ * The maximum of event_count's.  This is the size of the kevent() output
+ * array.
+ */
+static ssize_t event_max = 0;
 
 static uint64_t nsec_zero, nsec_now;
 UNUSED static uint64_t timecounter_zero, timecounter_now;
@@ -69,14 +87,9 @@ clock_gettime(UNUSED int id, struct timespec *ts)
 #endif
 
 #ifndef CLOCK_REALTIME_PRECISE
+/* darwin targets */
 #define CLOCK_REALTIME_PRECISE CLOCK_REALTIME
 #endif
-
-/**
- *
- * The kevent (direct) backend.
- *
- */
 
 /**
  * Time bookkeeping
@@ -262,7 +275,7 @@ discard_event(int fd, int filter, mrkthr_ctx_t *ctx)
 {
     struct kevent *kev;
     kev = new_event(fd, filter, EV_DELETE, 0, 0, ctx);
-    --kevents0_elnum;
+    --event_count;
     return 0;
 }
 
@@ -343,7 +356,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
                         NOTE_REVOKE,
                     0,
                     me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = st->fd;
     me->pdata.kev.filter = EVFILT_VNODE;
@@ -392,7 +405,7 @@ mrkthr_get_rbuflen(int fd)
     struct kevent *kev;
 
     kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = fd;
     me->pdata.kev.filter = EVFILT_READ;
@@ -430,7 +443,7 @@ mrkthr_wait_for_read(int fd)
     struct kevent *kev;
 
     kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = fd;
     me->pdata.kev.filter = EVFILT_READ;
@@ -468,7 +481,7 @@ mrkthr_get_wbuflen(int fd)
     struct kevent *kev;
 
     kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = fd;
     me->pdata.kev.filter = EVFILT_WRITE;
@@ -507,7 +520,7 @@ mrkthr_wait_for_write(int fd)
     struct kevent *kev;
 
     kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = fd;
     me->pdata.kev.filter = EVFILT_WRITE;
@@ -546,9 +559,9 @@ mrkthr_wait_for_events(int fd, int *events)
     struct kevent *rkev, *wkev;
 
     rkev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
     wkev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
-    ++kevents0_elnum;
+    ++event_count;
 
     me->pdata.kev.ident = fd;
     me->pdata.kev.filter = 0; /* special case */
@@ -579,7 +592,11 @@ mrkthr_wait_for_events(int fd, int *events)
 
 
 /**
- * Event loop
+ * Combined threads and events loop.
+ *
+ * The loop processes first threads, then events. It sleeps until the
+ * earliest thread resume time, or an I/O event occurs.
+ *
  */
 int
 mrkthr_loop(void)
@@ -649,11 +666,20 @@ mrkthr_loop(void)
         array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
 #endif
 
-        if (kevents0.elnum != 0 || kevents0_elnum != 0) {
-            kevents1_elnum = MAX(kevents1_elnum, kevents0_elnum);
-            UNUSED struct kevent *tmp;
-
-            if (array_ensure_len_dirty(&kevents1, kevents1_elnum, 0) != 0) {
+        if (kevents0.elnum != 0 || event_count != 0) {
+            event_max = MAX(event_max, event_count);
+#ifdef TRACE_VERBOSE
+            struct kevent *tmp;
+#endif
+            /*
+             * kevents1 is a grow-only array.  Here, don't call item
+             * initializers when growing ("dirty" grow).
+             *
+             * Upon return from kevent(), kevres holds the number of
+             * "valid" entries in  kevents1 which is always less than or
+             * equal to kevents1.elnum.
+             */
+            if (array_ensure_len_dirty(&kevents1, event_max, 0) != 0) {
                 FAIL("array_ensure_len");
             }
 
@@ -663,7 +689,7 @@ mrkthr_loop(void)
                             tmout);
 
 #ifdef TRACE_VERBOSE
-            CTRACE(FRED("...kevres=%d kevents0.elnum=%ld kevents0_elnum=%ld"), kevres, kevents0.elnum, kevents0_elnum);
+            CTRACE(FRED("...kevres=%d kevents0.elnum=%ld event_count=%ld"), kevres, kevents0.elnum, event_count);
             for (tmp = array_first(&kevents1, &it);
                  tmp != NULL && (int)it.iter < kevres;
                  tmp = array_next(&kevents1, &it)) {
@@ -681,7 +707,7 @@ mrkthr_loop(void)
 #endif
                     errno = 0;
                     continue;
-                } else if (kevents0_elnum == 0) {
+                } else if (event_count == 0) {
 #ifdef TRACE_VERBOSE
                     CTRACE("kevent0 was not quite meaningful");
 #endif
@@ -692,7 +718,7 @@ mrkthr_loop(void)
                 break;
             }
 
-            if (kevres == 0 && kevents0_elnum == 0) {
+            if (kevres == 0 && event_count == 0) {
 #ifdef TRACE_VERBOSE
                 CTRACE("Nothing to process ...");
 #endif
