@@ -32,13 +32,15 @@ waitee(UNUSED int id, UNUSED void *argv[])
     UNUSED uint64_t before, after;
     UNUSED uint64_t before_nsec, after_nsec;
     int n = (int)(intptr_t)(argv[0]);
+    int res;
 
-    //CTRACE("sleeping for: %ld ...", (uint64_t)(n * 1000));
+    CTRACE("waitee %d sleeping for: %ld ...", n, (uint64_t)(n * 1000));
 
     before = mrkthr_get_now_ticks_precise();
     before_nsec = mrkthr_get_now_precise();
-    if (mrkthr_sleep(n * 1000) != 0) {
-        return 0;
+    if ((res = mrkthr_sleep(n * 1000)) != 0) {
+        CTRACE("waitee %d res=%d returning 123", n, res);
+        return 123;
     }
     after = mrkthr_get_now_ticks_precise();
     after_nsec = mrkthr_get_now_precise();
@@ -57,11 +59,14 @@ waiter(UNUSED int id, UNUSED void *argv[])
     while (1) {
         char buf[64];
 
-        snprintf(buf, sizeof(buf), "waitee-%d", n);
-        CTRACE(">>>waitee %d ...", n);
+        snprintf(buf, sizeof(buf), "we%d", n);
+        CTRACE(">>> about to run waitee %d ...", n);
         res = mrkthr_wait_for(3000, buf, waitee, 1, n);
-        CTRACE("<<<waitee %d res=%d", n, res);
+        CTRACE("<<< waitee %d returned %d", n, res);
         //LTRACE(n, "waitee %d res=%d", n, res);
+        if (res != 0) {
+            break;
+        }
     }
     return 0;
 }
@@ -75,7 +80,7 @@ spawner(UNUSED int argc, UNUSED void *argv[])
     for (i = 4; i < 6; ++i) {
         char buf[64];
 
-        snprintf(buf, sizeof(buf), "waiter-%d", i);
+        snprintf(buf, sizeof(buf), "wr%d", i);
         mrkthr_spawn(buf, waiter, 1, i);
     }
     return(0);
