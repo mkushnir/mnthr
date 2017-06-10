@@ -39,8 +39,7 @@ waitee(UNUSED int id, UNUSED void *argv[])
     before = mrkthr_get_now_ticks_precise();
     before_nsec = mrkthr_get_now_precise();
     if ((res = mrkthr_sleep(n * 1000)) != 0) {
-        CTRACE("waitee %d res=%d returning 123", n, res);
-        return 123;
+        CTRACE("waitee %d res=%d", n, res);
     }
     after = mrkthr_get_now_ticks_precise();
     after_nsec = mrkthr_get_now_precise();
@@ -64,9 +63,6 @@ waiter(UNUSED int id, UNUSED void *argv[])
         res = mrkthr_wait_for(3000, buf, waitee, 1, n);
         CTRACE("<<< waitee %d returned %d", n, res);
         //LTRACE(n, "waitee %d res=%d", n, res);
-        if (res != 0) {
-            break;
-        }
     }
     return 0;
 }
@@ -76,7 +72,7 @@ spawner(UNUSED int argc, UNUSED void *argv[])
 {
     int i;
 
-    mrkthr_spawn("waiter-2", waiter, 1, 2);
+    mrkthr_spawn("wr2", waiter, 1, 2);
     for (i = 4; i < 6; ++i) {
         char buf[64];
 

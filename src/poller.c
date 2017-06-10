@@ -152,9 +152,15 @@ poller_sift_sleepq(void)
 
     while ((ctx = STQUEUE_HEAD(&runq)) != NULL) {
         mrkthr_ctx_t *bctx;
+        mrkthr_waitq_t sleepq_bucket_tmp;
 
         STQUEUE_DEQUEUE(&runq, runq_link);
         STQUEUE_ENTRY_FINI(runq_link, ctx);
+#ifdef TRACE_VERBOSE
+        CTRACE(FBGREEN("Resuming expired bucket owner >>>"));
+        mrkthr_dump(ctx);
+        CTRACE(FBGREEN("<<<"));
+#endif
         ctx->expire_ticks = 0;
 
         if (!(ctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
@@ -176,11 +182,9 @@ poller_sift_sleepq(void)
 #endif
         }
 
-#ifdef TRACE_VERBOSE
-        CTRACE(FBGREEN("Resuming expired bucket owner >>>"));
-        mrkthr_dump(ctx);
-        CTRACE(FBGREEN("<<<"));
-#endif
+        sleepq_bucket_tmp = ctx->sleepq_bucket;
+        DTQUEUE_FINI(&ctx->sleepq_bucket);
+
         if (poller_resume(ctx) != 0) {
 #ifdef TRACE_VERBOSE
             CTRACE("Could not resume co %ld, discarding ...",
@@ -188,14 +192,14 @@ poller_sift_sleepq(void)
 #endif
         }
 
-        while ((bctx = DTQUEUE_HEAD(&ctx->sleepq_bucket)) != NULL) {
+        while ((bctx = DTQUEUE_HEAD(&sleepq_bucket_tmp)) != NULL) {
+            DTQUEUE_DEQUEUE(&sleepq_bucket_tmp, sleepq_link);
+            DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
 #ifdef TRACE_VERBOSE
             CTRACE(FBGREEN("Resuming expired thread (from bucket) >>>"));
             mrkthr_dump(bctx);
             CTRACE(FBGREEN("<<<"));
 #endif
-            DTQUEUE_DEQUEUE(&ctx->sleepq_bucket, sleepq_link);
-            DTQUEUE_ENTRY_FINI(sleepq_link, bctx);
             bctx->expire_ticks = 0;
 
             if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
