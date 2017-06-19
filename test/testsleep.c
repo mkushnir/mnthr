@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <inttypes.h>
 
 
 #include <mrkcommon/dumpm.h>
@@ -34,7 +35,7 @@ waitee(UNUSED int id, UNUSED void *argv[])
     int n = (int)(intptr_t)(argv[0]);
     int res;
 
-    CTRACE("waitee %d sleeping for: %ld ...", n, (uint64_t)(n * 1000));
+    CTRACE("waitee %d sleeping for: %"PRId64" ...", n, (uint64_t)(n * 1000));
 
     before = mrkthr_get_now_ticks_precise();
     before_nsec = mrkthr_get_now_precise();
