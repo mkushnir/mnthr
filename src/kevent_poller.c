@@ -823,13 +823,12 @@ mrkthr_loop(void)
                     kevres = nanosleep(tmout, NULL);
 
                     if (kevres == -1) {
-                        perror("nanosleep");
                         if (errno == EINTR) {
                             CTRACE("nanosleep was interrupted, redoing");
                             errno = 0;
                             continue;
                         }
-                        perror("kevent");
+                        perror("nanosleep");
                         break;
                     }
                 } else {

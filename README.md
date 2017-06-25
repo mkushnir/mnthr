@@ -49,3 +49,7 @@ TODO
 *   more functionality;
 
 
+Misc
+====
+
+https://github.com/creationix/libco
