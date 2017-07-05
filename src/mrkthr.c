@@ -12,7 +12,12 @@
  * The lowest page of the stack is then protected with the PROT_NONE flag.
  * TODO: Take care of different stack layouts.
  *
- * Basic thread locking primitive, mrkthr_signal_t.
+ * thread locking primitives:
+ *  - mrkthr_signal_t, basic unreliable signal delivery.
+ *  - condition variable
+ *  - semaphore
+ *  - inverted semaphore
+ *  - reader-writer lock
  *
  * Basic time information. Internally the rdtsc() implementation for
  * x86-64 architecture is used to synchronize the notion of the
@@ -26,6 +31,10 @@
  * turn the thread into an interrupted state, which effectively causes all
  * "yielding" mrkthr_ctx_* calls to fail on return. This way the thread
  * receives an indication for clean up and exiting.
+ *
+ * Timed out thread execution: mrkthr_wait_for(), mrkthr_peek().
+ *
+ * I/O poller generic support.
  *
  *
  * Implementation Overview.
