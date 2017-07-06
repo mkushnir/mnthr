@@ -94,7 +94,7 @@ poller_resume(mrkthr_ctx_t *ctx)
         sleepq_remove(ctx);
         push_free_ctx(ctx);
         //TRRET(RESUME + 2);
-        //return CO_RC_EXITED;
+        //return MRKTHR_CO_RC_EXITED;
         return ctx->co.rc;
 
     } else {

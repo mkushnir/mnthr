@@ -966,7 +966,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
            ctx->co.f,
            (long)ssz,
            CO_STATE_STR(ctx->co.state),
-           CO_RC_STR(ctx->co.rc),
+           MRKTHR_CO_RC_STR(ctx->co.rc),
            (long)ctx->expire_ticks
     );
 
@@ -984,7 +984,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
                    (long long)tmp->co.id,
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
-                   CO_RC_STR(tmp->co.rc),
+                   MRKTHR_CO_RC_STR(tmp->co.rc),
                    (long)tmp->expire_ticks
             );
         }
@@ -1409,7 +1409,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     /*
      * We are ignoring all event management rules here.
      */
-    ctx->co.rc = CO_RC_USER_INTERRUPTED;
+    ctx->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
     ctx->co.state = CO_STATE_SET_INTERRUPT;
     ctx->expire_ticks = 1;
     ctx->sleepq_enqueue(ctx);
@@ -1454,13 +1454,13 @@ mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
 
     if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         sleepq_remove(me);
-        if (ctx->co.rc != CO_RC_USER_INTERRUPTED) {
+        if (ctx->co.rc != MRKTHR_CO_RC_USER_INTERRUPTED) {
             res = ctx->co.rc;
         }
     } else {
         assert(ctx->co.state & CO_STATE_RESUMABLE);
         remove_me_from_waitq(&ctx->waitq);
-        ctx->co.rc = CO_RC_TIMEDOUT;
+        ctx->co.rc = MRKTHR_CO_RC_TIMEDOUT;
         res = MRKTHR_WAIT_TIMEOUT;
     }
 
@@ -2531,10 +2531,10 @@ mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ..
 #endif
         mrkthr_set_interrupt(ctx);
         /*
-         * override co.rc (was set to CO_RC_USER_INTERRUPTED in
+         * override co.rc (was set to MRKTHR_CO_RC_USER_INTERRUPTED in
          * mrkthr_set_interrupt())
          */
-        ctx->co.rc = CO_RC_TIMEDOUT;
+        ctx->co.rc = MRKTHR_CO_RC_TIMEDOUT;
 
         res = MRKTHR_WAIT_TIMEOUT;
     }

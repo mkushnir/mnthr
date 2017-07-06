@@ -348,7 +348,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -524,7 +524,7 @@ mrkthr_get_rbuflen(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -582,7 +582,7 @@ mrkthr_wait_for_read(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -631,7 +631,7 @@ mrkthr_get_wbuflen(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -693,7 +693,7 @@ mrkthr_wait_for_write(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -738,7 +738,7 @@ mrkthr_wait_for_events(int fd, int *events)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = CO_RC_SIMULTANEOUS;
+        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 

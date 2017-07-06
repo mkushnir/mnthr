@@ -129,7 +129,7 @@ struct _mrkthr_ctx {
         unsigned int state;
 
         /*
-         * Thread return code, CO_RC_* or user-defined, can be set
+         * Thread return code, MRKTHR_CO_RC_* or user-defined, can be set
          * publicly using:
          *  - mrkthr_set_retval()
          *  - mrkthr_signal_error()

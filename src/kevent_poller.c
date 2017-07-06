@@ -372,7 +372,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -421,7 +421,7 @@ mrkthr_get_rbuflen(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -459,7 +459,7 @@ mrkthr_wait_for_read(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -498,7 +498,7 @@ mrkthr_get_wbuflen(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -537,7 +537,7 @@ mrkthr_wait_for_write(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -578,7 +578,7 @@ mrkthr_wait_for_events(int fd, int *events)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = CO_RC_USER_INTERRUPTED;
+        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
@@ -758,7 +758,7 @@ mrkthr_loop(void)
                          * do not tell kqueue to discard event, let the thread get away
                          * with it
                          */
-                        corc = CO_RC_POLLER;
+                        corc = MRKTHR_CO_RC_POLLER;
                     } else {
                         discard_event(kev->ident, kev->filter, ctx);
                         corc = 0;
