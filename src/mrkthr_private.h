@@ -46,7 +46,7 @@ extern "C" {
 #endif
 
 #ifndef STACKSIZE
-#   define STACKSIZE (PAGE_SIZE * 1024)
+#   define STACKSIZE (PAGE_SIZE * 8)
 #endif
 
 

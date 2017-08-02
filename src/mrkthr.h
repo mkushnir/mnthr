@@ -106,6 +106,7 @@ void mrkthr_dump_all_ctxes(void);
 void mrkthr_dump_sleepq(void);
 size_t mrkthr_gc(void);
 size_t mrkthr_ctx_sizeof(void);
+size_t mrkthr_set_stacksize(size_t);
 
 int mrkthr_dump(const mrkthr_ctx_t *);
 mrkthr_ctx_t *mrkthr_new(const char *, mrkthr_cofunc_t, int, ...);

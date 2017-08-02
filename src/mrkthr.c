@@ -113,6 +113,7 @@ typedef int (*writer_t) (int, int, int);
 
 int mrkthr_flags = 0;
 
+static size_t stacksize = STACKSIZE;
 ucontext_t main_uc;
 static char main_stack[STACKSIZE];
 
@@ -224,6 +225,27 @@ dump_ucontext (UNUSED ucontext_t *uc)
 #endif
     );
 #endif
+}
+
+
+size_t
+mrkthr_set_stacksize(size_t v)
+{
+    size_t res;
+
+    res = stacksize;
+
+    if (v < (PAGE_SIZE * 2)) {
+        v = PAGE_SIZE * 2;
+    } else if (v > (PAGE_SIZE * 2048)) {
+        v = PAGE_SIZE * 2048;
+    }
+
+    if (v % PAGE_SIZE) {
+        v += (PAGE_SIZE - (v % PAGE_SIZE));
+    }
+    stacksize = v;
+    return res;
 }
 
 
@@ -664,7 +686,7 @@ static void
 co_fini_ucontext(struct _co *co)
 {
     if (co->stack != MAP_FAILED) {
-        munmap(co->stack, STACKSIZE);
+        munmap(co->stack, co->uc.uc_stack.ss_size);
         co->stack = MAP_FAILED;
     }
     co->uc.uc_link = NULL;
@@ -877,7 +899,7 @@ mrkthr_gc(void)
     }                                                                          \
     if (ctx->co.stack == MAP_FAILED) {                                         \
         if ((ctx->co.stack = mmap(NULL,                                        \
-                                  STACKSIZE,                                   \
+                                  stacksize,                                   \
                                   PROT_READ|PROT_WRITE,                        \
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
@@ -891,7 +913,7 @@ mrkthr_gc(void)
         }                                                                      \
     }                                                                          \
     ctx->co.uc.uc_stack.ss_sp = ctx->co.stack;                                 \
-    ctx->co.uc.uc_stack.ss_size = STACKSIZE;                                   \
+    ctx->co.uc.uc_stack.ss_size = stacksize;                                   \
     ctx->co.uc.uc_link = &main_uc;                                             \
     ctx->co.f = f;                                                             \
     if (argc > 0) {                                                            \
@@ -1630,7 +1652,9 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
     }
 
     if ((res = connect(fd, addr, addrlen)) != 0) {
+#ifdef TRRET_DEBUG
         perror("connect");
+#endif
         if (errno == EINPROGRESS) {
             int optval;
             socklen_t optlen;
