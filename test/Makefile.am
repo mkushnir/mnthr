@@ -7,7 +7,8 @@ noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testp
 
 noinst_HEADERS = unittest.h
 
-BUILT_SOURCES = ../src/diag.c ../src/diag.h
+diags = ../src/diag.txt
+BUILT_SOURCES = diag.c diag.h
 
 if DEBUG
 DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
@@ -34,58 +35,60 @@ base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
 
 common_cflags = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
-nodist_testco_SOURCES = ../src/diag.c
+common_ldflags = -L$(libdir) -lmrkthr -lmrkcommon -lmndiag
+
+nodist_testco_SOURCES = diag.c
 testco_SOURCES = testco.c
 testco_CFLAGS = $(common_cflags)
-testco_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testco_LDFLAGS = $(common_ldflags)
 
-nodist_testsleep_SOURCES = ../src/diag.c
+nodist_testsleep_SOURCES = diag.c
 testsleep_SOURCES = testsleep.c
 testsleep_CFLAGS = $(common_cflags)
-testsleep_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testsleep_LDFLAGS = $(common_ldflags)
 
-nodist_testclock_SOURCES = ../src/diag.c
+nodist_testclock_SOURCES = diag.c
 testclock_SOURCES = testclock.c
 testclock_CFLAGS = $(common_cflags)
-testclock_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testclock_LDFLAGS = $(common_ldflags)
 
-nodist_testwaitfor_SOURCES = ../src/diag.c
+nodist_testwaitfor_SOURCES = diag.c
 testwaitfor_SOURCES = testwaitfor.c
 testwaitfor_CFLAGS = $(common_cflags)
-testwaitfor_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testwaitfor_LDFLAGS = $(common_ldflags)
 
-nodist_testsocket_SOURCES = ../src/diag.c
+nodist_testsocket_SOURCES = diag.c
 testsocket_SOURCES = testsocket.c
 testsocket_CFLAGS = $(common_cflags)
-testsocket_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testsocket_LDFLAGS = $(common_ldflags)
 
-nodist_testfile_SOURCES = ../src/diag.c
+nodist_testfile_SOURCES = diag.c
 testfile_SOURCES = testfile.c
 testfile_CFLAGS = $(common_cflags)
-testfile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testfile_LDFLAGS = $(common_ldflags)
 
-nodist_testprofile_SOURCES = ../src/diag.c
+nodist_testprofile_SOURCES = diag.c
 testprofile_SOURCES = testprofile.c
 testprofile_CFLAGS = $(common_cflags)
-testprofile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testprofile_LDFLAGS = $(common_ldflags)
 
-nodist_testsendfile_SOURCES = ../src/diag.c
+nodist_testsendfile_SOURCES = diag.c
 testsendfile_SOURCES = testsendfile.c
 testsendfile_CFLAGS = $(common_cflags)
-testsendfile_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testsendfile_LDFLAGS = $(common_ldflags)
 
-nodist_testswitch_SOURCES = ../src/diag.c
+nodist_testswitch_SOURCES = diag.c
 testswitch_SOURCES = testswitch.c
 testswitch_CFLAGS = $(common_cflags)
-testswitch_LDFLAGS = -L$(libdir) -lmrkthr -lmrkcommon
+testswitch_LDFLAGS = $(common_ldflags)
 
-nodist_testucontext_SOURCES = ../src/diag.c
+nodist_testucontext_SOURCES = diag.c
 testucontext_SOURCES = testucontext.c
 testucontext_CFLAGS = $(common_cflags)
-testucontext_LDFLAGS = -L$(libdir) -lmrkcommon
+testucontext_LDFLAGS = -L$(libdir) -lmrkcommon -lmndiag
 
-../src/diag.c ../src/diag.h: ../src/diag.txt
-	$(AM_V_GEN) cat ../src/diag.txt | sort -u | /bin/sh ../src/gen-diag mrkthr ../src
+diag.c diag.h: $(diags)
+	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -S diag.txt.tmp -L mrkthr -H diag.h -C diag.c ../*.[ch] ./*.[ch]
 
 testrun: all
 	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;
