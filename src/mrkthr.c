@@ -1476,7 +1476,7 @@ mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
 
     if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         sleepq_remove(me);
-        if (ctx->co.rc != MRKTHR_CO_RC_USER_INTERRUPTED) {
+        if (ctx->co.rc != (int)MRKTHR_CO_RC_USER_INTERRUPTED) {
             res = ctx->co.rc;
         }
     } else {

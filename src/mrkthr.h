@@ -10,10 +10,12 @@
 #include <time.h>
 #include <netdb.h>
 
-#include "mrkcommon/dtqueue.h"
-#include "mrkcommon/dumpm.h"
-#include "mrkcommon/util.h"
-#include "mrkcommon/bytestream.h"
+#include <mndiag.h>
+
+#include <mrkcommon/dtqueue.h>
+#include <mrkcommon/dumpm.h>
+#include <mrkcommon/util.h>
+#include <mrkcommon/bytestream.h>
 
 
 #ifdef __cplusplus
@@ -49,11 +51,20 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 
 #define MRKTHRET(rv) mrkthr_set_retval(rv); return rv
 
-#define MRKTHR_WAIT_TIMEOUT (-1)
-#define MRKTHR_JOIN_FAILURE (-2)
-#define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL (-3)
-#define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL (-4)
-#define MRKTHR_SEMA_TRY_ACQUIRE_FAIL (-5)
+#define MRKTHR_WAIT_TIMEOUT \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 1)
+
+#define MRKTHR_JOIN_FAILURE \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 2)
+
+#define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 3)
+
+#define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL    \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 4)
+
+#define MRKTHR_SEMA_TRY_ACQUIRE_FAIL    \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 5)
 
 /* These calls are cancellation points */
 #define MRKTHR_CPOINT
@@ -123,22 +134,40 @@ PRINTFLIKE(2, 3) int mrkthr_set_name(mrkthr_ctx_t *, const char *, ...);
 mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
 
-#define MRKTHR_CO_RC_EXITED 0x0101
-#define MRKTHR_CO_RC_USER_INTERRUPTED 0x0102
-#define MRKTHR_CO_RC_TIMEDOUT 0x0103
-#define MRKTHR_CO_RC_SIMULTANEOUS 0x0104
-#define MRKTHR_CO_RC_POLLER 0x0105
+#define MRKTHR_CO_RC_EXITED \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 1)
+
+#define MRKTHR_CO_RC_USER_INTERRUPTED   \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 2)
+
+#define MRKTHR_CO_RC_TIMEDOUT   \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 3)
+
+#define MRKTHR_CO_RC_SIMULTANEOUS   \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 4)
+
+#define MRKTHR_CO_RC_POLLER \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 5)
+
 #define MRKTHR_CO_RC_STR(rc) (                                         \
      (rc) == 0 ? "OK" :                                                \
-     (rc) == MRKTHR_CO_RC_EXITED ? "EXITED" :                          \
-     (rc) == MRKTHR_CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :      \
-     (rc) == MRKTHR_CO_RC_TIMEDOUT ? "TIMEDOUT" :                      \
-     (rc) == MRKTHR_CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :              \
-     (rc) == MRKTHR_CO_RC_POLLER ? "POLLER" :                          \
+     (rc) == (int)MRKTHR_CO_RC_EXITED ? "EXITED" :                     \
+     (rc) == (int)MRKTHR_CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" : \
+     (rc) == (int)MRKTHR_CO_RC_TIMEDOUT ? "TIMEDOUT" :                 \
+     (rc) == (int)MRKTHR_CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :         \
+     (rc) == (int)MRKTHR_CO_RC_POLLER ? "POLLER" :                     \
      "UD"                                                              \
  )                                                                     \
 
-#define MRKTHR_IS_CO_RC(rc) (((rc) & 0xffffff00) == 0x0100)
+
+#define MRKTHR_IS_CO_RC(rc)                            \
+    (((rc) &                                           \
+      (MNDIAG_BIT_GLOBAL |                             \
+       MNDIAG_BIT_PUBLIC |                             \
+       MNDIAG_BIT_LIBRARY |                            \
+       MNDIAG_BIT_CLASS)) ==                           \
+     MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 0)) \
+
 
 int mrkthr_get_retval(void);
 int mrkthr_set_retval(int);

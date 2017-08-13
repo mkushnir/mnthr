@@ -26,10 +26,12 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "mrkcommon/dtqueue.h"
-#include "mrkcommon/stqueue.h"
-#include "mrkcommon/rbt.h"
-#include "mrkcommon/util.h"
+#include <mndiag.h>
+
+#include <mrkcommon/dtqueue.h>
+#include <mrkcommon/stqueue.h>
+#include <mrkcommon/rbt.h>
+#include <mrkcommon/util.h>
 
 #ifdef __cplusplus
 extern "C" {
