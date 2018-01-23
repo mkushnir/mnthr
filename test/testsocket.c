@@ -46,7 +46,7 @@ run0(UNUSED int argc, UNUSED void **argv)
     int fd;
 
 
-    if ((fd = mrkthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
+    if ((fd = mrkthr_socket_connect("big-1", "1234", PF_INET)) == -1) {
         FAIL("mrkthr_socket_connect");
     }
 

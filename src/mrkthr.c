@@ -71,6 +71,7 @@
 #include <sys/uio.h>
 #include <time.h>
 #include <netdb.h>
+#include <inttypes.h>
 
 #define NO_PROFILE
 #include <mrkcommon/profile.h>
@@ -256,15 +257,11 @@ mrkthr_ctx_sizeof(void)
 }
 
 static int
-dump_sleepq_node(mnbtrie_node_t *trn, uint64_t key, UNUSED void *udata)
+dump_sleepq_node(mnbtrie_node_t *trn, UNUSED void *udata)
 {
     mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
     if (ctx != NULL) {
-        if (key != ctx->expire_ticks) {
-            TRACEC(FRED("trn=%p key=%016lx "), trn, (long)key);
-        } else {
-            TRACEC("trn=%p key=%016lx ", trn, (long)key);
-        }
+        TRACEC("trn=%p key=%016"PRIx64" ", trn, ctx->expire_ticks);
         mrkthr_dump(ctx);
     }
     return 0;
@@ -292,6 +289,10 @@ sleepq_remove(mrkthr_ctx_t *ctx)
     //CTRACE(FBLUE("SL before removing:"));
     //mrkthr_dump_sleepq();
     //CTRACE(FBLUE("---"));
+
+    if (ctx->expire_ticks == MRKTHR_SLEEP_UNDEFINED) {
+        return;
+    }
 
     if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
         mrkthr_ctx_t *sle, *bucket_host_pretendent;
@@ -322,6 +323,9 @@ sleepq_remove(mrkthr_ctx_t *ctx)
             if (sle == ctx) {
                 /* we are going to remove a bucket host */
 
+                //TRACEC(FYELLOW("removeH"));
+                //mrkthr_dump(ctx);
+
                 DTQUEUE_DEQUEUE(&sle->sleepq_bucket, sleepq_link);
                 DTQUEUE_ENTRY_FINI(sleepq_link, bucket_host_pretendent);
 
@@ -331,8 +335,6 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 DTQUEUE_ENTRY_FINI(sleepq_link, sle);
 
                 trn->value = bucket_host_pretendent;
-                //TRACEC(FYELLOW("removeH"));
-                //mrkthr_dump(ctx);
 
             } else {
                 /* we are removing from the bucket */
@@ -351,7 +353,13 @@ sleepq_remove(mrkthr_ctx_t *ctx)
 
         } else {
             //assert(sle == ctx);
-            if (sle != ctx) {
+            if (sle == ctx) {
+                //TRACEC(FYELLOW("remove "));
+                //mrkthr_dump(ctx);
+                trn->value = NULL;
+                btrie_remove_node(&the_sleepq, trn);
+                //btrie_remove_node_no_cleanup(&the_sleepq, trn);
+            } else {
                 /*
                  * Here we have found ctx is not in the bucket.
                  * Just ignore it.
@@ -364,15 +372,10 @@ sleepq_remove(mrkthr_ctx_t *ctx)
 
                 //assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
                 //assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
-            } else {
-                //TRACEC(FYELLOW("remove "));
-                //mrkthr_dump(ctx);
-                trn->value = NULL;
-                btrie_remove_node(&the_sleepq, trn);
             }
         }
     } else {
-        //if (ctx->expire_ticks > 1) {
+        //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
         //    TRACEC(FBLUE("not in sleepq 1:"));
         //    mrkthr_dump(ctx);
         //}
@@ -395,7 +398,7 @@ sleepq_insert(mrkthr_ctx_t *ctx)
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
-    //if (ctx->expire_ticks > 1) {
+    //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
     //    TRACEC(FRED("insert "));
     //    mrkthr_dump(ctx);
     //}
@@ -473,7 +476,7 @@ sleepq_append(mrkthr_ctx_t *ctx)
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
-    //if (ctx->expire_ticks > 1) {
+    //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
     //    TRACEC(FRED("append "));
     //    mrkthr_dump(ctx);
     //}
@@ -665,7 +668,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
 
     DTQUEUE_INIT(&ctx->sleepq_bucket);
     DTQUEUE_ENTRY_INIT(sleepq_link, ctx);
-    ctx->expire_ticks = 0;
+    ctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
 
     DTQUEUE_INIT(&ctx->waitq);
 
@@ -723,7 +726,7 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     /* remove me from sleepq */
     //DTQUEUE_FINI(&ctx->sleepq_bucket);
     //DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
-    ctx->expire_ticks = 0;
+    ctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
 
     ctx->sleepq_enqueue = sleepq_append;
 
@@ -1121,7 +1124,7 @@ yield(void)
         me->expire_ticks = MRKTHR_SLEEP_FOREVER;       \
     } else {                                           \
         if (v == 0) {                                  \
-            me->expire_ticks = 1;                      \
+            me->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;\
         } else {                                       \
             me->expire_ticks = fn(v);                  \
         }                                              \
@@ -1365,7 +1368,7 @@ set_resume(mrkthr_ctx_t *ctx)
     sleepq_remove(ctx);
 
     ctx->co.state = CO_STATE_SET_RESUME;
-    ctx->expire_ticks = 1;
+    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
     ctx->sleepq_enqueue(ctx);
 }
 
@@ -1386,10 +1389,10 @@ set_resume_fast(mrkthr_ctx_t *ctx)
         return;
     }
 
-    assert(ctx->expire_ticks == 1 || ctx->expire_ticks == 0);
+    assert(ctx->expire_ticks >= MRKTHR_SLEEP_RESUME_NOW);
 
     ctx->co.state = CO_STATE_SET_RESUME;
-    ctx->expire_ticks = 1;
+    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
     sleepq_insert_once(ctx);
 }
 
@@ -1433,7 +1436,7 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
      */
     ctx->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
     ctx->co.state = CO_STATE_SET_INTERRUPT;
-    ctx->expire_ticks = 1;
+    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
     ctx->sleepq_enqueue(ctx);
 }
 
@@ -1562,11 +1565,14 @@ mrkthr_socket_connect(const char *hostname,
 
     fd = -1;
     for (ai = ainfos; ai != NULL; ai = ai->ai_next) {
+        int res;
+
         if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1) {
             continue;
         }
 
-        if (mrkthr_connect(fd, ai->ai_addr, ai->ai_addrlen) != 0) {
+        if ((res = mrkthr_connect(fd, ai->ai_addr, ai->ai_addrlen)) != 0) {
+            CTRACE("socket error: %s", strerror(res));
             perror("mrkthr_connect");
             close(fd);
             fd = -1;
@@ -2150,7 +2156,7 @@ mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal,
     signal->owner = me;
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     res = sleepmsec(msec);
-    if (me->expire_ticks == 0) {
+    if (me->expire_ticks == MRKTHR_SLEEP_UNDEFINED) {
         /* I had been sleeping, but was resumed by signal_send() ... */
     } else {
         res = MRKTHR_WAIT_TIMEOUT;

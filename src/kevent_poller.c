@@ -604,13 +604,13 @@ mrkthr_loop(void)
     int kevres = 0;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
-    mnbtrie_node_t *node;
     mrkthr_ctx_t *ctx = NULL;
     mnarray_iter_t it;
 
     PROFILE_START(mrkthr_sched0_p);
 
     while (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
+        mnbtrie_node_t *trn;
         //sleep(1);
         update_now();
 
@@ -621,8 +621,8 @@ mrkthr_loop(void)
         poller_sift_sleepq();
 
         /* get the first to wake up */
-        if ((node = BTRIE_MIN(&the_sleepq)) != NULL) {
-            ctx = node->value;
+        if ((trn = BTRIE_MIN(&the_sleepq)) != NULL) {
+            ctx = trn->value;
             assert(ctx != NULL);
 
             if (ctx->expire_ticks > timecounter_now) {

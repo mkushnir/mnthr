@@ -52,19 +52,24 @@ typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
 #define MRKTHRET(rv) mrkthr_set_retval(rv); return rv
 
 #define MRKTHR_WAIT_TIMEOUT \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 1)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 129, 1)
+
 
 #define MRKTHR_JOIN_FAILURE \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 2)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 129, 2)
+
 
 #define MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 3)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 129, 3)
 
-#define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL    \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 4)
 
-#define MRKTHR_SEMA_TRY_ACQUIRE_FAIL    \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -1, 5)
+#define MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 129, 4)
+
+
+#define MRKTHR_SEMA_TRY_ACQUIRE_FAIL \
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 129, 5)
+
 
 /* These calls are cancellation points */
 #define MRKTHR_CPOINT
@@ -135,19 +140,19 @@ mrkthr_ctx_t *mrkthr_me(void);
 int mrkthr_id(void);
 
 #define MRKTHR_CO_RC_EXITED \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 1)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 130, 1)
 
 #define MRKTHR_CO_RC_USER_INTERRUPTED   \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 2)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 130, 2)
 
 #define MRKTHR_CO_RC_TIMEDOUT   \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 3)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 130, 3)
 
 #define MRKTHR_CO_RC_SIMULTANEOUS   \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 4)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 130, 4)
 
 #define MRKTHR_CO_RC_POLLER \
-    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, -2, 5)
+    MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MRKTHR, 130, 5)
 
 #define MRKTHR_CO_RC_STR(rc) (                                         \
      (rc) == 0 ? "OK" :                                                \
@@ -317,7 +322,9 @@ MRKTHR_CPOINT int mrkthr_wait_for(uint64_t, const char *, mrkthr_cofunc_t, int, 
 MRKTHR_CPOINT int mrkthr_peek(mrkthr_ctx_t *, uint64_t);
 
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more(mnbytestream_t *, void *, ssize_t);
+MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more_et(mnbytestream_t *, void *, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write(mnbytestream_t *, void *, size_t);
+MRKTHR_CPOINT ssize_t mrkthr_bytestream_write_et(mnbytestream_t *, void *, size_t);
 
 
 

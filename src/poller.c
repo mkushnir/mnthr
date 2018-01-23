@@ -133,13 +133,16 @@ poller_sift_sleepq(void)
         assert(ctx != NULL);
 
         if (ctx->expire_ticks < now) {
-            //if (ctx->expire_ticks > 1) {
-            //    CTRACEC(FBYELLOW("remove "));
+            //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
+            //    TRACEC(FBYELLOW("remove (poller)"));
             //    mrkthr_dump(ctx);
             //}
 
             STQUEUE_ENQUEUE(&runq, runq_link, ctx);
+            //sleepq_remove(ctx);
+            trn->value = NULL;
             btrie_remove_node(&the_sleepq, trn);
+            //btrie_remove_node_no_cleanup(&the_sleepq, trn);
             trn = NULL;
 #ifdef TRACE_VERBOSE
             CTRACE(FBGREEN("Put in runq:"));
@@ -161,7 +164,7 @@ poller_sift_sleepq(void)
         mrkthr_dump(ctx);
         CTRACE(FBGREEN("<<<"));
 #endif
-        ctx->expire_ticks = 0;
+        ctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
 
         if (!(ctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
             /*
@@ -200,7 +203,7 @@ poller_sift_sleepq(void)
             mrkthr_dump(bctx);
             CTRACE(FBGREEN("<<<"));
 #endif
-            bctx->expire_ticks = 0;
+            bctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
 
             if (!(bctx->co.state & CO_STATES_RESUMABLE_EXTERNALLY)) {
                 /*

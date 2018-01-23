@@ -1,17 +1,17 @@
 #ifndef MRKTHR_PRIVATE_H
 #define MRKTHR_PRIVATE_H
 
-#include <limits.h> /* ULONG_MAX*/
+#ifdef HAVE_CONFIG_H
+#   include "config.h"
+#endif
+
+#include <stdint.h> /* UINTMAX_MAX */
 
 #include <netinet/in.h>
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
 #endif
 #include <ucontext.h>
-
-#ifdef HAVE_CONFIG_H
-#   include <config.h>
-#endif
 
 #include <sys/param.h> /* PAGE_SIZE */
 
@@ -172,10 +172,13 @@ struct _mrkthr_ctx {
 
     /*
      * Expiration timestamp in the nsecs from the Epoch.
-     * ULONG_MAX if forever. 0 - polling, 1 - resume now.
+     * UINTMAX_MAX if forever. 0 - undefined (can never enter sleepq),
+     * 1 - resume now.
      */
      uint64_t expire_ticks;
-#   define MRKTHR_SLEEP_FOREVER (ULONG_MAX)
+#   define MRKTHR_SLEEP_UNDEFINED (0ul)
+#   define MRKTHR_SLEEP_RESUME_NOW (1ul)
+#   define MRKTHR_SLEEP_FOREVER (UINTMAX_MAX)
 
     void (*sleepq_enqueue)(struct _mrkthr_ctx *);
 

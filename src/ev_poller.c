@@ -165,7 +165,7 @@ ev_item_cmp(ev_item_t *a, ev_item_t *b)
     ha = ev_item_hash(a);
     hb = ev_item_hash(b);
     if (ha != hb) {
-        return ha > hb ? 1 : ha < hb ? -1 : 0;
+        return MNCMP(ha, hb);
     }
     if (a->ty != b->ty) {
         return a->ty - b->ty;
