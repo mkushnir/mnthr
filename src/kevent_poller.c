@@ -604,13 +604,13 @@ mrkthr_loop(void)
     int kevres = 0;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
-    mrkthr_ctx_t *ctx = NULL;
     mnarray_iter_t it;
 
     PROFILE_START(mrkthr_sched0_p);
 
     while (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
         mnbtrie_node_t *trn;
+        mrkthr_ctx_t *ctx = NULL;
         //sleep(1);
         update_now();
 

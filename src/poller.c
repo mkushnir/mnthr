@@ -142,7 +142,6 @@ poller_sift_sleepq(void)
             //sleepq_remove(ctx);
             trn->value = NULL;
             btrie_remove_node(&the_sleepq, trn);
-            //btrie_remove_node_no_cleanup(&the_sleepq, trn);
             trn = NULL;
 #ifdef TRACE_VERBOSE
             CTRACE(FBGREEN("Put in runq:"));

@@ -358,7 +358,6 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 //mrkthr_dump(ctx);
                 trn->value = NULL;
                 btrie_remove_node(&the_sleepq, trn);
-                //btrie_remove_node_no_cleanup(&the_sleepq, trn);
             } else {
                 /*
                  * Here we have found ctx is not in the bucket.
