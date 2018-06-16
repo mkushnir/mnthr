@@ -712,6 +712,12 @@ co_fini_other(struct _co *co)
     co->state = CO_STATE_DORMANT;
     // XXX let it stay for a while, and clear later ...
     //co->rc = 0;
+    /*
+     * sanity?
+     */
+    //if (co->stack != MAP_FAILED) {
+    //    memset(co->stack + PAGE_SIZE, 0xa5, co->uc.uc_stack.ss_size - PAGE_SIZE);
+    //}
 }
 
 
@@ -1296,7 +1302,6 @@ resume_waitq_one(mrkthr_waitq_t *waitq)
 void
 mrkthr_run(mrkthr_ctx_t *ctx)
 {
-    assert(ctx != me);
 #ifndef NDEBUG
     if (ctx->co.state != CO_STATE_DORMANT) {
         CTRACE("precondition failed. Non-dormant ctx is %p", ctx);
@@ -1350,6 +1355,12 @@ mrkthr_spawn_sig(const char *name, mrkthr_cofunc_t f, int argc, ...)
 static void
 set_resume(mrkthr_ctx_t *ctx)
 {
+#ifndef NDEBUG
+    if (ctx == me) {
+        CTRACE("Attept to resume self:");
+        mrkthr_dump(ctx);
+    }
+#endif
     assert(ctx != me);
 
     //CTRACE("Setting for resume: ---");
@@ -1375,6 +1386,12 @@ set_resume(mrkthr_ctx_t *ctx)
 void
 set_resume_fast(mrkthr_ctx_t *ctx)
 {
+#ifndef NDEBUG
+    if (ctx == me) {
+        CTRACE("Attept to resume self:");
+        mrkthr_dump(ctx);
+    }
+#endif
     assert(ctx != me);
 
     //CTRACE("Setting for resume: ---");
@@ -1571,8 +1588,14 @@ mrkthr_socket_connect(const char *hostname,
         }
 
         if ((res = mrkthr_connect(fd, ai->ai_addr, ai->ai_addrlen)) != 0) {
-            CTRACE("socket error: %s", strerror(res));
-            perror("mrkthr_connect");
+            if (MNDIAG_GET_LIBRARY(res) == MNDIAG_LIBRARY_MRKTHR) {
+                TR(res);
+            } else {
+#ifdef TRACE_VERBOSE
+                //perror("mrkthr_connect");
+                CTRACE("getsockopt in progress error: %s", strerror(res));
+#endif
+            }
             close(fd);
             fd = -1;
         }

@@ -55,7 +55,9 @@ mrkthr_bytestream_read_more_et(mnbytestream_t *stream, void *in, ssize_t sz)
         return -1;                                             \
     }                                                          \
     nwritten = fn(fd, stream->buf.data + stream->pos, sz);     \
-    stream->pos += nwritten;                                   \
+    if (nwritten >= 0) {                                       \
+        stream->pos += nwritten;                               \
+    }                                                          \
                                                                \
     return nwritten                                            \
 
