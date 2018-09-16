@@ -1077,6 +1077,13 @@ mrkthr_get_retval(void)
 }
 
 
+bool
+mrkthr_is_runnable(mrkthr_ctx_t *ctx)
+{
+    return ctx->co.state > CO_STATE_DORMANT;
+}
+
+
 void
 mrkthr_incabac(mrkthr_ctx_t *ctx)
 {
@@ -2151,6 +2158,13 @@ int
 mrkthr_signal_has_owner(mrkthr_signal_t *signal)
 {
     return signal->owner != NULL;
+}
+
+
+mrkthr_ctx_t *
+mrkthr_signal_get_owner(mrkthr_signal_t *signal)
+{
+    return signal->owner;
 }
 
 

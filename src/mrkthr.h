@@ -114,6 +114,7 @@ typedef struct _mrkthr_rwlock {
 int mrkthr_init(void);
 int mrkthr_fini(void);
 int mrkthr_loop(void);
+
 void mrkthr_shutdown(void);
 size_t mrkthr_compact_sleepq(size_t);
 size_t mrkthr_get_sleepq_length(void);
@@ -176,6 +177,7 @@ int mrkthr_id(void);
 
 int mrkthr_get_retval(void);
 int mrkthr_set_retval(int);
+bool mrkthr_is_runnable(mrkthr_ctx_t *);
 
 void mrkthr_set_prio(mrkthr_ctx_t *, int);
 void mrkthr_incabac(mrkthr_ctx_t *);
@@ -256,6 +258,7 @@ void mrkthr_signal_init(mrkthr_signal_t *, mrkthr_ctx_t *);
 #define MRKTHR_SIGNAL_INIT(signal) mrkthr_signal_init((signal), NULL)
 void mrkthr_signal_fini(mrkthr_signal_t *);
 int mrkthr_signal_has_owner(mrkthr_signal_t *);
+mrkthr_ctx_t *mrkthr_signal_get_owner(mrkthr_signal_t *);
 MRKTHR_CPOINT int mrkthr_signal_subscribe(mrkthr_signal_t *);
 MRKTHR_CPOINT int mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *,
                                                       uint64_t);
@@ -325,49 +328,6 @@ MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more(mnbytestream_t *, void *, ssiz
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_read_more_et(mnbytestream_t *, void *, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write(mnbytestream_t *, void *, size_t);
 MRKTHR_CPOINT ssize_t mrkthr_bytestream_write_et(mnbytestream_t *, void *, size_t);
-
-
-
-#define MRKTHR_RETRY(_mrkthr_shutting_down,                            \
-                     _n,                                               \
-                     _interval,                                        \
-                     _expr,                                            \
-                     _eexpr)                                           \
-do {                                                                   \
-    intmax_t _mrkthr_retry_count = n;                                  \
-    while (_mrkthr_retry_count-- > 0) {                                \
-        if (_mrkthr_shutting_down) {                                   \
-/*            CTRACE("MRKTHR_RETRY: shutting_down"); */                \
-            break;                                                     \
-        }                                                              \
-        if (!(_expr)) {                                                \
-            int _mrkthr_retry_rc;                                      \
-            _eexpr;                                                    \
-            if ((_mrkthr_retry_rc = mrkthr_sleep(                      \
-                            _interval * 1000)) != 0) {                 \
-                if (_mrkthr_retry_rc == MRKAMQP_STOP_THREADS ||        \
-                    _mrkthr_retry_rc == MRKAMQP_PROTOCOL_ERROR) {      \
-                    mrkthr_set_retval(0);                              \
-/*                                                                     \
-                    CTRACE("interval error: %d with res=%d",           \
-                           interval,                                   \
-                           _mrkthr_retry_rc);                          \
- */                                                                    \
-                } else {                                               \
-                    break;                                             \
-                }                                                      \
-            } else {                                                   \
-/*                CTRACE("interval again: %d", interval); */           \
-            }                                                          \
-            continue;                                                  \
-        }                                                              \
-/*        CTRACE("breaking %s", #expr); */                             \
-        break;                                                         \
-    }                                                                  \
-} while (false)                                                        \
-
-
-
 
 #ifdef __cplusplus
 }

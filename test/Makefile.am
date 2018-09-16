@@ -3,7 +3,7 @@ CLEANFILES = *.core
 #CLEANFILES += *.in
 AM_MAKEFLAGS = -s
 
-noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch testucontext
+noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch testucontext testinterrupt
 
 noinst_HEADERS = unittest.h
 
@@ -29,9 +29,6 @@ else
 dh_platform= ../src/kevent_util.h
 ls_platform= ../src/kevent_poller.c ../src/kevent_util.c
 endif
-
-
-base_sources = ../src/mrkthr.c ../src/poller.c $(ls_platform)
 
 common_cflags = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
@@ -81,6 +78,11 @@ nodist_testswitch_SOURCES = diag.c
 testswitch_SOURCES = testswitch.c
 testswitch_CFLAGS = $(common_cflags)
 testswitch_LDFLAGS = $(common_ldflags)
+
+nodist_testinterrupt_SOURCES = diag.c
+testinterrupt_SOURCES = testinterrupt.c
+testinterrupt_CFLAGS = $(common_cflags)
+testinterrupt_LDFLAGS = $(common_ldflags)
 
 nodist_testucontext_SOURCES = diag.c
 testucontext_SOURCES = testucontext.c
