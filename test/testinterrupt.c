@@ -52,7 +52,7 @@ worker11(UNUSED int argc, UNUSED void *argv[])
 static int
 worker2(UNUSED int argc, void *argv[])
 {
-    mrkthr_ctx_t *w10, *w11;
+    UNUSED mrkthr_ctx_t *w10, *w11;
     int n = 3;
 
     w10 = argv[0];
