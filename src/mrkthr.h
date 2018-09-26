@@ -177,12 +177,15 @@ int mrkthr_id(void);
 
 int mrkthr_get_retval(void);
 int mrkthr_set_retval(int);
+void *mrkthr_set_cld(void *);
+void *mrkthr_get_cld(void);
 bool mrkthr_is_runnable(mrkthr_ctx_t *);
 
 void mrkthr_set_prio(mrkthr_ctx_t *, int);
 void mrkthr_incabac(mrkthr_ctx_t *);
 void mrkthr_decabac(mrkthr_ctx_t *);
 MRKTHR_CPOINT int mrkthr_sleep(uint64_t);
+MRKTHR_CPOINT int mrkthr_sleep_usec(uint64_t);
 MRKTHR_CPOINT int mrkthr_sleep_ticks(uint64_t);
 MRKTHR_CPOINT int mrkthr_yield(void);
 MRKTHR_CPOINT int mrkthr_giveup(void);

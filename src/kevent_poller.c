@@ -161,6 +161,19 @@ wallclock_init(void)
 
 
 uint64_t
+poller_usec2ticks_absolute(uint64_t usec)
+{
+    return
+#ifdef USE_TSC
+        timecounter_now +
+            (uint64_t)(((long double)usec / 1000000.) * timecounter_freq);
+#else
+        timecounter_now + usec * 1000;
+#endif
+}
+
+
+uint64_t
 poller_msec2ticks_absolute(uint64_t msec)
 {
     return

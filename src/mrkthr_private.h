@@ -75,6 +75,8 @@ struct _mrkthr_ctx {
         char name[8];
         int (*f)(int, void *[]);
         void **argv;
+        /* weakref */
+        void *cld;
         int argc;
         unsigned abac;
 
@@ -297,6 +299,7 @@ void sleepq_remove(struct _mrkthr_ctx *);
 void set_resume_fast(struct _mrkthr_ctx *);
 void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
 
+uint64_t poller_usec2ticks_absolute(uint64_t);
 uint64_t poller_msec2ticks_absolute(uint64_t);
 uint64_t poller_ticks_absolute(uint64_t);
 void poller_clear_event(struct _mrkthr_ctx *);

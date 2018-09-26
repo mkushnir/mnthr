@@ -160,6 +160,7 @@ dump_ucontext (UNUSED ucontext_t *uc)
     "ss_sp=%p "
     "ss_size=%08lx "
     "ss_flags=%08x "
+    "__spare__=%08x %08x %08x %08x"
 #ifdef __amd64__
     "onstack=%016lx "
     "rip=%016lx "
@@ -197,6 +198,10 @@ dump_ucontext (UNUSED ucontext_t *uc)
         uc->uc_stack.ss_sp,
         uc->uc_stack.ss_size,
         uc->uc_stack.ss_flags,
+        uc->__spare__[0],
+        uc->__spare__[1],
+        uc->__spare__[2],
+        uc->__spare__[3],
 #ifdef __amd64__
         uc->uc_mcontext.mc_onstack,
         uc->uc_mcontext.mc_rip,
@@ -658,6 +663,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
     ctx->co.f = NULL;
     ctx->co.argc = 0;
     ctx->co.argv = NULL;
+    ctx->co.cld = NULL;
     ctx->co.abac = 0;
     ctx->co.state = CO_STATE_DORMANT;
     ctx->co.rc = 0;
@@ -708,6 +714,7 @@ co_fini_other(struct _co *co)
         free(co->argv);
         co->argv = NULL;
     }
+    co->cld = NULL;
     //co->abac = 0; /* cannot zero it here */
     co->state = CO_STATE_DORMANT;
     // XXX let it stay for a while, and clear later ...
@@ -1077,6 +1084,27 @@ mrkthr_get_retval(void)
 }
 
 
+void *
+mrkthr_set_cld(void *cld)
+{
+    void *res;
+
+    assert(me != NULL);
+
+    res = me->co.cld;
+    me->co.cld = cld;
+    return res;
+}
+
+
+void *
+mrkthr_get_cld(void)
+{
+    assert(me != NULL);
+    return me->co.cld;
+}
+
+
 bool
 mrkthr_is_runnable(mrkthr_ctx_t *ctx)
 {
@@ -1142,6 +1170,23 @@ yield(void)
         }                                              \
     }                                                  \
 
+
+static int
+sleepusec(uint64_t usec)
+{
+    /* first remove an old reference (if any) */
+    sleepq_remove(me);
+
+    MRKTHR_SET_EXPIRE_TICKS(usec, poller_usec2ticks_absolute);
+
+    //CTRACE("usec=%ld expire_ticks=%ld", usec, me->expire_ticks);
+
+    me->sleepq_enqueue(me);
+
+    return yield();
+}
+
+
 static int
 sleepmsec(uint64_t msec)
 {
@@ -1197,6 +1242,16 @@ mrkthr_sleep(uint64_t msec)
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
     return sleepmsec(msec);
+}
+
+
+int
+mrkthr_sleep_usec(uint64_t usec)
+{
+    assert(me != NULL);
+    /* put into sleepq(SLEEP) */
+    me->co.state = CO_STATE_SLEEP;
+    return sleepusec(usec);
 }
 
 

@@ -386,6 +386,13 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
  * Time bookkeeping
  */
 uint64_t
+poller_usec2ticks_absolute(uint64_t usec)
+{
+    return timecounter_now + usec * 1000;
+}
+
+
+uint64_t
 poller_msec2ticks_absolute(uint64_t msec)
 {
     return timecounter_now + msec * 1000000;
