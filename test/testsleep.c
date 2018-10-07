@@ -16,12 +16,12 @@ sleeper(UNUSED int id, UNUSED void *argv[])
         int n = (int)(intptr_t)(argv[0]);
 
         before = mrkthr_get_now_ticks_precise();
-        before_nsec = mrkthr_get_now_precise();
+        before_nsec = mrkthr_get_now_nsec_precise();
         if (mrkthr_sleep(n * 1000) != 0) {
             break;
         }
         after = mrkthr_get_now_ticks_precise();
-        after_nsec = mrkthr_get_now_precise();
+        after_nsec = mrkthr_get_now_nsec_precise();
         CTRACE("sleep=%Lf/%Lf", mrkthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
     }
     return 0;
@@ -38,12 +38,12 @@ waitee(UNUSED int id, UNUSED void *argv[])
     CTRACE("waitee %d sleeping for: %"PRId64" ...", n, (uint64_t)(n * 1000));
 
     before = mrkthr_get_now_ticks_precise();
-    before_nsec = mrkthr_get_now_precise();
+    before_nsec = mrkthr_get_now_nsec_precise();
     if ((res = mrkthr_sleep(n * 1000)) != 0) {
         CTRACE("waitee %d res=%d", n, res);
     }
     after = mrkthr_get_now_ticks_precise();
-    after_nsec = mrkthr_get_now_precise();
+    after_nsec = mrkthr_get_now_nsec_precise();
     //CTRACE("sleep=%Lf/%Lf", mrkthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
     return 0;
 }

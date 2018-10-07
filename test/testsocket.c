@@ -55,7 +55,7 @@ run0(UNUSED int argc, UNUSED void **argv)
     while (1) {
         char buf[1024];
 
-        snprintf(buf, sizeof(buf), "%016lx\n", (unsigned long)mrkthr_get_now());
+        snprintf(buf, sizeof(buf), "%016lx\n", (unsigned long)mrkthr_get_now_nsec());
 
         if (mrkthr_write_all_et(fd, buf, strlen(buf)) != 0) {
             FAIL("mrkthr_write_all_et");

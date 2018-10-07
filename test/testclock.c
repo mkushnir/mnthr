@@ -8,7 +8,7 @@ f (UNUSED int argc, UNUSED void *argv[])
 {
     while (1) {
         mrkthr_sleep(500);
-        CTRACE("now=%ld", (long)mrkthr_get_now()/1000000000);
+        CTRACE("now=%ld", (long)mrkthr_get_now_nsec()/1000000000);
     }
 
     return(0);

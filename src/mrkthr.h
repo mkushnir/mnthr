@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-const char *mrkthr_diag_str(int);
+void mndiag_mrkthr_str(int, char *, size_t);
 
 #define CTRACE(s, ...)                                         \
     do {                                                       \
@@ -298,17 +298,25 @@ void mrkthr_rwlock_release_write(mrkthr_rwlock_t *);
 void mrkthr_rwlock_fini(mrkthr_rwlock_t *);
 
 
-uint64_t mrkthr_get_now(void);
+uint64_t mrkthr_get_now_nsec(void);
 #define MRKTHR_GET_NOW_SEC() \
-    (mrkthr_get_now() / 1000000000)
+    (mrkthr_get_now_nsec() / 1000000000)
 #define MRKTHR_GET_NOW_FSEC() \
-    ((double)mrkthr_get_now() / 1000000000.0)
+    ((double)mrkthr_get_now(_nsed) / 1000000000.0)
+#define MRKTHR_GET_NOW_MSEC() \
+    (mrkthr_get_now_nsec() / 1000000)
+#define MRKTHR_GET_NOW_USEC() \
+    (mrkthr_get_now_nsec() / 1000)
 
-uint64_t mrkthr_get_now_precise(void);
-#define MRKTHR_GET_NOW_PRECISE_SEC() \
-    (mrkthr_get_now_precise() / 1000000000)
-#define MRKTHR_GET_NOW_PRECISE_FSEC() \
-    ((double)mrkthr_get_now_precise() / 1000000000.0)
+uint64_t mrkthr_get_now_nsec_precise(void);
+#define MRKTHR_GET_NOW_SEC_PRECISE() \
+    (mrkthr_get_now_nsec_precise() / 1000000000)
+#define MRKTHR_GET_NOW_FSEC_PRECISE() \
+    ((double)mrkthr_get_now_nsec_precise() / 1000000000.0)
+#define MRKTHR_GET_NOW_MSEC_PRECISE() \
+    (mrkthr_get_now_nsec_precise() / 1000000)
+#define MRKTHR_GET_NOW_USEC_PRECISE() \
+    (mrkthr_get_now_nsec_precise() / 1000)
 
 uint64_t mrkthr_get_now_ticks(void);
 #define MRKTHR_GET_NOW_TICKS_SEC() \

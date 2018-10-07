@@ -49,12 +49,12 @@ r(int n)
             ++dummy;
             //CTRACE(">>>");
             //mrkthr_sleep(100);
-            //now1 = mrkthr_get_now_precise();
+            //now1 = mrkthr_get_now_nsec_precise();
             mrkthr_yield();
             //CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
             //mrkthr_ctx_dump(me);
-            //now2 = mrkthr_get_now_precise();
+            //now2 = mrkthr_get_now_nsec_precise();
             //printf("."); fflush(stdout);
             //printf("%ld\n", (now2 - now1) / 1000);
             //CTRACE("iter=%d %ld", nn, (now2 - now1) / 1000);
@@ -70,9 +70,9 @@ baz(UNUSED int argc, UNUSED void *argv[])
     uint64_t n1, n2;
     uint64_t t;
 
-    n1 = mrkthr_get_now_precise();
+    n1 = mrkthr_get_now_nsec_precise();
     r(0);
-    n2 = mrkthr_get_now_precise();
+    n2 = mrkthr_get_now_nsec_precise();
     t = n2 - n1;
     ++ntotal;
     total += t;

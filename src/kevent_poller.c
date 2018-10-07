@@ -219,14 +219,14 @@ mrkthr_ticksdiff2sec(int64_t ticks)
 
 
 uint64_t
-mrkthr_get_now(void)
+mrkthr_get_now_nsec(void)
 {
     return nsec_now;
 }
 
 
 uint64_t
-mrkthr_get_now_precise(void)
+mrkthr_get_now_nsec_precise(void)
 {
     update_now();
     return nsec_now;
@@ -286,7 +286,7 @@ new_event(int fd, int filter, int flags, int fflags, intptr_t data, void *udata)
 static int
 discard_event(int fd, int filter, mrkthr_ctx_t *ctx)
 {
-    struct kevent *kev;
+    UNUSED struct kevent *kev;
     kev = new_event(fd, filter, EV_DELETE, 0, 0, ctx);
     --event_count;
     return 0;
@@ -569,7 +569,7 @@ int
 mrkthr_wait_for_events(int fd, int *events)
 {
     int res;
-    struct kevent *rkev, *wkev;
+    UNUSED struct kevent *rkev, *wkev;
 
     rkev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;

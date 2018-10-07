@@ -428,14 +428,14 @@ mrkthr_ticksdiff2sec(int64_t ticks)
 
 
 uint64_t
-mrkthr_get_now(void)
+mrkthr_get_now_nsec(void)
 {
     return timecounter_now;
 }
 
 
 uint64_t
-mrkthr_get_now_precise(void)
+mrkthr_get_now_nsec_precise(void)
 {
     return timecounter_now;
 }
