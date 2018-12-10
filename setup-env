@@ -5,6 +5,7 @@ then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include"
 
+    autoreconf --force
     aclocal
     autoheader
     autoreconf
@@ -13,48 +14,63 @@ then
     make distclean
     autoreconf
     ./configure --prefix=$HOME --enable-debug
+
 elif test "$1" = "dev"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --enable-debug
+
 elif test "$1" = "dev-memdebug"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include -DDO_MEMDEBUG"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --enable-debug
+
 elif test "$1" = "dev-rdtsc"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --enable-debug --with-rdtsc
+
 elif test "$1" = "dev-ev"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --enable-debug --with-ev
+
 elif test "$1" = "dev-ev-memdebug"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include -DDO_MEMDEBUG"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --enable-debug --with-ev
+
 elif test "$1" = "dev-ndebug"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME
+
 elif test "$1" = "dev-ndebug-rdtsc"
 then
     export LDFLAGS="${LDFLAGS} -L$HOME/lib"
     export CFLAGS="${CFLAGS} -I$HOME/include"
-    autoreconf
+    autoreconf --force
     ./configure --prefix=$HOME --with-rdtsc
+
+elif test "$1" = "dev-ndebug-static"
+then
+    export LDFLAGS="${LDFLAGS} -L$HOME/lib -L/usr/local/lib"
+    export CFLAGS="${CFLAGS} -I$HOME/include -I/usr/local/include"
+    autoreconf --force
+    ./configure --prefix=$HOME --enable-allstatic --enable-lto
+
 elif test "$1" = "dist"
 then
     unset LDFLAGS
@@ -76,5 +92,5 @@ then
         fi
     done
 else
-    echo "`basename $0` {init|dev|dist|dev-ndebug|dev-rdtsc}"
+    echo "`basename $0` {init|dev|dist|dev-ndebug|dev-rdtsc|dev-ndebug-static}"
 fi

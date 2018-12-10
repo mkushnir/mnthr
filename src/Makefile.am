@@ -26,10 +26,22 @@ nobase_include_HEADERS = mrkthr.h
 libmrkthr_la_SOURCES = mrkthr.c poller.c $(ls_platform) bytestream_helper.c
 nodist_libmrkthr_la_SOURCES = diag.c
 
+DEBUG_LD_FLAGS =
 if DEBUG
-DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
+DEBUG_CC_FLAGS = -g -O0 @CC_DEBUG@
+DEBUG_LD_FLAGS += -no-install
 else
-DEBUG_FLAGS = -DNDEBUG -O3
+DEBUG_CC_FLAGS = -DNDEBUG -O3 -fomit-frame-pointer
+if LTO
+DEBUG_CC_FLAGS += @CC_LTO@
+DEBUG_LD_FLAGS += @LD_LTO@
+endif
+endif
+
+if ALLSTATIC
+libmrkthr_la_LDFLAGS = -all-static
+else
+libmrkthr_la_LDFLAGS =
 endif
 
 if RDTSC
@@ -38,9 +50,10 @@ else
 RDTSC_FLAGS =
 endif
 
-libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_FLAGS) $(PLATFORM_FLAGS) -Wall -Wextra -Werror -std=c99 @MRKCOMMON_LOCAL_CFLAGS@ @LIBEV_CFLAGS@ @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
+libmrkthr_la_CFLAGS = $(RDTSC_FLAGS) $(DEBUG_CC_FLAGS) $(PLATFORM_FLAGS) -Wall -Wextra -Werror -std=c99 @MRKCOMMON_LOCAL_CFLAGS@ @LIBEV_CFLAGS@ @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
-libmrkthr_la_LDFLAGS = -version-info 0:0:0 -L$(libdir) -lmrkcommon -lmndiag @MRKCOMMON_LOCAL_LDFLAGS@ @LIBEV_LDFLAGS@
+libmrkthr_la_LDFLAGS += -version-info 0:0:0 -L$(libdir) @MRKCOMMON_LOCAL_LDFLAGS@ @LIBEV_LDFLAGS@
+libmrkthr_la_LIBADD = -lmrkcommon -lmndiag
 
 diag.c diag.h: $(diags)
 	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -v -S diag.txt.tmp -L mrkthr -H diag.h -C diag.c *.[ch]

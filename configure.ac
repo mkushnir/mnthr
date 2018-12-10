@@ -1,66 +1,63 @@
 AC_INIT(mrkthr, 0.1, markiyan.kushnir@gmail.com)
-if test -n "$USE_GCC"
-then
-    if test "$USE_GCC" = "46" && which gcc46
-    then
-        CC="gcc46"
-        CXX="c++46"
+
+AS_IF([test -n "$USE_GCC"],
+[
+    probe="gcc${USE_GCC}"
+    AS_IF([which $probe >/dev/null],
+    [
+        CC="gcc${USE_GCC}"
+        CXX="c++${USE_GCC}"
         CPP="cpp"
-    else
-        if which gcc
-        then
+    ],
+    [
+        AS_IF([which gcc >/dev/null],
+        [
             CC="gcc"
             CXX="g++"
             CPP="cpp"
-        else
+        ],
+        [
             echo "Cannot find gcc"
             exit 1
-        fi
-    fi
-    AC_SUBST(CLANG_DEBUG, [''])
-else
-    if which clang >/dev/null
-    then
+        ])
+    ])
+    AC_SUBST(CC_DEBUG, ['-ftrapv'])
+],
+[
+    AS_IF([which clang >/dev/null],
+    [
         CC="clang -Qunused-arguments -fcolor-diagnostics"
         CXX="clang++ -Qunused-arguments -fcolor-diagnostics"
         CPP="clang-cpp"
         clang_version=`clang --version | grep version | awk '{print $4;}'`
         clang_version_mjr=`echo $clang_version | awk -F. '{print $1;}'`
         clang_version_mnr=`echo $clang_version | awk -F. '{print $2;}'`
-        if test "$clang_version_mjr" = "3" -a "$clang_version_mnr" -lt 3
-        then
-            AC_SUBST(CLANG_DEBUG, ['-ftrapv -fcatch-undefined-behavior'])
-        else
-            # we assume all others are 3.3+
-            AC_SUBST(CLANG_DEBUG, ['-fsanitize=undefined-trap -fsanitize-undefined-trap-on-error'])
-        fi
-    else
+        AS_IF([test "$clang_version_mjr" = "3" -a "$clang_version_mnr" -lt 3],
+            [AC_SUBST(CC_DEBUG, ['-ftrapv -fcatch-undefined-behavior'])],
+            [AC_SUBST(CC_DEBUG, ['-fsanitize=undefined-trap -fsanitize-undefined-trap-on-error -fno-sanitize=alignment'])])
+        AC_SUBST(CC_LTO, ['-flto'])
+        AC_SUBST(LD_LTO, ['-Wl,--lto-O3'])
+    ],
+    [
         CC="cc"
         CXX="c++"
         CPP="cpp"
-        AC_SUBST(CLANG_DEBUG, [''])
-    fi
-fi
+        AC_SUBST(CC_DEBUG, ['-ftrapv'])
+    ])
+])
 
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
-case "$target_os" in
-    *linux*)
-        AC_SUBST(_GNU_SOURCE_MACRO, ['-D_GNU_SOURCE'])
-    ;;
-    *)
-        AC_SUBST(_GNU_SOURCE_MACRO)
-    ;;
-esac
 
-case "$target_os" in
-    *darwin*)
-        AC_SUBST(_XOPEN_SOURCE_MACRO, ['-D_XOPEN_SOURCE'])
-    ;;
-    *)
-        AC_SUBST(_XOPEN_SOURCE_MACRO)
-    ;;
-esac
+AS_CASE(["$target_os"],
+    [*linux*], [AC_SUBST(_GNU_SOURCE_MACRO, ['-D_GNU_SOURCE'])],
+    [AC_SUBST(_GNU_SOURCE_MACRO)]
+)
+
+AS_CASE(["$target_os"],
+    [*darwin*], [AC_SUBST(_XOPEN_SOURCE_MACRO, ['-D_XOPEN_SOURCE'])],
+    [AC_SUBST(_XOPEN_SOURCE_MACRO)]
+)
 
 AC_PREREQ
 
@@ -128,9 +125,25 @@ AC_SUBST(MRKCOMMON_LOCAL_LDFLAGS, [''])
 
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--enable-debug],
-                             [Enable debug build (default=no)]),
-              [AM_CONDITIONAL([DEBUG], [enable_debug=yes])],
-              [AM_CONDITIONAL([DEBUG], [test "$enable_debug" = "yes"])])
+                             [Enable debug build (default=no)]))
+
+AM_CONDITIONAL([DEBUG], [test "$enable_debug" = "yes"])
+
+AC_ARG_ENABLE(allstatic,
+              AC_HELP_STRING([--enable-allstatic],
+                             [Enable all static build (default=no)]),
+              [AC_MSG_NOTICE([Will build statically])],
+              [AC_MSG_NOTICE([Will not build statically])])
+
+AM_CONDITIONAL([ALLSTATIC], [test "$enable_allstatic" = "yes"])
+
+AC_ARG_ENABLE(lto,
+              AC_HELP_STRING([--enable-lto],
+                             [Enable all static build (default=no)]),
+              [AC_MSG_NOTICE([Will enable LTO])],
+              [AC_MSG_NOTICE([Will not enable LTO])])
+
+AM_CONDITIONAL([LTO], [test "$enable_lto" = "yes"])
 
 AC_ARG_WITH(rdtsc,
             AC_HELP_STRING([--with-rdtsc],
@@ -140,9 +153,9 @@ AC_ARG_WITH(rdtsc,
 
 AC_LANG(C)
 
-if test "$with_rdtsc" = "yes"
-then
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+
+AS_IF([test "$with_rdtsc" = "yes"],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 static inline unsigned long long
 rdtsc(void)
 {
@@ -153,8 +166,8 @@ rdtsc(void)
                     : "%rcx", "%rdx"
                    );
   return res;
-} ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))
-fi
+} ]], [[rdtsc();]])], [AC_MSG_RESULT(checking for RDTSC... yes)], AC_MSG_FAILURE([rdtsc instruction is not supported by your CPU]))])
+
 
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/param.h> /* PAGE_SIZE */
@@ -169,31 +182,23 @@ char x[PAGE_SIZE];
 ]], [
 ])], [AC_DEFINE([HAVE_PAGE_SIZE_CONSTANT], [], [Define if PAGE_SIZE is a constant value])], [])
 
-if echo $build_os | grep linux >/dev/null
-then
-   with_ev=yes
-   AM_CONDITIONAL([USE_EV], [true])
-else
-   AC_ARG_WITH(ev,
-               AC_HELP_STRING([--with-ev],
-                              [Use libev (default=no)]),
-               [AM_CONDITIONAL([USE_EV], [with_ev=yes])],
-               [AM_CONDITIONAL([USE_EV], [test "$with_ev" = "yes"])])
-    
-fi
+
+AS_IF([echo $build_os | grep linux >/dev/null],
+    [with_ev=yes
+     AM_CONDITIONAL([USE_EV], [true])],
+    [AC_ARG_WITH(ev,
+                 AC_HELP_STRING([--with-ev],
+                                [Use libev (default=no)]),
+                 [AM_CONDITIONAL([USE_EV], [with_ev=yes])],
+                 [AM_CONDITIONAL([USE_EV], [test "$with_ev" = "yes"])])])
 
 
-
-
-if test "$with_ev" = "yes"
-then
-    #AC_CHECK_LIB(ev, ev_run, [], [AC_MSG_FAILURE(libev.so is required.)])
-    AC_SUBST(LIBEV_CFLAGS, [''])
-    AC_SUBST(LIBEV_LDFLAGS, ['-lev'])
-else
-    AC_SUBST(LIBEV_CFLAGS, [''])
-    AC_SUBST(LIBEV_LDFLAGS, [''])
-fi
+AS_IF([test "$with_ev" = "yes"],
+    [#AC_CHECK_LIB(ev, ev_run, [], [AC_MSG_FAILURE(libev.so is required.)])
+     AC_SUBST(LIBEV_CFLAGS, [''])
+     AC_SUBST(LIBEV_LDFLAGS, ['-lev'])],
+    [AC_SUBST(LIBEV_CFLAGS, [''])
+     AC_SUBST(LIBEV_LDFLAGS, [''])])
 
 #AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 

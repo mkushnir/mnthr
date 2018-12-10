@@ -10,10 +10,20 @@ noinst_HEADERS = unittest.h
 diags = ../src/diag.txt
 BUILT_SOURCES = diag.c diag.h
 
+DEBUG_LD_FLAGS =
 if DEBUG
-DEBUG_FLAGS = -g -O0 @CLANG_DEBUG@
+DEBUG_CC_FLAGS = -g -O0 @CC_DEBUG@
+DEBUG_LD_FLAGS += -no-install
 else
-DEBUG_FLAGS = -DNDEBUG -O3
+DEBUG_CC_FLAGS = -DNDEBUG -O3 -fomit-frame-pointer
+if LTO
+DEBUG_CC_FLAGS += @CC_LTO@
+DEBUG_LD_FLAGS += @LD_LTO@
+endif
+endif
+
+if ALLSTATIC
+LDFLAGS += -all-static
 endif
 
 if RDTSC
@@ -22,17 +32,9 @@ else
 RDTSC_FLAGS =
 endif
 
-if USE_EV
-dh_platform=
-ls_platform= ../src/ev_poller.c
-else
-dh_platform= ../src/kevent_util.h
-ls_platform= ../src/kevent_poller.c ../src/kevent_util.c
-endif
+common_cflags = $(RDTSC_FLAGS) $(DEBUG_CC_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
-common_cflags = $(RDTSC_FLAGS) $(DEBUG_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
-
-common_ldflags = -L$(libdir) -lmrkthr -lmrkcommon -lmndiag
+common_ldflags = $(DEBUG_LD_FLAGS) -L$(libdir) -lmrkthr -lmrkcommon -lmndiag
 
 nodist_testco_SOURCES = diag.c
 testco_SOURCES = testco.c
