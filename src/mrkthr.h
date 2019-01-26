@@ -214,6 +214,7 @@ MRKTHR_CPOINT int mrkthr_accept_all2(int, mrkthr_socket_t **, off_t *);
 MRKTHR_CPOINT int mrkthr_read_all(int, char **, off_t *);
 MRKTHR_CPOINT ssize_t mrkthr_read_allb(int, char *, ssize_t);
 MRKTHR_CPOINT ssize_t mrkthr_read_allb_et(int, char *, ssize_t);
+MRKTHR_CPOINT ssize_t mrkthr_recv_allb(int, char *, ssize_t, int);
 MRKTHR_CPOINT ssize_t mrkthr_recvfrom_allb(int,
                                           void * restrict,
                                           ssize_t,
@@ -223,6 +224,7 @@ MRKTHR_CPOINT ssize_t mrkthr_recvfrom_allb(int,
 MRKTHR_CPOINT ssize_t mrkthr_get_wbuflen(int);
 MRKTHR_CPOINT int mrkthr_write_all(int, const char *, size_t);
 MRKTHR_CPOINT int mrkthr_write_all_et(int, const char *, size_t);
+MRKTHR_CPOINT int mrkthr_send_all(int, const char *, size_t, int);
 MRKTHR_CPOINT int mrkthr_sendto_all(int,
                                    const void *,
                                    size_t,

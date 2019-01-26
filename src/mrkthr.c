@@ -1968,6 +1968,36 @@ mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
 }
 
 
+ssize_t
+mrkthr_recv_allb(int fd, char *buf, ssize_t sz, int flags)
+{
+    ssize_t navail;
+    ssize_t nread;
+
+    assert(me != NULL);
+    assert(sz >= 0);
+
+    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
+        return -1;
+    }
+
+    sz = MIN(navail, sz);
+
+    if ((nread = recv(fd, buf, (size_t)sz, flags)) == -1) {
+        perror("recv");
+        return -1;
+    }
+
+    if (nread < sz) {
+        //TRACE("nread=%ld sz=%ld", nread, sz);
+        if (nread == 0) {
+            return -1;
+        }
+    }
+    return nread;
+}
+
+
 /**
  * Perform a single recvfrom from fd into buf.
  * Return the number of bytes received or -1 in case of error.
@@ -2058,6 +2088,32 @@ mrkthr_write_all_et(int fd, const char *buf, size_t len)
 
         }
 
+        remaining -= nwritten;
+    }
+    return 0;
+}
+
+
+int
+mrkthr_send_all(int fd, const char *buf, size_t len, int flags)
+{
+    ssize_t navail;
+    ssize_t nwritten;
+    off_t remaining = len;
+
+    assert(me != NULL);
+
+    while (remaining > 0) {
+        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MRKTHR_WRITE_ALL + 1);
+        }
+
+        if ((nwritten = send(fd, buf + len - remaining,
+                              MIN(navail, remaining),
+                              flags)) == -1) {
+
+            TRRET(MRKTHR_WRITE_ALL + 2);
+        }
         remaining -= nwritten;
     }
     return 0;
