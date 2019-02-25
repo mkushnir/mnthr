@@ -1,4 +1,3 @@
-AUTOMAKE_OPTIONS = foreign
 AM_MAKEFLAGS = -s
 
 if USE_EV

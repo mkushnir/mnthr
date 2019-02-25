@@ -46,6 +46,11 @@ AS_IF([test -n "$USE_GCC"],
     ])
 ])
 
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([.ac-aux])
+AC_CONFIG_FILES([Makefile src/Makefile man/Makefile test/Makefile])
+AC_CONFIG_HEADERS(config.h)
+
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
@@ -64,17 +69,13 @@ AC_PREREQ
 AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_AR
-AC_PROG_RANLIB
 AC_PROG_INSTALL
 
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 LT_INIT
-AM_INIT_AUTOMAKE
 AM_SILENT_RULES([yes])
 
 dnl AM_MAINTAINER_MODE
-
-AC_CONFIG_FILES([Makefile src/Makefile man/Makefile test/Makefile])
-AC_CONFIG_HEADERS(config.h)
 
 AC_CHECK_HEADER_STDBOOL
 
