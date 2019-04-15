@@ -590,6 +590,13 @@ mrkthr_shutdown(void)
 }
 
 
+bool
+mrkthr_shutting_down(void)
+{
+    return (bool)(mrkthr_flags & CO_FLAG_SHUTDOWN);
+}
+
+
 size_t
 mrkthr_compact_sleepq(size_t threshold)
 {
