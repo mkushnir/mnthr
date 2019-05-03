@@ -87,11 +87,11 @@ run11(UNUSED int argc, void **argv)
     sport = bytes_printf("%d", port);
     offset = 0;
 
-    if ((sock = mrkthr_socket_connect(host, (char *)BDATA(sport), AF_INET)) == -1) {
+    if ((sock = mrkthr_socket_connect(host, BCDATA(sport), AF_INET)) == -1) {
         goto err;
     }
 
-    if ((fd = open((char *)BDATA(fpath), O_RDONLY)) == -1) {
+    if ((fd = open(BCDATA(fpath), O_RDONLY)) == -1) {
         goto err;
     }
     if (fstat(fd, &sb) != 0) {
@@ -134,7 +134,7 @@ run01(UNUSED int argc, UNUSED void **argv)
     res = 0;
     sport = bytes_printf("%d", port);
 
-    if ((fd = mrkthr_socket_bind(host, (char *)BDATA(sport), AF_INET)) == -1) {
+    if ((fd = mrkthr_socket_bind(host, BCDATA(sport), AF_INET)) == -1) {
         goto err;
     }
 
