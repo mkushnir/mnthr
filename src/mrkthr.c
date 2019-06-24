@@ -780,7 +780,7 @@ mrkthr_ctx_fini(mrkthr_ctx_t **pctx)
 
 
 /* Ugly hack to work around -Wclobbered, a part of -Wextra in gcc */
-#ifdef __GNUC__
+#ifdef __GCC__
 static int
 _getcontext(ucontext_t *ucp)
 {
