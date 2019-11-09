@@ -12,7 +12,7 @@ BUILT_SOURCES = diag.c diag.h
 DEBUG_LD_FLAGS =
 if DEBUG
 DEBUG_CC_FLAGS = -g -O0 @CC_DEBUG@
-DEBUG_LD_FLAGS += -no-install
+DEBUG_LD_FLAGS += @LIBTOOL_NO_INSTALL@
 else
 DEBUG_CC_FLAGS = -DNDEBUG -O3 -fomit-frame-pointer
 if LTO

@@ -679,7 +679,7 @@ mrkthr_loop(void)
         array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
 #endif
 
-        if (kevents0.elnum != 0 || event_count != 0) {
+        if (ARRAY_ELNUM(&kevents0) != 0 || event_count != 0) {
             event_max = MAX(event_max, event_count);
 #ifdef TRACE_VERBOSE
             struct kevent *tmp;
@@ -690,19 +690,19 @@ mrkthr_loop(void)
              *
              * Upon return from kevent(), kevres holds the number of
              * "valid" entries in  kevents1 which is always less than or
-             * equal to kevents1.elnum.
+             * equal to ARRAY_ELNUM(&kevents1).
              */
             if (array_ensure_len_dirty(&kevents1, event_max, 0) != 0) {
                 FAIL("array_ensure_len");
             }
 
             kevres = kevent(q0,
-                            kevents0.data, kevents0.elnum,
-                            kevents1.data, kevents1.elnum,
+                            ARRAY_DATA(&kevents0), ARRAY_ELNUM(&kevents0),
+                            ARRAY_DATA(&kevents1), ARRAY_ELNUM(&kevents1),
                             tmout);
 
 #ifdef TRACE_VERBOSE
-            CTRACE(FRED("...kevres=%d kevents0.elnum=%ld event_count=%ld"), kevres, kevents0.elnum, event_count);
+            CTRACE(FRED("...kevres=%d kevents0.elnum=%ld event_count=%ld"), kevres, ARRAY_ELNUM(&kevents0), event_count);
             for (tmp = array_first(&kevents1, &it);
                  tmp != NULL && (int)it.iter < kevres;
                  tmp = array_next(&kevents1, &it)) {

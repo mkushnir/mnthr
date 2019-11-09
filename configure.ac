@@ -59,9 +59,15 @@ AS_CASE(["$target_os"],
     [AC_SUBST(_GNU_SOURCE_MACRO)]
 )
 
-AS_CASE(["$target_os"],
-    [*darwin*], [AC_SUBST(_XOPEN_SOURCE_MACRO, ['-D_XOPEN_SOURCE'])],
-    [AC_SUBST(_XOPEN_SOURCE_MACRO)]
+AS_CASE(["$target_os"], [*darwin*],
+    [
+     AC_SUBST(_XOPEN_SOURCE_MACRO, ['-D_XOPEN_SOURCE'])
+     AC_SUBST(LIBTOOL_NO_INSTALL, ['-no-fast-install'])
+    ],
+    [
+     AC_SUBST(_XOPEN_SOURCE_MACRO)
+     AC_SUBST(LIBTOOL_NO_INSTALL, ['-no-install'])
+    ]
 )
 
 AC_PREREQ
