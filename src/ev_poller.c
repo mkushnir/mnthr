@@ -267,15 +267,15 @@ ev_item_fini(ev_item_t *key, UNUSED void *v)
 static ev_item_t *
 ev_io_item_get(int fd, int event)
 {
-    ev_item_t probe, *ev;
+    ev_item_t *ev;
     mnhash_item_t *dit;
 
-    probe.ev.io.fd = fd;
-    probe.ev.io.events = event;
-    probe.hash = 0;
-    probe.ty = EV_TYPE_IO;
-
-    if ((dit = hash_get_item(&events, &probe)) == NULL) {
+    if ((dit = hash_get_item(&events, &(ev_item_t){
+                        .ev.io.fd = fd,
+                        .ev.io.events = event,
+                        .hash = 0,
+                        .ty = EV_TYPE_IO,
+                    })) == NULL) {
         ev = ev_item_new_io(fd, event);
         hash_set_item(&events, ev, NULL);
     } else {
