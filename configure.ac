@@ -1,4 +1,4 @@
-AC_INIT(mrkthr, 0.1, markiyan.kushnir@gmail.com)
+AC_INIT(mnthr, 0.1, markiyan.kushnir@gmail.com)
 
 AS_IF([test -n "$USE_GCC"],
 [
@@ -127,8 +127,8 @@ AC_COMPILE_IFELSE(
 
 AC_PRESERVE_HELP_ORDER
 
-AC_SUBST(MRKCOMMON_LOCAL_CFLAGS, [''])
-AC_SUBST(MRKCOMMON_LOCAL_LDFLAGS, [''])
+AC_SUBST(MNCOMMON_LOCAL_CFLAGS, [''])
+AC_SUBST(MNCOMMON_LOCAL_LDFLAGS, [''])
 
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--enable-debug],
@@ -207,6 +207,6 @@ AS_IF([test "$with_ev" = "yes"],
     [AC_SUBST(LIBEV_CFLAGS, [''])
      AC_SUBST(LIBEV_LDFLAGS, [''])])
 
-#AC_CHECK_LIB(mrkcommon, _fini, [], [AC_MSG_FAILURE(libmrkcommon.so is required.)]) 
+#AC_CHECK_LIB(mncommon, _fini, [], [AC_MSG_FAILURE(libmncommon.so is required.)]) 
 AC_CHECK_LIB(m, modfl, [], [AC_MSG_FAILURE(libm.so is required.)]) 
 AC_OUTPUT

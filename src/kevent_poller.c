@@ -8,29 +8,29 @@
 #include <sys/sysctl.h>
 
 #define NO_PROFILE
-#include <mrkcommon/profile.h>
+#include <mncommon/profile.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr_kevent_poller);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnthr_kevent_poller);
 #endif
 
-#include <mrkcommon/array.h>
+#include <mncommon/array.h>
 /* Experimental trie use */
-#include <mrkcommon/btrie.h>
+#include <mncommon/btrie.h>
 
-#include "mrkthr_private.h"
+#include "mnthr_private.h"
 
 //#define TRACE_VERBOSE
 #include "diag.h"
-#include <mrkcommon/dumpm.h>
+#include <mncommon/dumpm.h>
 
 #include <kevent_util.h>
 
-extern const profile_t *mrkthr_user_p;
-extern const profile_t *mrkthr_swap_p;
-extern const profile_t *mrkthr_sched0_p;
-extern const profile_t *mrkthr_sched1_p;
+extern const profile_t *mnthr_user_p;
+extern const profile_t *mnthr_swap_p;
+extern const profile_t *mnthr_sched0_p;
+extern const profile_t *mnthr_sched1_p;
 
 /**
  *
@@ -194,7 +194,7 @@ poller_ticks_absolute(uint64_t ticks)
 
 
 uint64_t
-mrkthr_msec2ticks(uint64_t msec)
+mnthr_msec2ticks(uint64_t msec)
 {
 #ifdef USE_TSC
     return ((long double)msec / 1000. * (long double)timecounter_freq);
@@ -205,28 +205,28 @@ mrkthr_msec2ticks(uint64_t msec)
 
 
 long double
-mrkthr_ticks2sec(uint64_t ticks)
+mnthr_ticks2sec(uint64_t ticks)
 {
     return (long double)ticks / (long double)timecounter_freq;
 }
 
 
 long double
-mrkthr_ticksdiff2sec(int64_t ticks)
+mnthr_ticksdiff2sec(int64_t ticks)
 {
     return (long double)ticks / (long double)timecounter_freq;
 }
 
 
 uint64_t
-mrkthr_get_now_nsec(void)
+mnthr_get_now_nsec(void)
 {
     return nsec_now;
 }
 
 
 uint64_t
-mrkthr_get_now_nsec_precise(void)
+mnthr_get_now_nsec_precise(void)
 {
     update_now();
     return nsec_now;
@@ -234,14 +234,14 @@ mrkthr_get_now_nsec_precise(void)
 
 
 uint64_t
-mrkthr_get_now_ticks(void)
+mnthr_get_now_ticks(void)
 {
     return timecounter_now;
 }
 
 
 uint64_t
-mrkthr_get_now_ticks_precise(void)
+mnthr_get_now_ticks_precise(void)
 {
     update_now();
     return timecounter_now;
@@ -284,7 +284,7 @@ new_event(int fd, int filter, int flags, int fflags, intptr_t data, void *udata)
  * Schedule an event to be discarded from the kqueue.
  */
 static int
-discard_event(int fd, int filter, mrkthr_ctx_t *ctx)
+discard_event(int fd, int filter, mnthr_ctx_t *ctx)
 {
     UNUSED struct kevent *kev;
     kev = new_event(fd, filter, EV_DELETE, 0, 0, ctx);
@@ -297,14 +297,14 @@ discard_event(int fd, int filter, mrkthr_ctx_t *ctx)
  * Remove an event from the kevents array.
  */
 void
-poller_clear_event(mrkthr_ctx_t *ctx)
+poller_clear_event(mnthr_ctx_t *ctx)
 {
     if (ctx->pdata.kev.ident != -1) {
         if (ctx->co.state & (CO_STATE_READ | CO_STATE_WRITE)) {
             discard_event(ctx->pdata.kev.ident, ctx->pdata.kev.filter, ctx);
         } else if (ctx->co.state == CO_STATE_OTHER_POLLER) {
             /*
-             * special case for mrkthr_wait_for_event()
+             * special case for mnthr_wait_for_event()
              */
             discard_event(ctx->pdata.kev.ident, EVFILT_READ, ctx);
             discard_event(ctx->pdata.kev.ident, EVFILT_WRITE, ctx);
@@ -313,11 +313,11 @@ poller_clear_event(mrkthr_ctx_t *ctx)
 }
 
 
-mrkthr_stat_t *
-mrkthr_stat_new(const char *path)
+mnthr_stat_t *
+mnthr_stat_new(const char *path)
 {
-    mrkthr_stat_t *res;
-    if ((res = malloc(sizeof(mrkthr_stat_t))) == NULL) {
+    mnthr_stat_t *res;
+    if ((res = malloc(sizeof(mnthr_stat_t))) == NULL) {
         FAIL("malloc");
     }
     res->path = strdup(path);
@@ -336,7 +336,7 @@ err:
 
 
 void
-mrkthr_stat_destroy(mrkthr_stat_t **st)
+mnthr_stat_destroy(mnthr_stat_t **st)
 {
     if (*st != NULL) {
         if ((*st)->path != NULL) {
@@ -353,7 +353,7 @@ mrkthr_stat_destroy(mrkthr_stat_t **st)
 
 
 int
-mrkthr_stat_wait(mrkthr_stat_t *st)
+mnthr_stat_wait(mnthr_stat_t *st)
 {
     int res;
     struct kevent *kev;
@@ -385,23 +385,23 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
             FAIL("result_event");
         }
-        poller_mrkthr_ctx_init(me);
+        poller_mnthr_ctx_init(me);
         res = 0;
         if (kev->fflags & (NOTE_DELETE | NOTE_RENAME)) {
-            res |= MRKTHR_ST_DELETE;
+            res |= MNTHR_ST_DELETE;
         }
         if (kev->fflags & (NOTE_WRITE | NOTE_EXTEND)) {
-            res |= MRKTHR_ST_WRITE;
+            res |= MNTHR_ST_WRITE;
         }
         if (kev->fflags & (NOTE_ATTRIB | NOTE_REVOKE)) {
-            res |= MRKTHR_ST_ATTRIB;
+            res |= MNTHR_ST_ATTRIB;
         }
     }
 
@@ -409,15 +409,15 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
 }
 
 
-#define MRKTHR_EVFILT_RW_FLAGS EV_ADD|EV_ENABLE
+#define MNTHR_EVFILT_RW_FLAGS EV_ADD|EV_ENABLE
 
 ssize_t
-mrkthr_get_rbuflen(int fd)
+mnthr_get_rbuflen(int fd)
 {
     int res;
     struct kevent *kev;
 
-    kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    kev = new_event(fd, EVFILT_READ, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
 
     me->pdata.kev.ident = fd;
@@ -434,14 +434,14 @@ mrkthr_get_rbuflen(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
             FAIL("result_event");
         }
-        poller_mrkthr_ctx_init(me);
+        poller_mnthr_ctx_init(me);
         res = (ssize_t)kev->data;
     }
 
@@ -450,12 +450,12 @@ mrkthr_get_rbuflen(int fd)
 
 
 int
-mrkthr_wait_for_read(int fd)
+mnthr_wait_for_read(int fd)
 {
     int res;
     struct kevent *kev;
 
-    kev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    kev = new_event(fd, EVFILT_READ, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
 
     me->pdata.kev.ident = fd;
@@ -472,14 +472,14 @@ mrkthr_wait_for_read(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
             FAIL("result_event");
         }
-        poller_mrkthr_ctx_init(me);
+        poller_mnthr_ctx_init(me);
         res = 0;
     }
 
@@ -488,12 +488,12 @@ mrkthr_wait_for_read(int fd)
 
 
 ssize_t
-mrkthr_get_wbuflen(int fd)
+mnthr_get_wbuflen(int fd)
 {
     int res;
     struct kevent *kev;
 
-    kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    kev = new_event(fd, EVFILT_WRITE, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
 
     me->pdata.kev.ident = fd;
@@ -511,15 +511,15 @@ mrkthr_get_wbuflen(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
             FAIL("result_event");
         }
-        poller_mrkthr_ctx_init(me);
-        res = (ssize_t)(kev->data ? kev->data : MRKTHR_DEFAULT_WBUFLEN);
+        poller_mnthr_ctx_init(me);
+        res = (ssize_t)(kev->data ? kev->data : MNTHR_DEFAULT_WBUFLEN);
     }
 
     return res;
@@ -527,12 +527,12 @@ mrkthr_get_wbuflen(int fd)
 
 
 int
-mrkthr_wait_for_write(int fd)
+mnthr_wait_for_write(int fd)
 {
     int res;
     struct kevent *kev;
 
-    kev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    kev = new_event(fd, EVFILT_WRITE, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
 
     me->pdata.kev.ident = fd;
@@ -550,14 +550,14 @@ mrkthr_wait_for_write(int fd)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         if ((kev = result_event(me->pdata.kev.idx)) == NULL) {
             FAIL("result_event");
         }
-        poller_mrkthr_ctx_init(me);
+        poller_mnthr_ctx_init(me);
         res = 0;
     }
 
@@ -566,14 +566,14 @@ mrkthr_wait_for_write(int fd)
 
 
 int
-mrkthr_wait_for_events(int fd, int *events)
+mnthr_wait_for_events(int fd, int *events)
 {
     int res;
     UNUSED struct kevent *rkev, *wkev;
 
-    rkev = new_event(fd, EVFILT_READ, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    rkev = new_event(fd, EVFILT_READ, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
-    wkev = new_event(fd, EVFILT_WRITE, MRKTHR_EVFILT_RW_FLAGS, 0, 0, me);
+    wkev = new_event(fd, EVFILT_WRITE, MNTHR_EVFILT_RW_FLAGS, 0, 0, me);
     ++event_count;
 
     me->pdata.kev.ident = fd;
@@ -591,12 +591,12 @@ mrkthr_wait_for_events(int fd, int *events)
         /*
          * we haven't got to kevent() call
          */
-        me->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+        me->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
         res = -1;
 
     } else {
         *events = me->pdata.kev.filter; /* special case */
-        poller_mrkthr_ctx_init(me);
+        poller_mnthr_ctx_init(me);
         res = 0;
     }
 
@@ -612,18 +612,18 @@ mrkthr_wait_for_events(int fd, int *events)
  *
  */
 int
-mrkthr_loop(void)
+mnthr_loop(void)
 {
     int kevres = 0;
     struct kevent *kev = NULL;
     struct timespec timeout, *tmout;
     mnarray_iter_t it;
 
-    PROFILE_START(mrkthr_sched0_p);
+    PROFILE_START(mnthr_sched0_p);
 
-    while (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
+    while (!(mnthr_flags & CO_FLAG_SHUTDOWN)) {
         mnbtrie_node_t *trn;
-        mrkthr_ctx_t *ctx = NULL;
+        mnthr_ctx_t *ctx = NULL;
         //sleep(1);
         update_now();
 
@@ -764,14 +764,14 @@ mrkthr_loop(void)
                      */
 #ifdef TRACE_VERBOSE
                     //CTRACE("Processing:");
-                    //mrkthr_dump(ctx);
+                    //mnthr_dump(ctx);
 #endif
                     if (kev->flags & EV_ERROR) {
                         /*
                          * do not tell kqueue to discard event, let the thread get away
                          * with it
                          */
-                        corc = MRKTHR_CO_RC_POLLER;
+                        corc = MNTHR_CO_RC_POLLER;
                     } else {
                         discard_event(kev->ident, kev->filter, ctx);
                         corc = 0;
@@ -779,19 +779,19 @@ mrkthr_loop(void)
                     if (ctx != NULL) {
                         if (ctx->co.state == CO_STATE_OTHER_POLLER) {
                             /*
-                             * special case for mrkthr_wait_for_event(),
+                             * special case for mnthr_wait_for_event(),
                              * defer resume
                              */
                             ctx->pdata.kev.idx = -1;
                             if (kev->filter == EVFILT_READ) {
                                 ctx->pdata.kev.filter |=
-                                    MRKTHR_WAIT_EVENT_READ;
+                                    MNTHR_WAIT_EVENT_READ;
                             } else if (kev->filter == EVFILT_WRITE) {
                                 ctx->pdata.kev.filter |=
-                                    MRKTHR_WAIT_EVENT_WRITE;
+                                    MNTHR_WAIT_EVENT_WRITE;
                             } else {
                                 /**/
-                                FAIL("mrkthr_loop");
+                                FAIL("mnthr_loop");
                             }
                             set_resume_fast(ctx);
 
@@ -859,14 +859,14 @@ mrkthr_loop(void)
         }
     }
 
-    PROFILE_STOP(mrkthr_sched0_p);
-    CTRACE("exiting mrkthr_loop ...");
+    PROFILE_STOP(mnthr_sched0_p);
+    CTRACE("exiting mnthr_loop ...");
     return kevres;
 }
 
 
 void
-poller_mrkthr_ctx_init(struct _mrkthr_ctx *ctx)
+poller_mnthr_ctx_init(struct _mnthr_ctx *ctx)
 {
     ctx->pdata.kev.ident = -1;
     ctx->pdata.kev.filter = 0;

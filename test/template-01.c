@@ -11,9 +11,9 @@
 #   include <malloc.h>
 #endif
 
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
-#include <mrkthr.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
+#include <mnthr.h>
 
 #include "diag.h"
 
@@ -72,7 +72,7 @@ UNUSED
 static void
 myinfo(UNUSED int sig)
 {
-    mrkthr_dump_all_ctxes();
+    mnthr_dump_all_ctxes();
 }
 
 
@@ -211,10 +211,10 @@ main(int argc, char **argv)
         //daemon_ize();
     }
 
-    (void)mrkthr_init();
-    (void)MRKTHR_SPAWN("run0", run0, argc, argv);
-    (void)mrkthr_loop();
-    (void)mrkthr_fini();
+    (void)mnthr_init();
+    (void)MNTHR_SPAWN("run0", run0, argc, argv);
+    (void)mnthr_loop();
+    (void)mnthr_fini();
 
 end:
 

@@ -5,7 +5,7 @@
 #include <sys/event.h>
 #include <sys/time.h>
 
-#include "mrkcommon/dumpm.h"
+#include "mncommon/dumpm.h"
 
 #ifdef __cplusplus
 extern "C" {

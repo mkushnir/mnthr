@@ -10,12 +10,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <mrkcommon/array.h>
-#include <mrkcommon/bytes.h>
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
+#include <mncommon/array.h>
+#include <mncommon/bytes.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
 
-#include <mrkthr.h>
+#include <mnthr.h>
 
 #define TSF_MODE_SERVER 0
 #define TSF_MODE_CLIENT 1
@@ -55,7 +55,7 @@ run10(UNUSED int argc, void **argv)
         ssize_t nread;
         char buf[1024];
 
-        if ((nread = mrkthr_read_allb(fd, buf, sizeof(buf))) <= 0) {
+        if ((nread = mnthr_read_allb(fd, buf, sizeof(buf))) <= 0) {
             break;
         }
         total += nread;
@@ -87,7 +87,7 @@ run11(UNUSED int argc, void **argv)
     sport = bytes_printf("%d", port);
     offset = 0;
 
-    if ((sock = mrkthr_socket_connect(host, BCDATA(sport), AF_INET)) == -1) {
+    if ((sock = mnthr_socket_connect(host, BCDATA(sport), AF_INET)) == -1) {
         goto err;
     }
 
@@ -98,7 +98,7 @@ run11(UNUSED int argc, void **argv)
         goto err;
     }
 
-    if (mrkthr_sendfile(fd, sock, &offset, sb.st_size) != 0) {
+    if (mnthr_sendfile(fd, sock, &offset, sb.st_size) != 0) {
         goto err;
     }
 
@@ -134,7 +134,7 @@ run01(UNUSED int argc, UNUSED void **argv)
     res = 0;
     sport = bytes_printf("%d", port);
 
-    if ((fd = mrkthr_socket_bind(host, BCDATA(sport), AF_INET)) == -1) {
+    if ((fd = mnthr_socket_bind(host, BCDATA(sport), AF_INET)) == -1) {
         goto err;
     }
 
@@ -144,12 +144,12 @@ run01(UNUSED int argc, UNUSED void **argv)
 
     while (true) {
         int res;
-        mrkthr_socket_t *buf;
+        mnthr_socket_t *buf;
         off_t i, offset;
 
         buf = NULL;
         offset = 0;
-        if ((res = mrkthr_accept_all2(fd, &buf, &offset)) != 0) {
+        if ((res = mnthr_accept_all2(fd, &buf, &offset)) != 0) {
             goto err;
         }
 
@@ -159,7 +159,7 @@ run01(UNUSED int argc, UNUSED void **argv)
             int fd;
 
             fd = buf[i].fd;
-            MRKTHR_SPAWN("run10", run10, (void *)(intptr_t)fd);
+            MNTHR_SPAWN("run10", run10, (void *)(intptr_t)fd);
         }
 
         if (buf != NULL) {
@@ -176,7 +176,7 @@ run01(UNUSED int argc, UNUSED void **argv)
 end:
     BYTES_DECREF(&sport);
 
-    MRKTHRET(res);
+    MNTHRET(res);
 
 err:
     res = 1;
@@ -194,7 +194,7 @@ run02(UNUSED int argc, UNUSED void **argv)
          s != NULL;
          s = array_next(&files, &it)) {
         //CTRACE("file: %s", BDATA(*s));
-        MRKTHR_SPAWN("run11", run11, *s);
+        MNTHR_SPAWN("run11", run11, *s);
     }
 
     return 0;
@@ -205,9 +205,9 @@ static int
 run00(UNUSED int argc, UNUSED void **argv)
 {
     if (mode == TSF_MODE_SERVER) {
-        MRKTHR_SPAWN("run01", run01);
+        MNTHR_SPAWN("run01", run01);
     } else {
-        MRKTHR_SPAWN("run02", run02);
+        MNTHR_SPAWN("run02", run02);
     }
 
     return 0;
@@ -284,10 +284,10 @@ main(int argc, char *argv[])
     }
 
     //TRACE("selected %s:%d", host, port);
-    mrkthr_init();
-    MRKTHR_SPAWN("run00", run00);
-    mrkthr_loop();
-    mrkthr_fini();
+    mnthr_init();
+    MNTHR_SPAWN("run00", run00);
+    mnthr_loop();
+    mnthr_fini();
     array_fini(&files);
     free(host);
     host = NULL;

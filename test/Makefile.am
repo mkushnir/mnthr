@@ -33,7 +33,7 @@ endif
 
 common_cflags = $(RDTSC_FLAGS) $(DEBUG_CC_FLAGS) -Wall -Wextra -Werror -std=c99 @_GNU_SOURCE_MACRO@ @_XOPEN_SOURCE_MACRO@ -I$(top_srcdir)/src -I$(top_srcdir) -I$(includedir)
 
-common_ldflags = $(DEBUG_LD_FLAGS) -L$(libdir) -lmrkthr -lmrkcommon -lmndiag
+common_ldflags = $(DEBUG_LD_FLAGS) -L$(libdir) -lmnthr -lmncommon -lmndiag
 
 nodist_testco_SOURCES = diag.c
 testco_SOURCES = testco.c
@@ -88,10 +88,10 @@ testinterrupt_LDFLAGS = $(common_ldflags)
 nodist_testucontext_SOURCES = diag.c
 testucontext_SOURCES = testucontext.c
 testucontext_CFLAGS = $(common_cflags)
-testucontext_LDFLAGS = -L$(libdir) -lmrkcommon -lmndiag
+testucontext_LDFLAGS = -L$(libdir) -lmncommon -lmndiag
 
 diag.c diag.h: $(diags)
-	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -v -S diag.txt.tmp -L mrkthr -H diag.h -C diag.c ../*.[ch] ./*.[ch]
+	$(AM_V_GEN) cat $(diags) | sort -u >diag.txt.tmp && mndiagen -v -S diag.txt.tmp -L mnthr -H diag.h -C diag.c ../*.[ch] ./*.[ch]
 
 testrun: all
 	for i in $(noinst_PROGRAMS); do if test -x ./$$i; then LD_LIBRARY_PATH=$(libdir) ./$$i; fi; done;

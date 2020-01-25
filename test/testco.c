@@ -1,16 +1,16 @@
 #include <signal.h>
 #include <ucontext.h>
 
-#include "mrkthr.h"
+#include "mnthr.h"
 #include "diag.h"
-#include "mrkcommon/dumpm.h"
-#include "mrkcommon/util.h"
+#include "mncommon/dumpm.h"
+#include "mncommon/util.h"
 #include "unittest.h"
 
 //static int read_pipe[2];
 //static int write_pipe[2];
 
-static mrkthr_ctx_t *shutdown_timer_ctx;
+static mnthr_ctx_t *shutdown_timer_ctx;
 static int _shutdown = 0;
 static const int nthreads = 100000;
 static const int niter = 1;
@@ -27,7 +27,7 @@ sigterm_handler(int sig, siginfo_t *info, UNUSED ucontext_t *uap)
           sig, info->si_signo, info->si_errno, info->si_code);
 
     if (!_shutdown) {
-        mrkthr_run(shutdown_timer_ctx);
+        mnthr_run(shutdown_timer_ctx);
     } else {
         _exit(0);
     }
@@ -37,10 +37,10 @@ sigterm_handler(int sig, siginfo_t *info, UNUSED ucontext_t *uap)
 static void
 r(int n)
 {
-    //const mrkthr_ctx_t *me = mrkthr_me();
+    //const mnthr_ctx_t *me = mnthr_me();
     int dummy = 1;
     UNUSED uint64_t now1, now2;
-    //UNUSED const mrkthr_ctx_t *me = mrkthr_me();
+    //UNUSED const mnthr_ctx_t *me = mnthr_me();
 
     //CTRACE("&me=%p", &me);
     if (n >= nrecur && !_shutdown) {
@@ -48,13 +48,13 @@ r(int n)
         while (nn-- && !_shutdown) {
             ++dummy;
             //CTRACE(">>>");
-            //mrkthr_sleep(100);
-            //now1 = mrkthr_get_now_nsec_precise();
-            mrkthr_yield();
+            //mnthr_sleep(100);
+            //now1 = mnthr_get_now_nsec_precise();
+            mnthr_yield();
             //CTRACE("<<<");
             //CTRACE("stack=%ld", ((uintptr_t)(me->co.uc.uc_stack.ss_sp + me->co.uc.uc_stack.ss_size)) - me->co.uc.uc_mcontext.mc_rsp);
-            //mrkthr_ctx_dump(me);
-            //now2 = mrkthr_get_now_nsec_precise();
+            //mnthr_ctx_dump(me);
+            //now2 = mnthr_get_now_nsec_precise();
             //printf("."); fflush(stdout);
             //printf("%ld\n", (now2 - now1) / 1000);
             //CTRACE("iter=%d %ld", nn, (now2 - now1) / 1000);
@@ -70,9 +70,9 @@ baz(UNUSED int argc, UNUSED void *argv[])
     uint64_t n1, n2;
     uint64_t t;
 
-    n1 = mrkthr_get_now_nsec_precise();
+    n1 = mnthr_get_now_nsec_precise();
     r(0);
-    n2 = mrkthr_get_now_nsec_precise();
+    n2 = mnthr_get_now_nsec_precise();
     t = n2 - n1;
     ++ntotal;
     total += t;
@@ -83,17 +83,17 @@ baz(UNUSED int argc, UNUSED void *argv[])
 UNUSED static int
 bar(UNUSED int argc, UNUSED void *argv[])
 {
-    UNUSED mrkthr_ctx_t *ctx;
+    UNUSED mnthr_ctx_t *ctx;
     int n = nthreads;
     long double oldtotal = total;
 
     while (n-- && !_shutdown) {
-        ctx = mrkthr_spawn("baz", baz, 0);
-        //mrkthr_ctx_dump(ctx);
+        ctx = mnthr_spawn("baz", baz, 0);
+        //mnthr_ctx_dump(ctx);
     }
     fprintf(stderr, "All started\n");
     while (!_shutdown) {
-        mrkthr_sleep(wt);
+        mnthr_sleep(wt);
         if (!ntotal) {
             continue;
         }
@@ -116,20 +116,20 @@ asd(UNUSED int argc, void *argv[])
     off_t offset = 0;
 
     CTRACE();
-    if (mrkthr_write_all(out, "asd", sizeof("asd")) != 0) {
+    if (mnthr_write_all(out, "asd", sizeof("asd")) != 0) {
         return 1;
     }
     CTRACE();
     while (1) {
         CTRACE();
-        if ((res = mrkthr_read_all(in, &buf, &offset)) != 0) {
+        if ((res = mnthr_read_all(in, &buf, &offset)) != 0) {
             CTRACE("res=%d", res);
             break;
         }
         CTRACE("asd reveived:");
         D16(buf, offset);
 
-        if (mrkthr_write_all(out, buf, offset) != 0) {
+        if (mnthr_write_all(out, buf, offset) != 0) {
             return 1;
         }
     }
@@ -150,13 +150,13 @@ qwe(UNUSED int argc, void *argv[])
 
     while (n--) {
         CTRACE();
-        if ((res = mrkthr_read_all(in, &buf, &offset)) != 0) {
+        if ((res = mnthr_read_all(in, &buf, &offset)) != 0) {
             CTRACE("res=%d", res);
             break;
         }
         CTRACE("qwe reveived:");
         D16(buf, offset);
-        if (mrkthr_write_all(out, buf, offset) != 0) {
+        if (mnthr_write_all(out, buf, offset) != 0) {
             return 1;
         }
     }
@@ -183,8 +183,8 @@ test0(void)
     struct sigaction act = {
         .sa_flags = SA_SIGINFO,
     };
-    UNUSED mrkthr_ctx_t *cli;
-    //mrkthr_ctx_t *srv;
+    UNUSED mnthr_ctx_t *cli;
+    //mnthr_ctx_t *srv;
 
     sigemptyset(&(act.sa_mask));
 
@@ -193,9 +193,9 @@ test0(void)
     sigaction(SIGINT, &act, NULL);
 
 
-    mrkthr_init();
+    mnthr_init();
 
-    shutdown_timer_ctx = mrkthr_new("tm", shut_me_down, 0);
+    shutdown_timer_ctx = mnthr_new("tm", shut_me_down, 0);
 
 
     //CTRACE();
@@ -210,15 +210,15 @@ test0(void)
 
     //CTRACE();
 
-    //srv = mrkthr_spawn("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
+    //srv = mnthr_spawn("qwe", qwe, 2, read_pipe[0], write_pipe[1]);
 
-    //cli = mrkthr_spawn("asd", asd, 2, write_pipe[0], read_pipe[1]);
+    //cli = mnthr_spawn("asd", asd, 2, write_pipe[0], read_pipe[1]);
 
-    cli = mrkthr_spawn("bar", bar, 0);
+    cli = mnthr_spawn("bar", bar, 0);
 
-    res = mrkthr_loop();
+    res = mnthr_loop();
 
-    mrkthr_fini();
+    mnthr_fini();
 
     CTRACE("res=%d", res);
 }
@@ -227,7 +227,7 @@ test0(void)
 int
 main(UNUSED int argc, UNUSED char *argv[])
 {
-    TRACE("size of mrkthr_ctx_t is %ld", (long)mrkthr_ctx_sizeof());
+    TRACE("size of mnthr_ctx_t is %ld", (long)mnthr_ctx_sizeof());
     test0();
     return 0;
 }

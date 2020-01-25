@@ -1,5 +1,5 @@
-#ifndef MRKTHR_PRIVATE_H
-#define MRKTHR_PRIVATE_H
+#ifndef MNTHR_PRIVATE_H
+#define MNTHR_PRIVATE_H
 
 #ifdef HAVE_CONFIG_H
 #   include "config.h"
@@ -28,10 +28,10 @@
 
 #include <mndiag.h>
 
-#include <mrkcommon/dtqueue.h>
-#include <mrkcommon/stqueue.h>
-#include <mrkcommon/rbt.h>
-#include <mrkcommon/util.h>
+#include <mncommon/dtqueue.h>
+#include <mncommon/stqueue.h>
+#include <mncommon/rbt.h>
+#include <mncommon/util.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,12 +62,12 @@ struct sf_hdtr {
 #endif
 
 
-struct _mrkthr_ctx;
+struct _mnthr_ctx;
 
-typedef DTQUEUE(_mrkthr_ctx, mrkthr_waitq_t);
-#define MRKTHR_WAITQ_T_DEFINED
+typedef DTQUEUE(_mnthr_ctx, mnthr_waitq_t);
+#define MNTHR_WAITQ_T_DEFINED
 
-struct _mrkthr_ctx {
+struct _mnthr_ctx {
     struct _co {
         ucontext_t uc;
         char *stack;
@@ -133,40 +133,40 @@ struct _mrkthr_ctx {
         unsigned int state;
 
         /*
-         * Thread return code, MRKTHR_CO_RC_* or user-defined, can be set
+         * Thread return code, MNTHR_CO_RC_* or user-defined, can be set
          * publicly using:
-         *  - mrkthr_set_retval()
-         *  - mrkthr_signal_error()
-         *  - mrkthr_signal_error_and_join()
+         *  - mnthr_set_retval()
+         *  - mnthr_signal_error()
+         *  - mnthr_signal_error_and_join()
          *
          * When setting, it is recommended to restrict to non-negative
          * values in order to prevent clashing with library's error codes
          * (which are all negative).
          *
          * This code is the return value of the following:
-         *  - mrkthr_signal_subscribe()
-         *  - mrkthr_join() + library code MRKTHR_JOIN_FAILURE
-         *  - mrkthr_set_interrupt_and_join() + library code
-         *    MRKTHR_JOIN_FAILURE
-         *  - mrkthr_signal_error_and_join()
-         *  - mrkthr_cond_wait()
-         *  - mrkthr_yield()
-         *  - mrkthr_sleep_ticks()
-         *  - mrkthr_sleep()
-         *  - mrkthr_set_interrupt_and_join_with_timeout() + library codes
-         *      MRKTHR_JOIN_FAILURE, MRKTHR_WAIT_TIMEOUT
-         *  - mrkthr_signal_subscribe_with_timeout() + library codes
-         *      MRKTHR_WAIT_TIMEOUT
-         *  - mrkthr_wait_for() + library code MRKTHR_WAIT_TIMEOUT
+         *  - mnthr_signal_subscribe()
+         *  - mnthr_join() + library code MNTHR_JOIN_FAILURE
+         *  - mnthr_set_interrupt_and_join() + library code
+         *    MNTHR_JOIN_FAILURE
+         *  - mnthr_signal_error_and_join()
+         *  - mnthr_cond_wait()
+         *  - mnthr_yield()
+         *  - mnthr_sleep_ticks()
+         *  - mnthr_sleep()
+         *  - mnthr_set_interrupt_and_join_with_timeout() + library codes
+         *      MNTHR_JOIN_FAILURE, MNTHR_WAIT_TIMEOUT
+         *  - mnthr_signal_subscribe_with_timeout() + library codes
+         *      MNTHR_WAIT_TIMEOUT
+         *  - mnthr_wait_for() + library code MNTHR_WAIT_TIMEOUT
          *
          * The following finctions return -1 on error, so the thread
-         * return code can only be expected using mrkthr_get_retval():
-         *  - mrkthr_stat_wait()
-         *  - mrkthr_get_rbuflen()
-         *  - mrkthr_wait_for_read()
-         *  - mrkthr_get_wbuflen()
-         *  - mrkthr_wait_for_write()
-         *  - mrkthr_wait_for_events()
+         * return code can only be expected using mnthr_get_retval():
+         *  - mnthr_stat_wait()
+         *  - mnthr_get_rbuflen()
+         *  - mnthr_wait_for_read()
+         *  - mnthr_get_wbuflen()
+         *  - mnthr_wait_for_write()
+         *  - mnthr_wait_for_events()
          *
          */
         int rc;
@@ -178,52 +178,52 @@ struct _mrkthr_ctx {
      * 1 - resume now.
      */
      uint64_t expire_ticks;
-#   define MRKTHR_SLEEP_UNDEFINED (0ul)
-#   define MRKTHR_SLEEP_RESUME_NOW (1ul)
-#   define MRKTHR_SLEEP_FOREVER (UINTMAX_MAX)
+#   define MNTHR_SLEEP_UNDEFINED (0ul)
+#   define MNTHR_SLEEP_RESUME_NOW (1ul)
+#   define MNTHR_SLEEP_FOREVER (UINTMAX_MAX)
 
-    void (*sleepq_enqueue)(struct _mrkthr_ctx *);
+    void (*sleepq_enqueue)(struct _mnthr_ctx *);
 
     /*
      * Sleep list bucket.
      *
-     * An instance of mrkthr_ctx_t can be placed in a sleep list in its
+     * An instance of mnthr_ctx_t can be placed in a sleep list in its
      * corresponding position based on the "expire_ticks" key. If another
      * instance is going to be placed in the sleep list under the same
      * key, it cannot be placed there because the keys must be unique. It
      * is then placed in a bucket. A bucket is implemented as a part of
-     * the mrkthr_ctx_t structure. Any member of the sleep list can be
+     * the mnthr_ctx_t structure. Any member of the sleep list can be
      * a "bucket owner", and can subsequently hold other instances under
      * the same key. This design resembles a multimap.
      */
-    mrkthr_waitq_t sleepq_bucket;
+    mnthr_waitq_t sleepq_bucket;
 
-    DTQUEUE_ENTRY(_mrkthr_ctx, sleepq_link);
+    DTQUEUE_ENTRY(_mnthr_ctx, sleepq_link);
 
     /*
      * Wait queue this ctx is a host of.
      */
-    mrkthr_waitq_t waitq;
+    mnthr_waitq_t waitq;
 
     /*
      * Membership of this ctx in an other wait queue.
      */
-    DTQUEUE_ENTRY(_mrkthr_ctx, waitq_link);
-    mrkthr_waitq_t *hosting_waitq;
+    DTQUEUE_ENTRY(_mnthr_ctx, waitq_link);
+    mnthr_waitq_t *hosting_waitq;
 
     /*
      * Membership of this ctx in free_ctxes.
      */
-    DTQUEUE_ENTRY(_mrkthr_ctx, free_link);
+    DTQUEUE_ENTRY(_mnthr_ctx, free_link);
 
     /*
      * Membership of this ctx in runq.
      */
-    STQUEUE_ENTRY(_mrkthr_ctx, runq_link);
+    STQUEUE_ENTRY(_mnthr_ctx, runq_link);
 
     /*
      * event lookup in kevents0,
-     * specifically for mrkthr_clear_event()
+     * specifically for mnthr_clear_event()
      */
     union {
         struct {
@@ -236,25 +236,25 @@ struct _mrkthr_ctx {
 
 };
 
-//#define MRKTHR_ST_DELETE
+//#define MNTHR_ST_DELETE
 // NOTE_DELETE
 // IN_DELETE_SELF
-//#define MRKTHR_ST_WRITE
+//#define MNTHR_ST_WRITE
 // NOTE_WRITE
 // IN_CREATE, IN_DELETE, IN_MOVED_FROM, IN_MOVED_TO
-//#define MRKTHR_ST_EXTEND
+//#define MNTHR_ST_EXTEND
 //NOTE_EXTEND
 //
-//#define MRKTHR_ST_ATTRIB
+//#define MNTHR_ST_ATTRIB
 // NOTE_ATTRIB
 // IN_ATTRIB
-//#define MRKTHR_ST_LINK
+//#define MNTHR_ST_LINK
 // NOTE_LINK
 //
-//#define MRKTHR_ST_RENAME
+//#define MNTHR_ST_RENAME
 // NOTE_RENAME
 //
-//#define MRKTHR_ST_REVOKE
+//#define MNTHR_ST_REVOKE
 // NOTE_REVOKE
 //
 
@@ -263,7 +263,7 @@ struct _mrkthr_ctx {
 struct _ev_item;
 #endif
 
-struct _mrkthr_stat {
+struct _mnthr_stat {
 #ifdef USE_EV
     struct _ev_item *ev;
 #endif
@@ -273,7 +273,7 @@ struct _mrkthr_stat {
 #endif
 };
 
-struct _mrkthr_profile {
+struct _mnthr_profile {
     const char *name;
     int id;
     uint64_t n;
@@ -284,34 +284,34 @@ struct _mrkthr_profile {
     long double avg;
 };
 
-#define MRKTHR_DEFAULT_WBUFLEN (1024*1024)
+#define MNTHR_DEFAULT_WBUFLEN (1024*1024)
 
 #define CO_FLAG_INITIALIZED 0x01
 #define CO_FLAG_SHUTDOWN 0x02
-extern int mrkthr_flags;
-extern struct _mrkthr_ctx *me;
+extern int mnthr_flags;
+extern struct _mnthr_ctx *me;
 extern ucontext_t main_uc;
 extern mnbtrie_t the_sleepq;
 
 int yield(void);
-void push_free_ctx(struct _mrkthr_ctx *);
-void sleepq_remove(struct _mrkthr_ctx *);
-void set_resume_fast(struct _mrkthr_ctx *);
-void mrkthr_ctx_finalize(struct _mrkthr_ctx *);
+void push_free_ctx(struct _mnthr_ctx *);
+void sleepq_remove(struct _mnthr_ctx *);
+void set_resume_fast(struct _mnthr_ctx *);
+void mnthr_ctx_finalize(struct _mnthr_ctx *);
 
 uint64_t poller_usec2ticks_absolute(uint64_t);
 uint64_t poller_msec2ticks_absolute(uint64_t);
 uint64_t poller_ticks_absolute(uint64_t);
-void poller_clear_event(struct _mrkthr_ctx *);
+void poller_clear_event(struct _mnthr_ctx *);
 void poller_init(void);
 void poller_fini(void);
-int poller_resume(struct _mrkthr_ctx *);
+int poller_resume(struct _mnthr_ctx *);
 void poller_sift_sleepq(void);
-void poller_mrkthr_ctx_init(struct _mrkthr_ctx *);
+void poller_mnthr_ctx_init(struct _mnthr_ctx *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#include "mrkthr.h"
+#include "mnthr.h"
 #endif

@@ -1,4 +1,4 @@
-#include "mrkcommon/util.h"
+#include "mncommon/util.h"
 
 #ifdef __cplusplus
 extern "C" {

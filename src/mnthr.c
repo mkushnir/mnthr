@@ -13,7 +13,7 @@
  * TODO: Take care of different stack layouts.
  *
  * thread locking primitives:
- *  - mrkthr_signal_t, basic unreliable signal delivery.
+ *  - mnthr_signal_t, basic unreliable signal delivery.
  *  - condition variable
  *  - semaphore
  *  - inverted semaphore
@@ -24,15 +24,15 @@
  * current time with the system's one. In the scheduler's execution
  * context, after each blocking system call returns, the rdtsc() is called
  * to update the library's "now" variable.  Also the corresponding
- * nanoseconds since the Epoch are calculated. The mrkthr_get_now()
+ * nanoseconds since the Epoch are calculated. The mnthr_get_now()
  * returns the value of the former.
  *
- * Request for thread's interruption. The mrkthr_set_interrupt() will
+ * Request for thread's interruption. The mnthr_set_interrupt() will
  * turn the thread into an interrupted state, which effectively causes all
- * "yielding" mrkthr_ctx_* calls to fail on return. This way the thread
+ * "yielding" mnthr_ctx_* calls to fail on return. This way the thread
  * receives an indication for clean up and exiting.
  *
- * Timed out thread execution: mrkthr_wait_for(), mrkthr_peek().
+ * Timed out thread execution: mnthr_wait_for(), mnthr_peek().
  *
  * I/O poller generic support.
  *
@@ -74,25 +74,25 @@
 #include <inttypes.h>
 
 #define NO_PROFILE
-#include <mrkcommon/profile.h>
+#include <mncommon/profile.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnthr);
 #endif
 
 //#define TRACE_VERBOSE
 //#define TRRET_DEBUG
 #include "diag.h"
-#include <mrkcommon/dumpm.h>
+#include <mncommon/dumpm.h>
 
-#include <mrkcommon/array.h>
-#include <mrkcommon/dtqueue.h>
-#include <mrkcommon/stqueue.h>
+#include <mncommon/array.h>
+#include <mncommon/dtqueue.h>
+#include <mncommon/stqueue.h>
 /* Experimental trie use */
-#include <mrkcommon/btrie.h>
+#include <mncommon/btrie.h>
 
-#include "mrkthr_private.h"
+#include "mnthr_private.h"
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -104,15 +104,15 @@ MEMDEBUG_DECLARE(mrkthr);
 #include <sys/sendfile.h>
 #endif
 
-const profile_t *mrkthr_user_p;
-const profile_t *mrkthr_swap_p;
-const profile_t *mrkthr_sched0_p;
-const profile_t *mrkthr_sched1_p;
+const profile_t *mnthr_user_p;
+const profile_t *mnthr_swap_p;
+const profile_t *mnthr_sched0_p;
+const profile_t *mnthr_sched1_p;
 
 
 typedef int (*writer_t) (int, int, int);
 
-int mrkthr_flags = 0;
+int mnthr_flags = 0;
 
 static size_t stacksize = STACKSIZE;
 ucontext_t main_uc;
@@ -120,9 +120,9 @@ static char main_stack[STACKSIZE];
 
 static int co_id = 0;
 static mnarray_t ctxes;
-mrkthr_ctx_t *me;
+mnthr_ctx_t *me;
 
-static DTQUEUE(_mrkthr_ctx, free_list);
+static DTQUEUE(_mnthr_ctx, free_list);
 
 /*
  * Sleep list holds threads that are waiting for resume
@@ -131,22 +131,22 @@ static DTQUEUE(_mrkthr_ctx, free_list);
 mnbtrie_t the_sleepq;
 
 
-static int mrkthr_ctx_init(mrkthr_ctx_t **);
-static int mrkthr_ctx_fini(mrkthr_ctx_t **);
+static int mnthr_ctx_init(mnthr_ctx_t **);
+static int mnthr_ctx_fini(mnthr_ctx_t **);
 static void co_fini_ucontext(struct _co *);
 static void co_fini_other(struct _co *);
-static void resume_waitq_all(mrkthr_waitq_t *);
-static mrkthr_ctx_t *mrkthr_ctx_new(void);
-static mrkthr_ctx_t *mrkthr_ctx_pop_free(void);
-static void set_resume(mrkthr_ctx_t *);
+static void resume_waitq_all(mnthr_waitq_t *);
+static mnthr_ctx_t *mnthr_ctx_new(void);
+static mnthr_ctx_t *mnthr_ctx_pop_free(void);
+static void set_resume(mnthr_ctx_t *);
 
 
 void
-push_free_ctx(mrkthr_ctx_t *ctx)
+push_free_ctx(mnthr_ctx_t *ctx)
 {
     //CTRACE("push_free_ctx");
-    //mrkthr_dump(ctx);
-    mrkthr_ctx_finalize(ctx);
+    //mnthr_dump(ctx);
+    mnthr_ctx_finalize(ctx);
     DTQUEUE_ENQUEUE(&free_list, free_link, ctx);
 }
 
@@ -235,7 +235,7 @@ dump_ucontext (UNUSED ucontext_t *uc)
 
 
 size_t
-mrkthr_set_stacksize(size_t v)
+mnthr_set_stacksize(size_t v)
 {
     size_t res;
 
@@ -256,25 +256,25 @@ mrkthr_set_stacksize(size_t v)
 
 
 size_t
-mrkthr_ctx_sizeof(void)
+mnthr_ctx_sizeof(void)
 {
-    return sizeof(mrkthr_ctx_t);
+    return sizeof(mnthr_ctx_t);
 }
 
 static int
 dump_sleepq_node(mnbtrie_node_t *trn, UNUSED void *udata)
 {
-    mrkthr_ctx_t *ctx = (mrkthr_ctx_t *)trn->value;
+    mnthr_ctx_t *ctx = (mnthr_ctx_t *)trn->value;
     if (ctx != NULL) {
         TRACEC("trn=%p key=%016"PRIx64" ", trn, ctx->expire_ticks);
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
     }
     return 0;
 }
 
 
 void
-mrkthr_dump_sleepq(void)
+mnthr_dump_sleepq(void)
 {
     CTRACE("sleepq:");
     btrie_traverse(&the_sleepq, dump_sleepq_node, NULL);
@@ -285,31 +285,31 @@ mrkthr_dump_sleepq(void)
 /* Sleep list */
 
 void
-sleepq_remove(mrkthr_ctx_t *ctx)
+sleepq_remove(mnthr_ctx_t *ctx)
 {
     mnbtrie_node_t *trn;
 
     //CTRACE(FBLUE("SL removing"));
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
     //CTRACE(FBLUE("SL before removing:"));
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
     //CTRACE(FBLUE("---"));
 
-    if (ctx->expire_ticks == MRKTHR_SLEEP_UNDEFINED) {
+    if (ctx->expire_ticks == MNTHR_SLEEP_UNDEFINED) {
         return;
     }
 
     if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
-        mrkthr_ctx_t *sle, *bucket_host_pretendent;
+        mnthr_ctx_t *sle, *bucket_host_pretendent;
 
         sle = trn->value;
 
         assert(sle != NULL);
 
         //CTRACE("sle:");
-        //mrkthr_dump(sle);
+        //mnthr_dump(sle);
         //CTRACE("ctx:");
-        //mrkthr_dump(ctx);
+        //mnthr_dump(ctx);
         /*
          * ctx is either the sle itself, or it is
          * in the sle.sleepq_bucket.
@@ -329,7 +329,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 /* we are going to remove a bucket host */
 
                 //TRACEC(FYELLOW("removeH"));
-                //mrkthr_dump(ctx);
+                //mnthr_dump(ctx);
 
                 DTQUEUE_DEQUEUE(&sle->sleepq_bucket, sleepq_link);
                 DTQUEUE_ENTRY_FINI(sleepq_link, bucket_host_pretendent);
@@ -345,14 +345,14 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                 /* we are removing from the bucket */
                 if (!DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx)) {
                     //CTRACE(FYELLOW("removing from bucket"));
-                    //mrkthr_dump(ctx);
+                    //mnthr_dump(ctx);
                     //CTRACE("-----");
                     DTQUEUE_REMOVE(&sle->sleepq_bucket, sleepq_link, ctx);
                     //TRACEC(FYELLOW("removeB"));
-                    //mrkthr_dump(ctx);
+                    //mnthr_dump(ctx);
                 } else {
                     //TRACEC(FBLUE("?????? "));
-                    //mrkthr_dump(ctx);
+                    //mnthr_dump(ctx);
                 }
             }
 
@@ -360,7 +360,7 @@ sleepq_remove(mrkthr_ctx_t *ctx)
             //assert(sle == ctx);
             if (sle == ctx) {
                 //TRACEC(FYELLOW("remove "));
-                //mrkthr_dump(ctx);
+                //mnthr_dump(ctx);
                 trn->value = NULL;
                 btrie_remove_node(&the_sleepq, trn);
             } else {
@@ -368,56 +368,56 @@ sleepq_remove(mrkthr_ctx_t *ctx)
                  * Here we have found ctx is not in the bucket.
                  * Just ignore it.
                  */
-                //mrkthr_dump(sle);
+                //mnthr_dump(sle);
                 //CTRACE("ctx: %p/%p", DTQUEUE_PREV(sleepq_link, ctx), DTQUEUE_NEXT(sleepq_link, ctx));
                 //TRACEC(FBLUE("not in sleepq 0:"));
-                //mrkthr_dump(ctx);
-                //mrkthr_dump_sleepq();
+                //mnthr_dump(ctx);
+                //mnthr_dump_sleepq();
 
                 //assert(DTQUEUE_ORPHAN(&sle->sleepq_bucket, sleepq_link, ctx));
                 //assert(DTQUEUE_EMPTY(&ctx->sleepq_bucket));
             }
         }
     } else {
-        //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
+        //if (ctx->expire_ticks > MNTHR_SLEEP_RESUME_NOW) {
         //    TRACEC(FBLUE("not in sleepq 1:"));
-        //    mrkthr_dump(ctx);
+        //    mnthr_dump(ctx);
         //}
     }
     //CTRACE(FBLUE("SL after removing:"));
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
     //CTRACE(FBLUE("---"));
 }
 
 
 static void
-sleepq_insert(mrkthr_ctx_t *ctx)
+sleepq_insert(mnthr_ctx_t *ctx)
 {
     mnbtrie_node_t *trn;
-    mrkthr_ctx_t *bucket_host;
+    mnthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL inserting"));
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
 
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
-    //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
+    //if (ctx->expire_ticks > MNTHR_SLEEP_RESUME_NOW) {
     //    TRACEC(FRED("insert "));
-    //    mrkthr_dump(ctx);
+    //    mnthr_dump(ctx);
     //}
-    bucket_host = (mrkthr_ctx_t *)(trn->value);
+    bucket_host = (mnthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
-        mrkthr_ctx_t *head;
+        mnthr_ctx_t *head;
 
         //TRACE("while inserting, found bucket:");
-        //mrkthr_dump(bucket_host);
+        //mnthr_dump(bucket_host);
         if ((head = DTQUEUE_HEAD(&bucket_host->sleepq_bucket)) == NULL) {
             DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
         } else {
 
             //CTRACE("before:");
-            //mrkthr_dump(DTQUEUE_HEAD(&bucket_host->sleepq_bucket));
+            //mnthr_dump(DTQUEUE_HEAD(&bucket_host->sleepq_bucket));
             DTQUEUE_INSERT_BEFORE(&bucket_host->sleepq_bucket,
                                   sleepq_link,
                                   head,
@@ -425,22 +425,22 @@ sleepq_insert(mrkthr_ctx_t *ctx)
         }
 
         //TRACE("After adding to the bucket:");
-        //mrkthr_dump(bucket_host);
+        //mnthr_dump(bucket_host);
     } else {
         trn->value = ctx;
     }
     //CTRACE(FGREEN("SL after inserting:"));
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
     //CTRACE(FGREEN("---"));
 }
 
 
 static void
-sleepq_insert_once(mrkthr_ctx_t *ctx)
+sleepq_insert_once(mnthr_ctx_t *ctx)
 {
     mnbtrie_node_t *trn;
     if ((trn = btrie_find_exact(&the_sleepq, ctx->expire_ticks)) != NULL) {
-        mrkthr_ctx_t *bucket_host;
+        mnthr_ctx_t *bucket_host;
 
         bucket_host = trn->value;
         assert(bucket_host != NULL);
@@ -450,7 +450,7 @@ sleepq_insert_once(mrkthr_ctx_t *ctx)
              * we are done
              */
         } else {
-            mrkthr_ctx_t *head;
+            mnthr_ctx_t *head;
 
             if ((head = DTQUEUE_HEAD(&bucket_host->sleepq_bucket)) == NULL) {
                 DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
@@ -469,40 +469,40 @@ sleepq_insert_once(mrkthr_ctx_t *ctx)
 
 
 static void
-sleepq_append(mrkthr_ctx_t *ctx)
+sleepq_append(mnthr_ctx_t *ctx)
 {
     mnbtrie_node_t *trn;
-    mrkthr_ctx_t *bucket_host;
+    mnthr_ctx_t *bucket_host;
 
     //CTRACE(FGREEN("SL appending"));
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
 
     if ((trn = btrie_add_node(&the_sleepq, ctx->expire_ticks)) == NULL) {
         FAIL("btrie_add_node");
     }
-    //if (ctx->expire_ticks > MRKTHR_SLEEP_RESUME_NOW) {
+    //if (ctx->expire_ticks > MNTHR_SLEEP_RESUME_NOW) {
     //    TRACEC(FRED("append "));
-    //    mrkthr_dump(ctx);
+    //    mnthr_dump(ctx);
     //}
-    bucket_host = (mrkthr_ctx_t *)(trn->value);
+    bucket_host = (mnthr_ctx_t *)(trn->value);
     if (bucket_host != NULL) {
         //TRACE("while appending, found bucket:");
-        //mrkthr_dump(bucket_host);
+        //mnthr_dump(bucket_host);
         DTQUEUE_ENQUEUE(&bucket_host->sleepq_bucket, sleepq_link, ctx);
 
         //TRACE("After adding to the bucket:");
-        //mrkthr_dump(bucket_host);
+        //mnthr_dump(bucket_host);
     } else {
         trn->value = ctx;
     }
     //CTRACE(FGREEN("SL after appending:"));
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
     //CTRACE(FGREEN("---"));
 }
 
 
 void
-mrkthr_set_prio(mrkthr_ctx_t *ctx, int flag)
+mnthr_set_prio(mnthr_ctx_t *ctx, int flag)
 {
     ctx->sleepq_enqueue = flag ? sleepq_insert : sleepq_append;
 }
@@ -512,29 +512,29 @@ mrkthr_set_prio(mrkthr_ctx_t *ctx, int flag)
  * Module init/fini
  */
 int
-mrkthr_init(void)
+mnthr_init(void)
 {
     UNUSED size_t sz;
 
-    if (mrkthr_flags & CO_FLAG_INITIALIZED) {
+    if (mnthr_flags & CO_FLAG_INITIALIZED) {
         return 0;
     }
 
     PROFILE_INIT_MODULE();
-    mrkthr_user_p = PROFILE_REGISTER("user");
-    mrkthr_swap_p = PROFILE_REGISTER("swap");
-    mrkthr_sched0_p = PROFILE_REGISTER("sched0");
-    mrkthr_sched1_p = PROFILE_REGISTER("sched1");
+    mnthr_user_p = PROFILE_REGISTER("user");
+    mnthr_swap_p = PROFILE_REGISTER("swap");
+    mnthr_sched0_p = PROFILE_REGISTER("sched0");
+    mnthr_sched1_p = PROFILE_REGISTER("sched1");
 
 #ifdef DO_MEMDEBUG
-    MEMDEBUG_REGISTER(mrkthr);
+    MEMDEBUG_REGISTER(mnthr);
 #endif
 
     DTQUEUE_INIT(&free_list);
 
-    if (array_init(&ctxes, sizeof(mrkthr_ctx_t *), 0,
-                  (array_initializer_t)mrkthr_ctx_init,
-                  (array_finalizer_t)mrkthr_ctx_fini) != 0) {
+    if (array_init(&ctxes, sizeof(mnthr_ctx_t *), 0,
+                  (array_initializer_t)mnthr_ctx_init,
+                  (array_finalizer_t)mnthr_ctx_fini) != 0) {
         FAIL("array_init");
     }
 
@@ -546,16 +546,16 @@ mrkthr_init(void)
     me = NULL;
     btrie_init(&the_sleepq);
 
-    mrkthr_flags |= CO_FLAG_INITIALIZED;
+    mnthr_flags |= CO_FLAG_INITIALIZED;
 
     return 0;
 }
 
 
 int
-mrkthr_fini(void)
+mnthr_fini(void)
 {
-    if (!(mrkthr_flags & CO_FLAG_INITIALIZED)) {
+    if (!(mnthr_flags & CO_FLAG_INITIALIZED)) {
         return 0;
     }
 
@@ -568,7 +568,7 @@ mrkthr_fini(void)
     PROFILE_REPORT_SEC();
     PROFILE_FINI_MODULE();
 
-    mrkthr_flags &= ~CO_FLAG_INITIALIZED;
+    mnthr_flags &= ~CO_FLAG_INITIALIZED;
 
     return 0;
 }
@@ -583,22 +583,22 @@ uyuyuy(UNUSED int argc, UNUSED void **argv)
 
 
 void
-mrkthr_shutdown(void)
+mnthr_shutdown(void)
 {
-    mrkthr_flags |= CO_FLAG_SHUTDOWN;
-    mrkthr_spawn("uyuyuy", uyuyuy, 0);
+    mnthr_flags |= CO_FLAG_SHUTDOWN;
+    mnthr_spawn("uyuyuy", uyuyuy, 0);
 }
 
 
 bool
-mrkthr_shutting_down(void)
+mnthr_shutting_down(void)
 {
-    return (bool)(mrkthr_flags & CO_FLAG_SHUTDOWN);
+    return (bool)(mnthr_flags & CO_FLAG_SHUTDOWN);
 }
 
 
 size_t
-mrkthr_compact_sleepq(size_t threshold)
+mnthr_compact_sleepq(size_t threshold)
 {
     size_t volume = 0;
 
@@ -611,25 +611,25 @@ mrkthr_compact_sleepq(size_t threshold)
 
 
 size_t
-mrkthr_get_sleepq_length(void)
+mnthr_get_sleepq_length(void)
 {
     return btrie_get_nvals(&the_sleepq);
 }
 
 
 size_t
-mrkthr_get_sleepq_volume(void)
+mnthr_get_sleepq_volume(void)
 {
     return btrie_get_volume(&the_sleepq);
 }
 
 
 static int
-dump_ctx_traverser(mrkthr_ctx_t **ctx, UNUSED void *udata)
+dump_ctx_traverser(mnthr_ctx_t **ctx, UNUSED void *udata)
 {
     if (*ctx != NULL) {
         if ((*ctx)->co.id != -1) {
-            mrkthr_dump(*ctx);
+            mnthr_dump(*ctx);
         }
     }
     return 0;
@@ -637,7 +637,7 @@ dump_ctx_traverser(mrkthr_ctx_t **ctx, UNUSED void *udata)
 
 
 void
-mrkthr_dump_all_ctxes(void)
+mnthr_dump_all_ctxes(void)
 {
     TRACEC("all ctxes:\n");
     array_traverse(&ctxes, (array_traverser_t)dump_ctx_traverser, NULL);
@@ -646,14 +646,14 @@ mrkthr_dump_all_ctxes(void)
 
 
 /*
- * mrkthr_ctx management
+ * mnthr_ctx management
  */
 static int
-mrkthr_ctx_init(mrkthr_ctx_t **pctx)
+mnthr_ctx_init(mnthr_ctx_t **pctx)
 {
-    mrkthr_ctx_t *ctx;
+    mnthr_ctx_t *ctx;
 
-    if ((ctx = malloc(sizeof(mrkthr_ctx_t))) == NULL) {
+    if ((ctx = malloc(sizeof(mnthr_ctx_t))) == NULL) {
         FAIL("malloc");
     }
 
@@ -680,7 +680,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
 
     DTQUEUE_INIT(&ctx->sleepq_bucket);
     DTQUEUE_ENTRY_INIT(sleepq_link, ctx);
-    ctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
+    ctx->expire_ticks = MNTHR_SLEEP_UNDEFINED;
 
     DTQUEUE_INIT(&ctx->waitq);
 
@@ -689,7 +689,7 @@ mrkthr_ctx_init(mrkthr_ctx_t **pctx)
 
     DTQUEUE_ENTRY_INIT(free_link, ctx);
     STQUEUE_ENTRY_INIT(runq_link, ctx);
-    poller_mrkthr_ctx_init(ctx);
+    poller_mnthr_ctx_init(ctx);
 
     *pctx = ctx;
 
@@ -736,7 +736,7 @@ co_fini_other(struct _co *co)
 
 
 void
-mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
+mnthr_ctx_finalize(mnthr_ctx_t *ctx)
 {
     /*
      * XXX not cleaning ucontext for future use.
@@ -745,7 +745,7 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
     /* remove me from sleepq */
     //DTQUEUE_FINI(&ctx->sleepq_bucket);
     //DTQUEUE_ENTRY_FINI(sleepq_link, ctx);
-    ctx->expire_ticks = MRKTHR_SLEEP_UNDEFINED;
+    ctx->expire_ticks = MNTHR_SLEEP_UNDEFINED;
 
     ctx->sleepq_enqueue = sleepq_append;
 
@@ -761,16 +761,16 @@ mrkthr_ctx_finalize(mrkthr_ctx_t *ctx)
         ctx->hosting_waitq = NULL;
     }
 
-    poller_mrkthr_ctx_init(ctx);
+    poller_mnthr_ctx_init(ctx);
 }
 
 
 static int
-mrkthr_ctx_fini(mrkthr_ctx_t **pctx)
+mnthr_ctx_fini(mnthr_ctx_t **pctx)
 {
     if (*pctx != NULL) {
         co_fini_ucontext(&(*pctx)->co);
-        mrkthr_ctx_finalize(*pctx);
+        mnthr_ctx_finalize(*pctx);
         (*pctx)->co.rc = 0;
         free(*pctx);
         *pctx = NULL;
@@ -791,10 +791,10 @@ _getcontext(ucontext_t *ucp)
 #endif
 
 
-static mrkthr_ctx_t *
-mrkthr_ctx_new(void)
+static mnthr_ctx_t *
+mnthr_ctx_new(void)
 {
-    mrkthr_ctx_t **ctx;
+    mnthr_ctx_t **ctx;
     if ((ctx = array_incr(&ctxes)) == NULL) {
         FAIL("array_incr");
     }
@@ -802,10 +802,10 @@ mrkthr_ctx_new(void)
 }
 
 
-static mrkthr_ctx_t *
-mrkthr_ctx_pop_free(void)
+static mnthr_ctx_t *
+mnthr_ctx_pop_free(void)
 {
-    mrkthr_ctx_t *ctx;
+    mnthr_ctx_t *ctx;
 
     for (ctx = DTQUEUE_HEAD(&free_list);
          ctx != NULL;
@@ -817,7 +817,7 @@ mrkthr_ctx_pop_free(void)
         }
     }
 
-    ctx = mrkthr_ctx_new();
+    ctx = mnthr_ctx_new();
 
 end:
     return ctx;
@@ -826,12 +826,12 @@ end:
 
 
 size_t
-mrkthr_gc(void)
+mnthr_gc(void)
 {
     size_t res;
-    mrkthr_ctx_t **pctx0, **pctx1, *tmp;
+    mnthr_ctx_t **pctx0, **pctx1, *tmp;
     mnarray_iter_t it0, it1;
-    DTQUEUE(_mrkthr_ctx, tmp_list);
+    DTQUEUE(_mnthr_ctx, tmp_list);
 
     res = 0;
     DTQUEUE_INIT(&tmp_list);
@@ -841,7 +841,7 @@ mrkthr_gc(void)
         if (!DTQUEUE_ORPHAN(&free_list, free_link, *pctx0)) {
             if ((*pctx0)->co.abac > 0) {
                 CTRACE("co.abac not clear during gc (keeping):");
-                mrkthr_dump(*pctx0);
+                mnthr_dump(*pctx0);
                 assert((*pctx0)->co.id == -1);
                 DTQUEUE_ENTRY_INIT(free_link, *pctx0);
                 DTQUEUE_ENQUEUE(&tmp_list, free_link, *pctx0);
@@ -893,17 +893,17 @@ mrkthr_gc(void)
 
 
 /**
- * Return a new mrkthr_ctx_t instance. The new instance doesn't have to
+ * Return a new mnthr_ctx_t instance. The new instance doesn't have to
  * be freed, and should be treated as an opaque object. It's internally
  * reclaimed as soon as the worker function returns.
  */
 #define VNEW_BODY(get_ctx_fn)                                                  \
     int i;                                                                     \
-    assert(mrkthr_flags & CO_FLAG_INITIALIZED);                                \
+    assert(mnthr_flags & CO_FLAG_INITIALIZED);                                \
     ctx = get_ctx_fn();                                                        \
     assert(ctx!= NULL);                                                        \
     if (ctx->co.id != -1) {                                                    \
-        mrkthr_dump(ctx);                                                      \
+        mnthr_dump(ctx);                                                      \
         CTRACE("Unclear ctx: during thread %s creation", name);                \
     }                                                                          \
     assert(ctx->co.id == -1);                                                  \
@@ -915,7 +915,7 @@ mrkthr_gc(void)
         ctx->co.name[0] = '\0';                                                \
     }                                                                          \
     if (_getcontext(&ctx->co.uc) != 0) {                                       \
-        TR(MRKTHR_CTX_NEW + 1);                                                \
+        TR(MNTHR_CTX_NEW + 1);                                                \
         ctx = NULL;                                                            \
         goto vnew_body_end;                                                    \
     }                                                                          \
@@ -926,7 +926,7 @@ mrkthr_gc(void)
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
                                   0)) == MAP_FAILED) {                         \
-            TR(_MRKTHR_NEW + 2);                                               \
+            TR(_MNTHR_NEW + 2);                                               \
             ctx = NULL;                                                        \
             goto vnew_body_end;                                                \
         }                                                                      \
@@ -952,43 +952,43 @@ vnew_body_end:                                                                 \
 
 
 
-mrkthr_ctx_t *
-mrkthr_new(const char *name, mrkthr_cofunc_t f, int argc, ...)
+mnthr_ctx_t *
+mnthr_new(const char *name, mnthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
-    mrkthr_ctx_t *ctx = NULL;
+    mnthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY(mrkthr_ctx_pop_free);
+    VNEW_BODY(mnthr_ctx_pop_free);
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_new");
+        FAIL("mnthr_new");
     }
     return ctx;
 }
 
 
-mrkthr_ctx_t *
-mrkthr_new_sig(const char *name, mrkthr_cofunc_t f, int argc, ...)
+mnthr_ctx_t *
+mnthr_new_sig(const char *name, mnthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
-    mrkthr_ctx_t *ctx = NULL;
+    mnthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY(mrkthr_ctx_new);
+    VNEW_BODY(mnthr_ctx_new);
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_new");
+        FAIL("mnthr_new");
     }
     return ctx;
 }
 
 
 int
-mrkthr_dump(const mrkthr_ctx_t *ctx)
+mnthr_dump(const mnthr_ctx_t *ctx)
 {
     UNUSED ucontext_t uc;
-    mrkthr_ctx_t *tmp;
+    mnthr_ctx_t *tmp;
     ssize_t ssz;
 
 #ifdef __FreeBSD__
@@ -1003,14 +1003,14 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
     ssz = -1;
 #endif
 
-    TRACEC("mrkthr %p/%s id=%lld f=%p ssz=%ld st=%s rc=%s exp=%016lx\n",
+    TRACEC("mnthr %p/%s id=%lld f=%p ssz=%ld st=%s rc=%s exp=%016lx\n",
            ctx,
            ctx->co.name,
            (long long)ctx->co.id,
            ctx->co.f,
            (long)ssz,
            CO_STATE_STR(ctx->co.state),
-           MRKTHR_CO_RC_STR(ctx->co.rc),
+           MNTHR_CO_RC_STR(ctx->co.rc),
            (long)ctx->expire_ticks
     );
 
@@ -1022,13 +1022,13 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
              tmp != NULL;
              tmp = DTQUEUE_NEXT(sleepq_link, tmp)) {
 
-            TRACEC(" +mrkthr %p/%s id=%lld f=%p st=%s rc=%s exp=%016lx\n",
+            TRACEC(" +mnthr %p/%s id=%lld f=%p st=%s rc=%s exp=%016lx\n",
                    tmp,
                    tmp->co.name,
                    (long long)tmp->co.id,
                    tmp->co.f,
                    CO_STATE_STR(tmp->co.state),
-                   MRKTHR_CO_RC_STR(tmp->co.rc),
+                   MNTHR_CO_RC_STR(tmp->co.rc),
                    (long)tmp->expire_ticks
             );
         }
@@ -1038,7 +1038,7 @@ mrkthr_dump(const mrkthr_ctx_t *ctx)
 
 
 PRINTFLIKE(2, 3) int
-mrkthr_set_name(mrkthr_ctx_t *ctx,
+mnthr_set_name(mnthr_ctx_t *ctx,
                      const char *fmt,
                      ...)
 {
@@ -1053,17 +1053,17 @@ mrkthr_set_name(mrkthr_ctx_t *ctx,
 
 
 /*
- * mrkthr management
+ * mnthr management
  */
-mrkthr_ctx_t *
-mrkthr_me(void)
+mnthr_ctx_t *
+mnthr_me(void)
 {
     return me;
 }
 
 
 int
-mrkthr_id(void)
+mnthr_id(void)
 {
     if (me != NULL) {
         return me->co.id;
@@ -1073,7 +1073,7 @@ mrkthr_id(void)
 
 
 int
-mrkthr_set_retval(int rv)
+mnthr_set_retval(int rv)
 {
     int rc;
     assert(me != NULL);
@@ -1084,7 +1084,7 @@ mrkthr_set_retval(int rv)
 
 
 int
-mrkthr_get_retval(void)
+mnthr_get_retval(void)
 {
     assert(me != NULL);
     return me->co.rc;
@@ -1092,7 +1092,7 @@ mrkthr_get_retval(void)
 
 
 void *
-mrkthr_set_cld(void *cld)
+mnthr_set_cld(void *cld)
 {
     void *res;
 
@@ -1105,7 +1105,7 @@ mrkthr_set_cld(void *cld)
 
 
 void *
-mrkthr_get_cld(void)
+mnthr_get_cld(void)
 {
     assert(me != NULL);
     return me->co.cld;
@@ -1113,21 +1113,21 @@ mrkthr_get_cld(void)
 
 
 bool
-mrkthr_is_runnable(mrkthr_ctx_t *ctx)
+mnthr_is_runnable(mnthr_ctx_t *ctx)
 {
     return ctx->co.state > CO_STATE_DORMANT;
 }
 
 
 void
-mrkthr_incabac(mrkthr_ctx_t *ctx)
+mnthr_incabac(mnthr_ctx_t *ctx)
 {
     ++ctx->co.abac;
 }
 
 
 void
-mrkthr_decabac(mrkthr_ctx_t *ctx)
+mnthr_decabac(mnthr_ctx_t *ctx)
 {
     assert(ctx->co.abac > 0);
     --ctx->co.abac;
@@ -1144,14 +1144,14 @@ yield(void)
 
 #ifdef TRACE_VERBOSE
     CTRACE("yielding from <<<");
-    //mrkthr_dump(me);
+    //mnthr_dump(me);
 #endif
 
-    PROFILE_STOP(mrkthr_user_p);
-    PROFILE_START(mrkthr_swap_p);
+    PROFILE_STOP(mnthr_user_p);
+    PROFILE_START(mnthr_swap_p);
     res = swapcontext(&me->co.uc, &main_uc);
-    PROFILE_STOP(mrkthr_swap_p);
-    PROFILE_START(mrkthr_user_p);
+    PROFILE_STOP(mnthr_swap_p);
+    PROFILE_START(mnthr_user_p);
     if(res != 0) {
         CTRACE("swapcontext() error");
         return setcontext(&main_uc);
@@ -1159,19 +1159,19 @@ yield(void)
 
 #ifdef TRACE_VERBOSE
     CTRACE("back from yield >>>");
-    //mrkthr_dump(me);
+    //mnthr_dump(me);
 #endif
 
     return me->co.rc;
 }
 
 
-#define MRKTHR_SET_EXPIRE_TICKS(v, fn)                 \
-    if (v == MRKTHR_SLEEP_FOREVER) {                   \
-        me->expire_ticks = MRKTHR_SLEEP_FOREVER;       \
+#define MNTHR_SET_EXPIRE_TICKS(v, fn)                 \
+    if (v == MNTHR_SLEEP_FOREVER) {                   \
+        me->expire_ticks = MNTHR_SLEEP_FOREVER;       \
     } else {                                           \
         if (v == 0) {                                  \
-            me->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;\
+            me->expire_ticks = MNTHR_SLEEP_RESUME_NOW;\
         } else {                                       \
             me->expire_ticks = fn(v);                  \
         }                                              \
@@ -1184,7 +1184,7 @@ sleepusec(uint64_t usec)
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    MRKTHR_SET_EXPIRE_TICKS(usec, poller_usec2ticks_absolute);
+    MNTHR_SET_EXPIRE_TICKS(usec, poller_usec2ticks_absolute);
 
     //CTRACE("usec=%ld expire_ticks=%ld", usec, me->expire_ticks);
 
@@ -1200,7 +1200,7 @@ sleepmsec(uint64_t msec)
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    MRKTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
+    MNTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
 
     //CTRACE("msec=%ld expire_ticks=%ld", msec, me->expire_ticks);
 
@@ -1216,7 +1216,7 @@ sleepticks(uint64_t ticks)
     /* first remove an old reference (if any) */
     sleepq_remove(me);
 
-    MRKTHR_SET_EXPIRE_TICKS(ticks, poller_ticks_absolute);
+    MNTHR_SET_EXPIRE_TICKS(ticks, poller_ticks_absolute);
 
     //CTRACE("ticks=%ld expire_ticks=%ld", ticks, me->expire_ticks);
 
@@ -1243,7 +1243,7 @@ sleepticks_absolute(uint64_t ticks)
 
 
 int
-mrkthr_sleep(uint64_t msec)
+mnthr_sleep(uint64_t msec)
 {
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
@@ -1253,7 +1253,7 @@ mrkthr_sleep(uint64_t msec)
 
 
 int
-mrkthr_sleep_usec(uint64_t usec)
+mnthr_sleep_usec(uint64_t usec)
 {
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
@@ -1263,7 +1263,7 @@ mrkthr_sleep_usec(uint64_t usec)
 
 
 int
-mrkthr_sleep_ticks(uint64_t ticks)
+mnthr_sleep_ticks(uint64_t ticks)
 {
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
@@ -1273,7 +1273,7 @@ mrkthr_sleep_ticks(uint64_t ticks)
 
 
 int
-mrkthr_yield(void)
+mnthr_yield(void)
 {
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
@@ -1283,17 +1283,17 @@ mrkthr_yield(void)
 
 
 int
-mrkthr_giveup(void)
+mnthr_giveup(void)
 {
     assert(me != NULL);
     /* put into sleepq(SLEEP) */
     me->co.state = CO_STATE_SLEEP;
-    return sleepticks_absolute(MRKTHR_SLEEP_FOREVER);
+    return sleepticks_absolute(MNTHR_SLEEP_FOREVER);
 }
 
 
 static void
-append_me_to_waitq(mrkthr_waitq_t *waitq)
+append_me_to_waitq(mnthr_waitq_t *waitq)
 {
     assert(me != NULL);
     if (me->hosting_waitq != NULL) {
@@ -1305,7 +1305,7 @@ append_me_to_waitq(mrkthr_waitq_t *waitq)
 
 
 static void
-remove_me_from_waitq(mrkthr_waitq_t *waitq)
+remove_me_from_waitq(mnthr_waitq_t *waitq)
 {
     assert(me != NULL);
     assert(me->hosting_waitq = waitq);
@@ -1319,7 +1319,7 @@ remove_me_from_waitq(mrkthr_waitq_t *waitq)
  * Sleep until the target ctx has exited.
  */
 static int
-join_waitq(mrkthr_waitq_t *waitq)
+join_waitq(mnthr_waitq_t *waitq)
 {
     append_me_to_waitq(waitq);
     return yield();
@@ -1327,11 +1327,11 @@ join_waitq(mrkthr_waitq_t *waitq)
 
 
 int
-mrkthr_join(mrkthr_ctx_t *ctx)
+mnthr_join(mnthr_ctx_t *ctx)
 {
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
-        return MRKTHR_JOIN_FAILURE;
+        return MNTHR_JOIN_FAILURE;
     }
     me->co.state = CO_STATE_JOIN;
     return join_waitq(&ctx->waitq);
@@ -1339,9 +1339,9 @@ mrkthr_join(mrkthr_ctx_t *ctx)
 
 
 static void
-resume_waitq_all(mrkthr_waitq_t *waitq)
+resume_waitq_all(mnthr_waitq_t *waitq)
 {
-    mrkthr_ctx_t *t;
+    mnthr_ctx_t *t;
 
     while ((t = DTQUEUE_HEAD(waitq)) != NULL) {
         assert(t->hosting_waitq = waitq);
@@ -1354,9 +1354,9 @@ resume_waitq_all(mrkthr_waitq_t *waitq)
 
 
 static void
-resume_waitq_one(mrkthr_waitq_t *waitq)
+resume_waitq_one(mnthr_waitq_t *waitq)
 {
-    mrkthr_ctx_t *t;
+    mnthr_ctx_t *t;
 
     if ((t = DTQUEUE_HEAD(waitq)) != NULL) {
         assert(t->hosting_waitq = waitq);
@@ -1369,15 +1369,15 @@ resume_waitq_one(mrkthr_waitq_t *waitq)
 
 
 void
-mrkthr_run(mrkthr_ctx_t *ctx)
+mnthr_run(mnthr_ctx_t *ctx)
 {
 #ifndef NDEBUG
     if (ctx->co.state != CO_STATE_DORMANT) {
         CTRACE("precondition failed. Non-dormant ctx is %p", ctx);
         if (ctx != NULL) {
-            D8(ctx, sizeof(mrkthr_ctx_t));
+            D8(ctx, sizeof(mnthr_ctx_t));
             CTRACE("now trying to dump it ...");
-            mrkthr_dump(ctx);
+            mnthr_dump(ctx);
         }
     }
 #endif
@@ -1387,59 +1387,59 @@ mrkthr_run(mrkthr_ctx_t *ctx)
 }
 
 
-mrkthr_ctx_t *
-mrkthr_spawn(const char *name, mrkthr_cofunc_t f, int argc, ...)
+mnthr_ctx_t *
+mnthr_spawn(const char *name, mnthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
-    mrkthr_ctx_t *ctx = NULL;
+    mnthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY(mrkthr_ctx_pop_free);
+    VNEW_BODY(mnthr_ctx_pop_free);
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_spawn");
+        FAIL("mnthr_spawn");
     }
-    mrkthr_run(ctx);
+    mnthr_run(ctx);
     return ctx;
 }
 
 
-mrkthr_ctx_t *
-mrkthr_spawn_sig(const char *name, mrkthr_cofunc_t f, int argc, ...)
+mnthr_ctx_t *
+mnthr_spawn_sig(const char *name, mnthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
-    mrkthr_ctx_t *ctx = NULL;
+    mnthr_ctx_t *ctx = NULL;
 
     va_start(ap, argc);
-    VNEW_BODY(mrkthr_ctx_new);
+    VNEW_BODY(mnthr_ctx_new);
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_spawn");
+        FAIL("mnthr_spawn");
     }
-    mrkthr_run(ctx);
+    mnthr_run(ctx);
     return ctx;
 }
 
 
 static void
-set_resume(mrkthr_ctx_t *ctx)
+set_resume(mnthr_ctx_t *ctx)
 {
 #ifndef NDEBUG
     if (ctx == me) {
         CTRACE("Attept to resume self:");
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
     }
 #endif
     assert(ctx != me);
 
     //CTRACE("Setting for resume: ---");
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
     //CTRACE("---");
 
     //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
         CTRACE("Will not resume this ctx:");
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
         return;
     }
 
@@ -1447,37 +1447,37 @@ set_resume(mrkthr_ctx_t *ctx)
     sleepq_remove(ctx);
 
     ctx->co.state = CO_STATE_SET_RESUME;
-    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
+    ctx->expire_ticks = MNTHR_SLEEP_RESUME_NOW;
     ctx->sleepq_enqueue(ctx);
 }
 
 
 void
-set_resume_fast(mrkthr_ctx_t *ctx)
+set_resume_fast(mnthr_ctx_t *ctx)
 {
 #ifndef NDEBUG
     if (ctx == me) {
         CTRACE("Attept to resume self:");
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
     }
 #endif
     assert(ctx != me);
 
     //CTRACE("Setting for resume: ---");
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
     //CTRACE("---");
 
     //assert(ctx->co.f != NULL);
     if (ctx->co.f == NULL) {
         CTRACE("Will not resume this ctx:");
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
         return;
     }
 
-    assert(ctx->expire_ticks >= MRKTHR_SLEEP_RESUME_NOW);
+    assert(ctx->expire_ticks >= MNTHR_SLEEP_RESUME_NOW);
 
     ctx->co.state = CO_STATE_SET_RESUME;
-    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
+    ctx->expire_ticks = MNTHR_SLEEP_RESUME_NOW;
     sleepq_insert_once(ctx);
 }
 
@@ -1486,26 +1486,26 @@ set_resume_fast(mrkthr_ctx_t *ctx)
  * Send an interrupt signal to the thread.
  */
 void
-mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
+mnthr_set_interrupt(mnthr_ctx_t *ctx)
 {
 #ifndef NDEBUG
     if (ctx == me) {
         CTRACE("precondition failed. self-interrupting ctx is %p", ctx);
         if (ctx != NULL) {
-            D8(ctx, sizeof(mrkthr_ctx_t));
+            D8(ctx, sizeof(mnthr_ctx_t));
             CTRACE("now trying to dump it ...");
-            mrkthr_dump(ctx);
+            mnthr_dump(ctx);
         }
     }
 #endif
     assert(ctx != me);
 
-    //mrkthr_dump(ctx);
+    //mnthr_dump(ctx);
 
     if (ctx->co.f == NULL) {
 #ifdef TRACE_VERBOSE
         CTRACE("Will not interrupt this ctx:");
-        mrkthr_dump(ctx);
+        mnthr_dump(ctx);
 #endif
         return;
     }
@@ -1519,22 +1519,22 @@ mrkthr_set_interrupt(mrkthr_ctx_t *ctx)
     /*
      * We are ignoring all event management rules here.
      */
-    ctx->co.rc = MRKTHR_CO_RC_USER_INTERRUPTED;
+    ctx->co.rc = MNTHR_CO_RC_USER_INTERRUPTED;
     ctx->co.state = CO_STATE_SET_INTERRUPT;
-    ctx->expire_ticks = MRKTHR_SLEEP_RESUME_NOW;
+    ctx->expire_ticks = MNTHR_SLEEP_RESUME_NOW;
     ctx->sleepq_enqueue(ctx);
 }
 
 
 int
-mrkthr_set_interrupt_and_join(mrkthr_ctx_t *ctx)
+mnthr_set_interrupt_and_join(mnthr_ctx_t *ctx)
 {
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
-        return MRKTHR_JOIN_FAILURE;
+        return MNTHR_JOIN_FAILURE;
     }
 
-    mrkthr_set_interrupt(ctx);
+    mnthr_set_interrupt(ctx);
 
     me->co.state = CO_STATE_JOIN_INTERRUPTED;
 
@@ -1543,19 +1543,19 @@ mrkthr_set_interrupt_and_join(mrkthr_ctx_t *ctx)
 
 
 int
-mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
+mnthr_set_interrupt_and_join_with_timeout(mnthr_ctx_t *ctx, uint64_t msec)
 {
     int res;
     int64_t id;
 
     if (!(ctx->co.state & CO_STATE_RESUMABLE)) {
         /* dormant thread, or an attempt to join self ? */
-        return MRKTHR_JOIN_FAILURE;
+        return MNTHR_JOIN_FAILURE;
     }
-    mrkthr_set_interrupt(ctx);
+    mnthr_set_interrupt(ctx);
 
     me->co.state = CO_STATE_JOIN_INTERRUPTED;
-    MRKTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
+    MNTHR_SET_EXPIRE_TICKS(msec, poller_msec2ticks_absolute);
 
     append_me_to_waitq(&ctx->waitq);
     id = ctx->co.id;
@@ -1564,14 +1564,14 @@ mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
 
     if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         sleepq_remove(me);
-        if (ctx->co.rc != (int)MRKTHR_CO_RC_USER_INTERRUPTED) {
+        if (ctx->co.rc != (int)MNTHR_CO_RC_USER_INTERRUPTED) {
             res = ctx->co.rc;
         }
     } else {
         assert(ctx->co.state & CO_STATE_RESUMABLE);
         remove_me_from_waitq(&ctx->waitq);
-        ctx->co.rc = MRKTHR_CO_RC_TIMEDOUT;
-        res = MRKTHR_WAIT_TIMEOUT;
+        ctx->co.rc = MNTHR_CO_RC_TIMEDOUT;
+        res = MNTHR_WAIT_TIMEOUT;
     }
 
     return res;
@@ -1579,7 +1579,7 @@ mrkthr_set_interrupt_and_join_with_timeout(mrkthr_ctx_t *ctx, uint64_t msec)
 
 
 int
-mrkthr_is_dead(mrkthr_ctx_t *ctx)
+mnthr_is_dead(mnthr_ctx_t *ctx)
 {
     return ctx->co.id == -1;
 }
@@ -1590,7 +1590,7 @@ mrkthr_is_dead(mrkthr_ctx_t *ctx)
  */
 
 int
-mrkthr_socket(const char *hostname,
+mnthr_socket(const char *hostname,
               const char *servname,
               int family,
               int socktype)
@@ -1631,7 +1631,7 @@ mrkthr_socket(const char *hostname,
 
 
 int
-mrkthr_socket_connect(const char *hostname,
+mnthr_socket_connect(const char *hostname,
                       const char *servname,
                       int family)
 {
@@ -1656,12 +1656,12 @@ mrkthr_socket_connect(const char *hostname,
             continue;
         }
 
-        if ((res = mrkthr_connect(fd, ai->ai_addr, ai->ai_addrlen)) != 0) {
-            if (MNDIAG_GET_LIBRARY(res) == MNDIAG_LIBRARY_MRKTHR) {
+        if ((res = mnthr_connect(fd, ai->ai_addr, ai->ai_addrlen)) != 0) {
+            if (MNDIAG_GET_LIBRARY(res) == MNDIAG_LIBRARY_MNTHR) {
                 TR(res);
             } else {
 #ifdef TRACE_VERBOSE
-                //perror("mrkthr_connect");
+                //perror("mnthr_connect");
                 CTRACE("getsockopt in progress error: %s", strerror(res));
 #endif
             }
@@ -1681,7 +1681,7 @@ mrkthr_socket_connect(const char *hostname,
 
 
 int
-mrkthr_socket_bind(const char *hostname,
+mnthr_socket_bind(const char *hostname,
                    const char *servname,
                    int family)
 {
@@ -1739,13 +1739,13 @@ mrkthr_socket_bind(const char *hostname,
 
 
 int
-mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
+mnthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int res = 0;
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
         perror("fcntl");
-        TRRET(MRKTHR_CONNECT + 1);
+        TRRET(MNTHR_CONNECT + 1);
     }
 
     if ((res = connect(fd, addr, addrlen)) != 0) {
@@ -1756,14 +1756,14 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             int optval;
             socklen_t optlen;
 
-            if (mrkthr_get_wbuflen(fd) < 0) {
-                TRRET(MRKTHR_CONNECT + 2);
+            if (mnthr_get_wbuflen(fd) < 0) {
+                TRRET(MNTHR_CONNECT + 2);
             }
 
             optlen = sizeof(optval);
             if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &optval, &optlen) != 0) {
                 perror("getsockopt");
-                TRRET(MRKTHR_CONNECT + 3);
+                TRRET(MNTHR_CONNECT + 3);
             }
             res = optval;
         }
@@ -1774,31 +1774,31 @@ mrkthr_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 
 
 int
-mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
+mnthr_accept_all(int fd, mnthr_socket_t **buf, off_t *offset)
 {
     ssize_t navail;
     ssize_t nread = 0;
-    mrkthr_socket_t *tmp;
+    mnthr_socket_t *tmp;
 
     assert(me != NULL);
 
-    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
-        TRRET(MRKTHR_ACCEPT_ALL + 1);
+    if ((navail = mnthr_get_rbuflen(fd)) <= 0) {
+        TRRET(MNTHR_ACCEPT_ALL + 1);
     }
 
-    if ((tmp = realloc(*buf, (*offset + navail) * sizeof(mrkthr_socket_t))) == NULL) {
+    if ((tmp = realloc(*buf, (*offset + navail) * sizeof(mnthr_socket_t))) == NULL) {
         FAIL("realloc");
     }
     *buf = tmp;
 
     if (navail == 0) {
         /* EOF ? */
-        TRRET(MRKTHR_ACCEPT_ALL + 2);
+        TRRET(MNTHR_ACCEPT_ALL + 2);
     }
 
     while (nread < navail) {
         tmp = *buf + (*offset + nread);
-        tmp->addrlen = sizeof(union _mrkthr_addr);
+        tmp->addrlen = sizeof(union _mnthr_addr);
 
         if ((tmp->fd = accept(fd, &tmp->addr.sa, &tmp->addrlen)) == -1) {
             //perror("accept");
@@ -1810,7 +1810,7 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
     if (nread < navail) {
         //TRACE("nread=%ld navail=%ld", nread, navail);
         if (nread == 0) {
-            TRRET(MRKTHR_ACCEPT_ALL + 4);
+            TRRET(MNTHR_ACCEPT_ALL + 4);
         }
     }
 
@@ -1821,27 +1821,27 @@ mrkthr_accept_all(int fd, mrkthr_socket_t **buf, off_t *offset)
 
 
 int
-mrkthr_accept_all2(int fd, mrkthr_socket_t **buf, off_t *offset)
+mnthr_accept_all2(int fd, mnthr_socket_t **buf, off_t *offset)
 {
-    mrkthr_socket_t *tmp;
+    mnthr_socket_t *tmp;
     ssize_t navail;
 
     assert(me != NULL);
 
-    if (mrkthr_wait_for_read(fd) != 0) {
-        TRRET(MRKTHR_ACCEPT_ALL + 1);
+    if (mnthr_wait_for_read(fd) != 0) {
+        TRRET(MNTHR_ACCEPT_ALL + 1);
     }
 
     navail = 0;
     for (navail = 0; ; ++navail) {
         if ((tmp = realloc(*buf,
                            (*offset + navail + 1) *
-                                sizeof(mrkthr_socket_t))) == NULL) {
+                                sizeof(mnthr_socket_t))) == NULL) {
             FAIL("realloc");
         }
         *buf = tmp;
         tmp = *buf + (*offset + navail);
-        tmp->addrlen = sizeof(union _mrkthr_addr);
+        tmp->addrlen = sizeof(union _mnthr_addr);
         if ((tmp->fd = accept(fd, &tmp->addr.sa, &tmp->addrlen)) == -1) {
             if (errno != EAGAIN) {
                 perror("accept");
@@ -1852,7 +1852,7 @@ mrkthr_accept_all2(int fd, mrkthr_socket_t **buf, off_t *offset)
 
     if (navail == 0) {
         /* EOF ? */
-        TRRET(MRKTHR_ACCEPT_ALL + 2);
+        TRRET(MNTHR_ACCEPT_ALL + 2);
     }
 
     *offset += navail;
@@ -1866,7 +1866,7 @@ mrkthr_accept_all2(int fd, mrkthr_socket_t **buf, off_t *offset)
  * operation and read into that location from fd.
  */
 int
-mrkthr_read_all(int fd, char **buf, off_t *offset)
+mnthr_read_all(int fd, char **buf, off_t *offset)
 {
     ssize_t navail;
     ssize_t nread;
@@ -1874,8 +1874,8 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
 
     assert(me != NULL);
 
-    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
-        TRRET(MRKTHR_READ_ALL + 1);
+    if ((navail = mnthr_get_rbuflen(fd)) <= 0) {
+        TRRET(MNTHR_READ_ALL + 1);
     }
 
     if ((tmp = realloc(*buf, *offset + navail)) == NULL) {
@@ -1885,18 +1885,18 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
 
     if (navail == 0) {
         /* EOF ? */
-        TRRET(MRKTHR_READ_ALL + 2);
+        TRRET(MNTHR_READ_ALL + 2);
     }
 
     if ((nread = read(fd, *buf + *offset, navail)) == -1) {
         perror("read");
-        TRRET(MRKTHR_READ_ALL + 3);
+        TRRET(MNTHR_READ_ALL + 3);
     }
 
     if (nread < navail) {
         //TRACE("nread=%ld navail=%ld", nread, navail);
         if (nread == 0) {
-            TRRET(MRKTHR_READ_ALL + 4);
+            TRRET(MNTHR_READ_ALL + 4);
         }
     }
 
@@ -1911,14 +1911,14 @@ mrkthr_read_all(int fd, char **buf, off_t *offset)
  * Return the number of bytes read or -1 in case of error.
  */
 ssize_t
-mrkthr_read_allb(int fd, char *buf, ssize_t sz)
+mnthr_read_allb(int fd, char *buf, ssize_t sz)
 {
     ssize_t navail;
     ssize_t nread;
 
     assert(me != NULL);
 
-    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
+    if ((navail = mnthr_get_rbuflen(fd)) <= 0) {
         return -1;
     }
 
@@ -1940,10 +1940,10 @@ mrkthr_read_allb(int fd, char *buf, ssize_t sz)
 
 
 /*
- * edge-triggered version of mrkthr_read_allb()
+ * edge-triggered version of mnthr_read_allb()
  */
 ssize_t
-mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
+mnthr_read_allb_et(int fd, char *buf, ssize_t sz)
 {
     ssize_t nleft, totread;
 
@@ -1956,7 +1956,7 @@ mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 ssize_t navail;
 
-                if ((navail = mrkthr_get_rbuflen(fd)) < 0) {
+                if ((navail = mnthr_get_rbuflen(fd)) < 0) {
                     return -1;
                 }
                 continue;
@@ -1976,7 +1976,7 @@ mrkthr_read_allb_et(int fd, char *buf, ssize_t sz)
 
 
 ssize_t
-mrkthr_recv_allb(int fd, char *buf, ssize_t sz, int flags)
+mnthr_recv_allb(int fd, char *buf, ssize_t sz, int flags)
 {
     ssize_t navail;
     ssize_t nread;
@@ -1984,7 +1984,7 @@ mrkthr_recv_allb(int fd, char *buf, ssize_t sz, int flags)
     assert(me != NULL);
     assert(sz >= 0);
 
-    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
+    if ((navail = mnthr_get_rbuflen(fd)) <= 0) {
         return -1;
     }
 
@@ -2010,7 +2010,7 @@ mrkthr_recv_allb(int fd, char *buf, ssize_t sz, int flags)
  * Return the number of bytes received or -1 in case of error.
  */
 ssize_t
-mrkthr_recvfrom_allb(int fd,
+mnthr_recvfrom_allb(int fd,
                      void * restrict buf,
                      ssize_t sz,
                      int flags,
@@ -2022,7 +2022,7 @@ mrkthr_recvfrom_allb(int fd,
 
     assert(me != NULL);
 
-    if ((navail = mrkthr_get_rbuflen(fd)) <= 0) {
+    if ((navail = mnthr_get_rbuflen(fd)) <= 0) {
         return -1;
     }
 
@@ -2047,7 +2047,7 @@ mrkthr_recvfrom_allb(int fd,
  * Write len bytes from buf into fd.
  */
 int
-mrkthr_write_all(int fd, const char *buf, size_t len)
+mnthr_write_all(int fd, const char *buf, size_t len)
 {
     ssize_t navail;
     ssize_t nwritten;
@@ -2056,14 +2056,14 @@ mrkthr_write_all(int fd, const char *buf, size_t len)
     assert(me != NULL);
 
     while (remaining > 0) {
-        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
-            TRRET(MRKTHR_WRITE_ALL + 1);
+        if ((navail = mnthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MNTHR_WRITE_ALL + 1);
         }
 
         if ((nwritten = write(fd, buf + len - remaining,
                               MIN(navail, remaining))) == -1) {
 
-            TRRET(MRKTHR_WRITE_ALL + 2);
+            TRRET(MNTHR_WRITE_ALL + 2);
         }
         remaining -= nwritten;
     }
@@ -2072,7 +2072,7 @@ mrkthr_write_all(int fd, const char *buf, size_t len)
 
 
 int
-mrkthr_write_all_et(int fd, const char *buf, size_t len)
+mnthr_write_all_et(int fd, const char *buf, size_t len)
 {
     ssize_t nwritten;
     off_t remaining = len;
@@ -2084,13 +2084,13 @@ mrkthr_write_all_et(int fd, const char *buf, size_t len)
         if ((nwritten = write(fd, buf + len - remaining,
                               MIN(navail, remaining))) == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
-                    TRRET(MRKTHR_WRITE_ALL + 1);
+                if ((navail = mnthr_get_wbuflen(fd)) <= 0) {
+                    TRRET(MNTHR_WRITE_ALL + 1);
                 }
                 continue;
 
             } else {
-                TRRET(MRKTHR_WRITE_ALL + 2);
+                TRRET(MNTHR_WRITE_ALL + 2);
             }
 
         }
@@ -2102,7 +2102,7 @@ mrkthr_write_all_et(int fd, const char *buf, size_t len)
 
 
 int
-mrkthr_send_all(int fd, const char *buf, size_t len, int flags)
+mnthr_send_all(int fd, const char *buf, size_t len, int flags)
 {
     ssize_t navail;
     ssize_t nwritten;
@@ -2111,15 +2111,15 @@ mrkthr_send_all(int fd, const char *buf, size_t len, int flags)
     assert(me != NULL);
 
     while (remaining > 0) {
-        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
-            TRRET(MRKTHR_WRITE_ALL + 1);
+        if ((navail = mnthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MNTHR_WRITE_ALL + 1);
         }
 
         if ((nwritten = send(fd, buf + len - remaining,
                               MIN(navail, remaining),
                               flags)) == -1) {
 
-            TRRET(MRKTHR_WRITE_ALL + 2);
+            TRRET(MNTHR_WRITE_ALL + 2);
         }
         remaining -= nwritten;
     }
@@ -2131,7 +2131,7 @@ mrkthr_send_all(int fd, const char *buf, size_t len, int flags)
  * Write len bytes from buf into fd.
  */
 int
-mrkthr_sendto_all(int fd,
+mnthr_sendto_all(int fd,
                   const void *buf,
                   size_t len,
                   int flags,
@@ -2145,15 +2145,15 @@ mrkthr_sendto_all(int fd,
     assert(me != NULL);
 
     while (remaining > 0) {
-        if ((navail = mrkthr_get_wbuflen(fd)) <= 0) {
-            TRRET(MRKTHR_SENDTO_ALL + 1);
+        if ((navail = mnthr_get_wbuflen(fd)) <= 0) {
+            TRRET(MNTHR_SENDTO_ALL + 1);
         }
 
         if ((nwritten = sendto(fd, ((const char *)buf) + len - remaining,
                                MIN((size_t)navail, remaining),
                                flags, to, tolen)) == -1) {
 
-            TRRET(MRKTHR_SENDTO_ALL + 2);
+            TRRET(MNTHR_SENDTO_ALL + 2);
         }
         remaining -= nwritten;
     }
@@ -2162,7 +2162,7 @@ mrkthr_sendto_all(int fd,
 
 
 int
-mrkthr_sendfile_np(int fd,
+mnthr_sendfile_np(int fd,
                    int s,
                    off_t offset,
                    size_t nbytes,
@@ -2178,8 +2178,8 @@ mrkthr_sendfile_np(int fd,
     _sbytes = 0;
 
     while (_sbytes == 0) {
-        if (mrkthr_get_wbuflen(s) <= 0) {
-            TRRET(MRKTHR_SENDFILE + 1);
+        if (mnthr_get_wbuflen(s) <= 0) {
+            TRRET(MNTHR_SENDFILE + 1);
         }
 #ifdef SENDFILE_DARWIN_STYLE
         _sbytes = nbytes;
@@ -2196,13 +2196,13 @@ mrkthr_sendfile_np(int fd,
 #endif
             == -1) {
             if (errno == EBUSY) {
-                if (mrkthr_get_rbuflen(fd) <= 0) {
-                    TRRET(MRKTHR_SENDFILE + 2);
+                if (mnthr_get_rbuflen(fd) <= 0) {
+                    TRRET(MNTHR_SENDFILE + 2);
                 }
                 continue;
 
             } else {
-                TRRET(MRKTHR_SENDFILE + 3);
+                TRRET(MNTHR_SENDFILE + 3);
             }
         }
         break;
@@ -2217,15 +2217,15 @@ mrkthr_sendfile_np(int fd,
 
 
 int
-mrkthr_sendfile(int fd,
+mnthr_sendfile(int fd,
                 int s,
                 off_t *offset,
                 size_t nbytes)
 {
     ssize_t nread;
 
-    if (mrkthr_get_wbuflen(s) <= 0) {
-        TRRET(MRKTHR_SENDFILE + 1);
+    if (mnthr_get_wbuflen(s) <= 0) {
+        TRRET(MNTHR_SENDFILE + 1);
     }
 
     nread = 0;
@@ -2259,35 +2259,35 @@ mrkthr_sendfile(int fd,
  * Event Primitive.
  */
 void
-mrkthr_signal_init(mrkthr_signal_t *signal, mrkthr_ctx_t *ctx)
+mnthr_signal_init(mnthr_signal_t *signal, mnthr_ctx_t *ctx)
 {
     signal->owner = ctx;
 }
 
 
 void
-mrkthr_signal_fini(mrkthr_signal_t *signal)
+mnthr_signal_fini(mnthr_signal_t *signal)
 {
     signal->owner = NULL;
 }
 
 
 int
-mrkthr_signal_has_owner(mrkthr_signal_t *signal)
+mnthr_signal_has_owner(mnthr_signal_t *signal)
 {
     return signal->owner != NULL;
 }
 
 
-mrkthr_ctx_t *
-mrkthr_signal_get_owner(mrkthr_signal_t *signal)
+mnthr_ctx_t *
+mnthr_signal_get_owner(mnthr_signal_t *signal)
 {
     return signal->owner;
 }
 
 
 int
-mrkthr_signal_subscribe(mrkthr_signal_t *signal)
+mnthr_signal_subscribe(mnthr_signal_t *signal)
 {
     int res;
 
@@ -2301,7 +2301,7 @@ mrkthr_signal_subscribe(mrkthr_signal_t *signal)
 
 
 int
-mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal,
+mnthr_signal_subscribe_with_timeout(mnthr_signal_t *signal,
                                      uint64_t msec)
 {
     int res;
@@ -2310,10 +2310,10 @@ mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal,
     signal->owner = me;
     me->co.state = CO_STATE_SIGNAL_SUBSCRIBE;
     res = sleepmsec(msec);
-    if (me->expire_ticks == MRKTHR_SLEEP_UNDEFINED) {
+    if (me->expire_ticks == MNTHR_SLEEP_UNDEFINED) {
         /* I had been sleeping, but was resumed by signal_send() ... */
     } else {
-        res = MRKTHR_WAIT_TIMEOUT;
+        res = MNTHR_WAIT_TIMEOUT;
     }
     signal->owner = NULL;
     return res;
@@ -2321,7 +2321,7 @@ mrkthr_signal_subscribe_with_timeout(mrkthr_signal_t *signal,
 
 
 void
-mrkthr_signal_send(mrkthr_signal_t *signal)
+mnthr_signal_send(mnthr_signal_t *signal)
 {
     //CTRACE("signal->owner=%p", signal->owner);
     if (signal->owner != NULL) {
@@ -2342,7 +2342,7 @@ mrkthr_signal_send(mrkthr_signal_t *signal)
 
 
 void
-mrkthr_signal_error(mrkthr_signal_t *signal, int rc)
+mnthr_signal_error(mnthr_signal_t *signal, int rc)
 {
     if (signal->owner != NULL) {
         if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {
@@ -2354,7 +2354,7 @@ mrkthr_signal_error(mrkthr_signal_t *signal, int rc)
 
 
 int
-mrkthr_signal_error_and_join(mrkthr_signal_t *signal, int rc)
+mnthr_signal_error_and_join(mnthr_signal_t *signal, int rc)
 {
     if (signal->owner != NULL) {
         if (signal->owner->co.state == CO_STATE_SIGNAL_SUBSCRIBE) {
@@ -2372,14 +2372,14 @@ mrkthr_signal_error_and_join(mrkthr_signal_t *signal, int rc)
  * Condition Variable Primitive.
  */
 void
-mrkthr_cond_init(mrkthr_cond_t *cond)
+mnthr_cond_init(mnthr_cond_t *cond)
 {
     DTQUEUE_INIT(&cond->waitq);
 }
 
 
 int
-mrkthr_cond_wait(mrkthr_cond_t *cond)
+mnthr_cond_wait(mnthr_cond_t *cond)
 {
     me->co.state = CO_STATE_CONDWAIT;
     return join_waitq(&cond->waitq);
@@ -2387,23 +2387,23 @@ mrkthr_cond_wait(mrkthr_cond_t *cond)
 
 
 void
-mrkthr_cond_signal_all(mrkthr_cond_t *cond)
+mnthr_cond_signal_all(mnthr_cond_t *cond)
 {
     resume_waitq_all(&cond->waitq);
 }
 
 
 void
-mrkthr_cond_signal_one(mrkthr_cond_t *cond)
+mnthr_cond_signal_one(mnthr_cond_t *cond)
 {
     resume_waitq_one(&cond->waitq);
 }
 
 
 void
-mrkthr_cond_fini(mrkthr_cond_t *cond)
+mnthr_cond_fini(mnthr_cond_t *cond)
 {
-    mrkthr_cond_signal_all(cond);
+    mnthr_cond_signal_all(cond);
     DTQUEUE_FINI(&cond->waitq);
 }
 
@@ -2413,16 +2413,16 @@ mrkthr_cond_fini(mrkthr_cond_t *cond)
  * Semaphore Primitive.
  */
 void
-mrkthr_sema_init(mrkthr_sema_t *sema, int n)
+mnthr_sema_init(mnthr_sema_t *sema, int n)
 {
-    mrkthr_cond_init(&sema->cond);
+    mnthr_cond_init(&sema->cond);
     sema->n = n;
     sema->i = n;
 }
 
 
 int
-mrkthr_sema_acquire(mrkthr_sema_t *sema)
+mnthr_sema_acquire(mnthr_sema_t *sema)
 {
     //int res = me->co.rc;
     int res = 0;
@@ -2432,7 +2432,7 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
 
     } else {
         while (sema->i == 0) {
-            if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
+            if ((res = mnthr_cond_wait(&sema->cond)) != 0) {
                 return res;
             }
         }
@@ -2445,7 +2445,7 @@ mrkthr_sema_acquire(mrkthr_sema_t *sema)
 
 
 int
-mrkthr_sema_try_acquire(mrkthr_sema_t *sema)
+mnthr_sema_try_acquire(mnthr_sema_t *sema)
 {
     //int res = me->co.rc;
     int res = 0;
@@ -2453,7 +2453,7 @@ mrkthr_sema_try_acquire(mrkthr_sema_t *sema)
     if (sema->i > 0) {
         --(sema->i);
     } else {
-        res = MRKTHR_SEMA_TRY_ACQUIRE_FAIL;
+        res = MNTHR_SEMA_TRY_ACQUIRE_FAIL;
     }
 
     return res;
@@ -2461,21 +2461,21 @@ mrkthr_sema_try_acquire(mrkthr_sema_t *sema)
 
 
 void
-mrkthr_sema_release(mrkthr_sema_t *sema)
+mnthr_sema_release(mnthr_sema_t *sema)
 {
     if (!((sema->i >= 0) && (sema->i < sema->n))) {
         CTRACE("i=%d n=%d", sema->i, sema->n);
     }
     assert((sema->i >= 0) && (sema->i < sema->n));
-    mrkthr_cond_signal_one(&sema->cond);
+    mnthr_cond_signal_one(&sema->cond);
     ++(sema->i);
 }
 
 
 void
-mrkthr_sema_fini(mrkthr_sema_t *sema)
+mnthr_sema_fini(mnthr_sema_t *sema)
 {
-    mrkthr_cond_fini(&sema->cond);
+    mnthr_cond_fini(&sema->cond);
     sema->n = -1;
     sema->i = -1;
 }
@@ -2485,25 +2485,25 @@ mrkthr_sema_fini(mrkthr_sema_t *sema)
  * Inverted Semaphore
  */
 void
-mrkthr_inverted_sema_init(mrkthr_inverted_sema_t *sema, int n)
+mnthr_inverted_sema_init(mnthr_inverted_sema_t *sema, int n)
 {
-    mrkthr_cond_init(&sema->cond);
+    mnthr_cond_init(&sema->cond);
     sema->n = n;
     sema->i = 0;
 }
 
 
 void
-mrkthr_inverted_sema_acquire(mrkthr_inverted_sema_t *sema)
+mnthr_inverted_sema_acquire(mnthr_inverted_sema_t *sema)
 {
     assert((sema->i >= 0) && (sema->i <= sema->n));
     ++sema->i;
-    mrkthr_cond_signal_one(&sema->cond);
+    mnthr_cond_signal_one(&sema->cond);
 }
 
 
 void
-mrkthr_inverted_sema_release(mrkthr_inverted_sema_t *sema)
+mnthr_inverted_sema_release(mnthr_inverted_sema_t *sema)
 {
     --sema->i;
     assert((sema->i >= 0) && (sema->i <= sema->n));
@@ -2511,14 +2511,14 @@ mrkthr_inverted_sema_release(mrkthr_inverted_sema_t *sema)
 
 
 int
-mrkthr_inverted_sema_wait(mrkthr_inverted_sema_t *sema)
+mnthr_inverted_sema_wait(mnthr_inverted_sema_t *sema)
 {
     int res;
 
     assert((sema->i >= 0) && (sema->i <= sema->n));
     res = 0;
     while (sema->i < sema->n) {
-        if ((res = mrkthr_cond_wait(&sema->cond)) != 0) {
+        if ((res = mnthr_cond_wait(&sema->cond)) != 0) {
             return res;
         }
     }
@@ -2528,9 +2528,9 @@ mrkthr_inverted_sema_wait(mrkthr_inverted_sema_t *sema)
 
 
 void
-mrkthr_inverted_sema_fini(mrkthr_inverted_sema_t *sema)
+mnthr_inverted_sema_fini(mnthr_inverted_sema_t *sema)
 {
-    mrkthr_cond_fini(&sema->cond);
+    mnthr_cond_fini(&sema->cond);
     sema->n = -1;
     sema->i = -1;
 }
@@ -2541,22 +2541,22 @@ mrkthr_inverted_sema_fini(mrkthr_inverted_sema_t *sema)
  * Readers-writer Lock Primitive.
  */
 void
-mrkthr_rwlock_init(mrkthr_rwlock_t *lock)
+mnthr_rwlock_init(mnthr_rwlock_t *lock)
 {
-    mrkthr_cond_init(&lock->cond);
+    mnthr_cond_init(&lock->cond);
     lock->nreaders = 0;
     lock->fwriter = false;
 }
 
 
 int
-mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
+mnthr_rwlock_acquire_read(mnthr_rwlock_t *lock)
 {
     //int res = me->co.rc;
     int res = 0;
 
     while (lock->fwriter) {
-        if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
+        if ((res = mnthr_cond_wait(&lock->cond)) != 0) {
             return res;
         }
     }
@@ -2570,10 +2570,10 @@ mrkthr_rwlock_acquire_read(mrkthr_rwlock_t *lock)
 
 
 int
-mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *lock)
+mnthr_rwlock_try_acquire_read(mnthr_rwlock_t *lock)
 {
     if (lock->fwriter) {
-        return MRKTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL;
+        return MNTHR_RWLOCK_TRY_ACQUIRE_READ_FAIL;
     }
 
     assert(!lock->fwriter);
@@ -2585,26 +2585,26 @@ mrkthr_rwlock_try_acquire_read(mrkthr_rwlock_t *lock)
 
 
 void
-mrkthr_rwlock_release_read(mrkthr_rwlock_t *lock)
+mnthr_rwlock_release_read(mnthr_rwlock_t *lock)
 {
     assert(!lock->fwriter);
 
     --(lock->nreaders);
     if (lock->nreaders == 0) {
-        mrkthr_cond_signal_one(&lock->cond);
+        mnthr_cond_signal_one(&lock->cond);
     }
 }
 
 
 int
-mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
+mnthr_rwlock_acquire_write(mnthr_rwlock_t *lock)
 {
     //int res = me->co.rc;
     int res = 0;
 
     while (lock->fwriter || (lock->nreaders > 0)) {
 
-        if ((res = mrkthr_cond_wait(&lock->cond)) != 0) {
+        if ((res = mnthr_cond_wait(&lock->cond)) != 0) {
             return res;
         }
     }
@@ -2618,10 +2618,10 @@ mrkthr_rwlock_acquire_write(mrkthr_rwlock_t *lock)
 
 
 int
-mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
+mnthr_rwlock_try_acquire_write(mnthr_rwlock_t *lock)
 {
     if (lock->fwriter || (lock->nreaders > 0)) {
-        return MRKTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL;
+        return MNTHR_RWLOCK_TRY_ACQUIRE_WRITE_FAIL;
     }
 
     assert(!(lock->fwriter || (lock->nreaders > 0)));
@@ -2633,19 +2633,19 @@ mrkthr_rwlock_try_acquire_write(mrkthr_rwlock_t *lock)
 
 
 void
-mrkthr_rwlock_release_write(mrkthr_rwlock_t *lock)
+mnthr_rwlock_release_write(mnthr_rwlock_t *lock)
 {
     assert(lock->fwriter && (lock->nreaders == 0));
 
     lock->fwriter = false;
-    mrkthr_cond_signal_all(&lock->cond);
+    mnthr_cond_signal_all(&lock->cond);
 }
 
 
 void
-mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
+mnthr_rwlock_fini(mnthr_rwlock_t *lock)
 {
-    mrkthr_cond_fini(&lock->cond);
+    mnthr_cond_fini(&lock->cond);
     lock->nreaders = 0;
     lock->fwriter = false;
 }
@@ -2656,23 +2656,23 @@ mrkthr_rwlock_fini(mrkthr_rwlock_t *lock)
  * specified inverval of time.
  *
  * Return either thread's return code (typically >= 0), or
- * MRKTHR_WAIT_TIMEOUT.
+ * MNTHR_WAIT_TIMEOUT.
  */
 int
-mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ...)
+mnthr_wait_for(uint64_t msec, const char *name, mnthr_cofunc_t f, int argc, ...)
 {
     va_list ap;
     int res;
-    mrkthr_ctx_t *ctx;
+    mnthr_ctx_t *ctx;
     int64_t id;
 
     assert(me != NULL);
 
     va_start(ap, argc);
-    VNEW_BODY(mrkthr_ctx_pop_free);
+    VNEW_BODY(mnthr_ctx_pop_free);
     va_end(ap);
     if (ctx == NULL) {
-        FAIL("mrkthr_wait_for");
+        FAIL("mnthr_wait_for");
     }
 
     me->co.state = CO_STATE_WAITFOR;
@@ -2683,20 +2683,20 @@ mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ..
     id = ctx->co.id;
 
     //CTRACE("before sleep:");
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
 
     res = sleepmsec(msec);
 
     /* now remove me from both queues */
 
     //CTRACE("after sleep:");
-    //mrkthr_dump_sleepq();
+    //mnthr_dump_sleepq();
 
     if (ctx->co.id != id || ctx->co.state == CO_STATE_DORMANT) {
         /* I had been sleeping, but by their exit I was resumed ... */
 
         //CTRACE("removing me:");
-        //mrkthr_dump(me);
+        //mnthr_dump(me);
 
         sleepq_remove(me);
 
@@ -2709,18 +2709,18 @@ mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ..
         remove_me_from_waitq(&ctx->waitq);
 #ifndef NDEBUG
         if (ctx == me) {
-            CTRACE("self-interrupting from within mrkthr_wait_for:");
-            mrkthr_dump(ctx);
+            CTRACE("self-interrupting from within mnthr_wait_for:");
+            mnthr_dump(ctx);
         }
 #endif
-        mrkthr_set_interrupt(ctx);
+        mnthr_set_interrupt(ctx);
         /*
-         * override co.rc (was set to MRKTHR_CO_RC_USER_INTERRUPTED in
-         * mrkthr_set_interrupt())
+         * override co.rc (was set to MNTHR_CO_RC_USER_INTERRUPTED in
+         * mnthr_set_interrupt())
          */
-        ctx->co.rc = MRKTHR_CO_RC_TIMEDOUT;
+        ctx->co.rc = MNTHR_CO_RC_TIMEDOUT;
 
-        res = MRKTHR_WAIT_TIMEOUT;
+        res = MNTHR_WAIT_TIMEOUT;
     }
 
     return res;
@@ -2728,11 +2728,11 @@ mrkthr_wait_for(uint64_t msec, const char *name, mrkthr_cofunc_t f, int argc, ..
 
 
 /*
- * Returns as mrkthr_wait_for(), except it does not interrupt the target
+ * Returns as mnthr_wait_for(), except it does not interrupt the target
  * thread.
  */
 int
-mrkthr_peek(mrkthr_ctx_t *ctx, uint64_t msec)
+mnthr_peek(mnthr_ctx_t *ctx, uint64_t msec)
 {
     int res;
     int64_t id;
@@ -2745,7 +2745,7 @@ mrkthr_peek(mrkthr_ctx_t *ctx, uint64_t msec)
         /* I had been sleeping, but by their exit I was resumed ... */
 
         //CTRACE("removing me:");
-        //mrkthr_dump(me);
+        //mnthr_dump(me);
 
         sleepq_remove(me);
 
@@ -2758,11 +2758,11 @@ mrkthr_peek(mrkthr_ctx_t *ctx, uint64_t msec)
         remove_me_from_waitq(&ctx->waitq);
 #ifndef NDEBUG
         if (ctx == me) {
-            CTRACE("self-interrupting from within mrkthr_peek:");
-            mrkthr_dump(ctx);
+            CTRACE("self-interrupting from within mnthr_peek:");
+            mnthr_dump(ctx);
         }
 #endif
-        res = MRKTHR_WAIT_TIMEOUT;
+        res = MNTHR_WAIT_TIMEOUT;
     }
 
     return res;

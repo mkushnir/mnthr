@@ -14,12 +14,12 @@ DISTDIR=/data0/mkushnir/distfiles
 GNU_CONFIGURE=	yes
 CONFIGURE_ENV=	LDFLAGS="-L${LOCALBASE}/lib -L${HOME}/lib" CFLAGS=-I${HOME}/include
 
-PLIST_FILES=	include/mrkthr.h \
-		lib/libmrkthr.a \
-		lib/libmrkthr.la \
-		lib/libmrkthr.so \
-		lib/libmrkthr.so.0 \
-		lib/libmrkthr.so.0.0.0
+PLIST_FILES=	include/mnthr.h \
+		lib/libmnthr.a \
+		lib/libmnthr.la \
+		lib/libmnthr.so \
+		lib/libmnthr.so.0 \
+		lib/libmnthr.so.0.0.0
 
 PLIST_DIRS=	lib include
 

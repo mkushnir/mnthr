@@ -7,10 +7,10 @@
 
 
 #define TRRET_DEBUG
-#include "mrkcommon/bytestream.h"
-#include "mrkcommon/dumpm.h"
-#include "mrkcommon/util.h"
-#include "mrkthr.h"
+#include "mncommon/bytestream.h"
+#include "mncommon/dumpm.h"
+#include "mncommon/util.h"
+#include "mnthr.h"
 
 #include "diag.h"
 
@@ -30,9 +30,9 @@ _bytestream_consume_data(UNUSED int argc, void **argv)
     fd = (int)(uintptr_t)argv[1];
 
     res = bytestream_consume_data(bs, (void *)(intptr_t)fd);
-    //mrkthr_set_retval(res);
+    //mnthr_set_retval(res);
     //return res;
-    MRKTHRET(res);
+    MNTHRET(res);
 }
 
 static int
@@ -40,7 +40,7 @@ bytestream_consume_data_with_timeout(mnbytestream_t *bs,
                                      void *fd,
                                      uint64_t tmout)
 {
-    return mrkthr_wait_for(tmout,
+    return mnthr_wait_for(tmout,
                            NULL,
                            _bytestream_consume_data,
                            2,
@@ -66,8 +66,8 @@ run0(UNUSED int argc, UNUSED void **argv)
 
     bytestream_init(&bs, 1024*1024);
 
-    bs.read_more = mrkthr_bytestream_read_more;
-    bs.write = mrkthr_bytestream_write;
+    bs.read_more = mnthr_bytestream_read_more;
+    bs.write = mnthr_bytestream_write;
     while (bytestream_consume_data_with_timeout(&bs, (void *)(intptr_t)fdin, 1000) == 0) {
         SPOS(&bs) = SEOD(&bs);
     }
@@ -103,8 +103,8 @@ run1(UNUSED int argc, UNUSED void **argv)
 
     bytestream_init(&bs, 1024*1024);
 
-    bs.read_more = mrkthr_bytestream_read_more;
-    bs.write = mrkthr_bytestream_write;
+    bs.read_more = mnthr_bytestream_read_more;
+    bs.write = mnthr_bytestream_write;
     while ((res = bytestream_consume_data_with_timeout(
                 &bs,
                 (void *)(intptr_t)fdin,
@@ -137,8 +137,8 @@ run2(UNUSED int argc, UNUSED void **argv)
     int fdin, fdout;
     mnbytestream_t bs;
 
-    if ((fdin = mrkthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
-        perror("mrkthr_socket_connect");
+    if ((fdin = mnthr_socket_connect("10.1.2.10", "1234", PF_INET)) == -1) {
+        perror("mnthr_socket_connect");
         return 1;
     }
 
@@ -149,8 +149,8 @@ run2(UNUSED int argc, UNUSED void **argv)
 
     bytestream_init(&bs, 1024*1024);
 
-    bs.read_more = mrkthr_bytestream_read_more;
-    bs.write = mrkthr_bytestream_write;
+    bs.read_more = mnthr_bytestream_read_more;
+    bs.write = mnthr_bytestream_write;
     while ((res = bytestream_consume_data_with_timeout(
                     &bs,
                     (void *)(intptr_t)fdin,
@@ -174,13 +174,13 @@ main(void)
 {
     int res;
 
-    mrkthr_init();
+    mnthr_init();
 
-    //mrkthr_spawn("run0", run0, 0);
-    //mrkthr_spawn("run1", run1, 0);
-    mrkthr_spawn("run2", run2, 0);
-    res = mrkthr_loop();
+    //mnthr_spawn("run0", run0, 0);
+    //mnthr_spawn("run1", run1, 0);
+    mnthr_spawn("run2", run2, 0);
+    res = mnthr_loop();
 
-    mrkthr_fini();
+    mnthr_fini();
     return res;
 }

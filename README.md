@@ -1,4 +1,4 @@
-mrkthr
+mnthr
 ======
 
 User-level threading library inspired by [ironport/shrapnel](https://github.com/ironport/shrapnel).
@@ -35,7 +35,7 @@ Limitations:
     virtual address space limit.
 
 
-Dependencies: [mkushnir/mrkcommon](https://github.com/mkushnir/mrkcommon).
+Dependencies: [mkushnir/mncommon](https://github.com/mkushnir/mncommon).
 
 The porject is gradually getting mature.
 

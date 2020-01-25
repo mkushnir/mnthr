@@ -1,6 +1,6 @@
 #include <sys/mman.h>
-#include <mrkcommon/btrie.h>
-#include "mrkthr_private.h"
+#include <mncommon/btrie.h>
+#include "mnthr_private.h"
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

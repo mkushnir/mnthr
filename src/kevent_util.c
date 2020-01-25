@@ -4,7 +4,7 @@
 #include <sys/event.h>
 #include <sys/time.h>
 
-#include "mrkcommon/dumpm.h"
+#include "mncommon/dumpm.h"
 
 static const char *
 kevent_flags_str (unsigned short f)

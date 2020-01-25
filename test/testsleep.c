@@ -2,9 +2,9 @@
 #include <inttypes.h>
 
 
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
-#include <mrkthr.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
+#include <mnthr.h>
 #include "unittest.h"
 
 UNUSED static int
@@ -15,14 +15,14 @@ sleeper(UNUSED int id, UNUSED void *argv[])
         uint64_t before_nsec, after_nsec;
         int n = (int)(intptr_t)(argv[0]);
 
-        before = mrkthr_get_now_ticks_precise();
-        before_nsec = mrkthr_get_now_nsec_precise();
-        if (mrkthr_sleep(n * 1000) != 0) {
+        before = mnthr_get_now_ticks_precise();
+        before_nsec = mnthr_get_now_nsec_precise();
+        if (mnthr_sleep(n * 1000) != 0) {
             break;
         }
-        after = mrkthr_get_now_ticks_precise();
-        after_nsec = mrkthr_get_now_nsec_precise();
-        CTRACE("sleep=%Lf/%Lf", mrkthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
+        after = mnthr_get_now_ticks_precise();
+        after_nsec = mnthr_get_now_nsec_precise();
+        CTRACE("sleep=%Lf/%Lf", mnthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
     }
     return 0;
 }
@@ -37,14 +37,14 @@ waitee(UNUSED int id, UNUSED void *argv[])
 
     CTRACE("waitee %d sleeping for: %"PRId64" ...", n, (uint64_t)(n * 1000));
 
-    before = mrkthr_get_now_ticks_precise();
-    before_nsec = mrkthr_get_now_nsec_precise();
-    if ((res = mrkthr_sleep(n * 1000)) != 0) {
+    before = mnthr_get_now_ticks_precise();
+    before_nsec = mnthr_get_now_nsec_precise();
+    if ((res = mnthr_sleep(n * 1000)) != 0) {
         CTRACE("waitee %d res=%d", n, res);
     }
-    after = mrkthr_get_now_ticks_precise();
-    after_nsec = mrkthr_get_now_nsec_precise();
-    //CTRACE("sleep=%Lf/%Lf", mrkthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
+    after = mnthr_get_now_ticks_precise();
+    after_nsec = mnthr_get_now_nsec_precise();
+    //CTRACE("sleep=%Lf/%Lf", mnthr_ticks2sec(after-before), (after_nsec-before_nsec)/1000000000.L);
     return 0;
 }
 
@@ -61,7 +61,7 @@ waiter(UNUSED int id, UNUSED void *argv[])
 
         snprintf(buf, sizeof(buf), "we%d", n);
         CTRACE(">>> about to run waitee %d ...", n);
-        res = mrkthr_wait_for(3000, buf, waitee, 1, n);
+        res = mnthr_wait_for(3000, buf, waitee, 1, n);
         CTRACE("<<< waitee %d returned %d", n, res);
         //LTRACE(n, "waitee %d res=%d", n, res);
     }
@@ -73,12 +73,12 @@ spawner(UNUSED int argc, UNUSED void *argv[])
 {
     int i;
 
-    mrkthr_spawn("wr2", waiter, 1, 2);
+    mnthr_spawn("wr2", waiter, 1, 2);
     for (i = 4; i < 6; ++i) {
         char buf[64];
 
         snprintf(buf, sizeof(buf), "wr%d", i);
-        mrkthr_spawn(buf, waiter, 1, i);
+        mnthr_spawn(buf, waiter, 1, i);
     }
     return(0);
 }
@@ -86,17 +86,17 @@ spawner(UNUSED int argc, UNUSED void *argv[])
 static void
 test0(void)
 {
-    if (mrkthr_init() != 0) {
-        perror("mrkthr_init");
+    if (mnthr_init() != 0) {
+        perror("mnthr_init");
         return;
     }
 
-    mrkthr_spawn("spawner", spawner, 0);
+    mnthr_spawn("spawner", spawner, 0);
 
-    mrkthr_loop();
+    mnthr_loop();
 
-    if (mrkthr_fini() != 0) {
-        perror("mrkthr_fini");
+    if (mnthr_fini() != 0) {
+        perror("mnthr_fini");
         return;
     }
 

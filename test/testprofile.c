@@ -1,15 +1,15 @@
 #define NO_PROFILE
-#include <mrkcommon/profile.h>
+#include <mncommon/profile.h>
 
-#include <mrkcommon/dumpm.h>
-#include <mrkcommon/util.h>
-#include <mrkthr.h>
+#include <mncommon/dumpm.h>
+#include <mncommon/util.h>
+#include <mnthr.h>
 #include "unittest.h"
 
-extern const profile_t *mrkthr_user_p;
-extern const profile_t *mrkthr_swap_p;
-extern const profile_t *mrkthr_sched0_p;
-extern const profile_t *mrkthr_sched1_p;
+extern const profile_t *mnthr_user_p;
+extern const profile_t *mnthr_swap_p;
+extern const profile_t *mnthr_sched0_p;
+extern const profile_t *mnthr_sched1_p;
 
 const profile_t *s0_p;
 
@@ -19,8 +19,8 @@ run(UNUSED int argc, void **argv)
     int i, j;
     int *n;
 
-    PROFILE_STOP(mrkthr_swap_p);
-    PROFILE_START(mrkthr_user_p);
+    PROFILE_STOP(mnthr_swap_p);
+    PROFILE_START(mnthr_user_p);
 
     n = argv[0];
     j = (int)(uintptr_t)argv[1];
@@ -28,13 +28,13 @@ run(UNUSED int argc, void **argv)
         if (j == 0) {
             PROFILE_START(s0_p);
         }
-        mrkthr_yield();
+        mnthr_yield();
         if (j == 0) {
             PROFILE_STOP(s0_p);
         }
     }
-    PROFILE_STOP(mrkthr_user_p);
-    PROFILE_START(mrkthr_swap_p);
+    PROFILE_STOP(mnthr_user_p);
+    PROFILE_START(mnthr_swap_p);
     return 0;
 }
 
@@ -43,8 +43,8 @@ main(UNUSED int argc, UNUSED char *argv[])
 {
     int i, n;
 
-    if (mrkthr_init() != 0) {
-        perror("mrkthr_init");
+    if (mnthr_init() != 0) {
+        perror("mnthr_init");
         return 0;
     }
 
@@ -52,13 +52,13 @@ main(UNUSED int argc, UNUSED char *argv[])
 
     n = 100;
     for (i = 0; i < 50000; ++i) {
-        mrkthr_spawn("run", run, 2, &n, i);
+        mnthr_spawn("run", run, 2, &n, i);
     }
 
-    mrkthr_loop();
+    mnthr_loop();
 
-    if (mrkthr_fini() != 0) {
-        perror("mrkthr_fini");
+    if (mnthr_fini() != 0) {
+        perror("mnthr_fini");
         return 0;
     }
     return 0;

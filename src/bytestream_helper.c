@@ -1,18 +1,18 @@
-#include <mrkcommon/bytestream.h>
-#include <mrkcommon/util.h>
-#include <mrkcommon/dumpm.h>
-#include <mrkthr.h>
+#include <mncommon/bytestream.h>
+#include <mncommon/util.h>
+#include <mncommon/dumpm.h>
+#include <mnthr.h>
 
 #define BLOCKSZ 4096
 
 #ifdef USE_EV
-#define mrkthr_read_allb mrkthr_read_allb_et
-#define mrkthr_write_all mrkthr_write_all_et
+#define mnthr_read_allb mnthr_read_allb_et
+#define mnthr_write_all mnthr_write_all_et
 #endif
 
 
 
-#define MRKTHR_BYTESTREAM_READ_MORE_BODY(fn)                           \
+#define MNTHR_BYTESTREAM_READ_MORE_BODY(fn)                           \
     ssize_t nread;                                                     \
     ssize_t need;                                                      \
     int fd = (intptr_t)in;                                             \
@@ -34,21 +34,21 @@
 
 
 ssize_t
-mrkthr_bytestream_read_more(mnbytestream_t *stream, void *in, ssize_t sz)
+mnthr_bytestream_read_more(mnbytestream_t *stream, void *in, ssize_t sz)
 {
-    MRKTHR_BYTESTREAM_READ_MORE_BODY(mrkthr_read_allb);
+    MNTHR_BYTESTREAM_READ_MORE_BODY(mnthr_read_allb);
 }
 
 
 ssize_t
-mrkthr_bytestream_read_more_et(mnbytestream_t *stream, void *in, ssize_t sz)
+mnthr_bytestream_read_more_et(mnbytestream_t *stream, void *in, ssize_t sz)
 {
-    MRKTHR_BYTESTREAM_READ_MORE_BODY(mrkthr_read_allb_et);
+    MNTHR_BYTESTREAM_READ_MORE_BODY(mnthr_read_allb_et);
 }
 
 
 
-#define MRKTHR_BYTESTREAM_WRITE_BODY(fn)                       \
+#define MNTHR_BYTESTREAM_WRITE_BODY(fn)                       \
     ssize_t nwritten;                                          \
     int fd = (intptr_t)out;                                    \
     if ((stream->pos + (ssize_t)sz) > stream->eod) {           \
@@ -63,14 +63,14 @@ mrkthr_bytestream_read_more_et(mnbytestream_t *stream, void *in, ssize_t sz)
 
 
 ssize_t
-mrkthr_bytestream_write(mnbytestream_t *stream, void *out, size_t sz)
+mnthr_bytestream_write(mnbytestream_t *stream, void *out, size_t sz)
 {
-    MRKTHR_BYTESTREAM_WRITE_BODY(mrkthr_write_all);
+    MNTHR_BYTESTREAM_WRITE_BODY(mnthr_write_all);
 }
 
 
 ssize_t
-mrkthr_bytestream_write_et(mnbytestream_t *stream, void *out, size_t sz)
+mnthr_bytestream_write_et(mnbytestream_t *stream, void *out, size_t sz)
 {
-    MRKTHR_BYTESTREAM_WRITE_BODY(mrkthr_write_all_et);
+    MNTHR_BYTESTREAM_WRITE_BODY(mnthr_write_all_et);
 }

@@ -1,13 +1,13 @@
-#include "mrkcommon/dumpm.h"
-#include "mrkcommon/util.h"
-#include "mrkthr.h"
+#include "mncommon/dumpm.h"
+#include "mncommon/util.h"
+#include "mnthr.h"
 #include "unittest.h"
 
 UNUSED static int
 fff(UNUSED int argc, UNUSED void *argv[])
 {
     CTRACE("argc=%d", argc);
-    mrkthr_sleep(200);
+    mnthr_sleep(200);
     CTRACE("returning");
     return 1;
 }
@@ -16,7 +16,7 @@ UNUSED static int
 ff(UNUSED int argc, UNUSED void *argv[])
 {
     CTRACE("argc=%d", argc);
-    mrkthr_sleep(2000);
+    mnthr_sleep(2000);
     CTRACE("returning");
     return 1;
 }
@@ -29,7 +29,7 @@ r (UNUSED int argc, UNUSED void *argv[])
 
     memset(buf, 0, sizeof(buf));
 
-    nread = mrkthr_read_allb(0, buf, sizeof(buf));
+    nread = mnthr_read_allb(0, buf, sizeof(buf));
     CTRACE("nread=%ld", nread);
     if (nread > 0) {
         CTRACE("buf='%s'", buf);
@@ -42,13 +42,13 @@ f (UNUSED int argc, UNUSED void *argv[])
 {
     int res;
 
-    res = mrkthr_wait_for(1000, "one", ff, 2, 123, 234);
+    res = mnthr_wait_for(1000, "one", ff, 2, 123, 234);
     CTRACE("res=%d", res);
-    res = mrkthr_wait_for(1000, "two", fff, 2, 123, 234);
+    res = mnthr_wait_for(1000, "two", fff, 2, 123, 234);
     CTRACE("res=%d", res);
-    mrkthr_sleep(3000);
+    mnthr_sleep(3000);
     CTRACE(FGREEN("Now type something, waiting for 5 secs ..."));
-    res = mrkthr_wait_for(5000, "three", r, 0);
+    res = mnthr_wait_for(5000, "three", r, 0);
     CTRACE("res=%d", res);
     return(0);
 }
@@ -56,17 +56,17 @@ f (UNUSED int argc, UNUSED void *argv[])
 static void
 test0 (void)
 {
-    if (mrkthr_init() != 0) {
-        perror("mrkthr_init");
+    if (mnthr_init() != 0) {
+        perror("mnthr_init");
         return;
     }
-    mrkthr_spawn("qweqwe", f, 0);
-    mrkthr_loop();
+    mnthr_spawn("qweqwe", f, 0);
+    mnthr_loop();
 
     //TRACE("res=%d", res);
 
-    if (mrkthr_fini() != 0) {
-        perror("mrkthr_fini");
+    if (mnthr_fini() != 0) {
+        perror("mnthr_fini");
         return;
     }
 

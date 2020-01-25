@@ -5,33 +5,33 @@
 #include <sys/ioctl.h>
 
 #define NO_PROFILE
-#include <mrkcommon/profile.h>
+#include <mncommon/profile.h>
 
 #ifdef DO_MEMDEBUG
-#include <mrkcommon/memdebug.h>
-MEMDEBUG_DECLARE(mrkthr_ev_poller);
+#include <mncommon/memdebug.h>
+MEMDEBUG_DECLARE(mnthr_ev_poller);
 #endif
 
-#include <mrkcommon/bytes.h>
-#include <mrkcommon/hash.h>
-#include <mrkcommon/fasthash.h>
+#include <mncommon/bytes.h>
+#include <mncommon/hash.h>
+#include <mncommon/fasthash.h>
 /* Experimental trie use */
-#include <mrkcommon/btrie.h>
-#include <mrkcommon/util.h>
+#include <mncommon/btrie.h>
+#include <mncommon/util.h>
 
-#include "mrkthr_private.h"
+#include "mnthr_private.h"
 
 //#define TRACE_VERBOSE
 //#define TRRET_DEBUG
 #include "diag.h"
-#include <mrkcommon/dumpm.h>
+#include <mncommon/dumpm.h>
 
 #include <ev.h>
 
-extern const profile_t *mrkthr_user_p;
-extern const profile_t *mrkthr_swap_p;
-extern const profile_t *mrkthr_sched0_p;
-extern const profile_t *mrkthr_sched1_p;
+extern const profile_t *mnthr_user_p;
+extern const profile_t *mnthr_swap_p;
+extern const profile_t *mnthr_sched0_p;
+extern const profile_t *mnthr_sched1_p;
 
 /**
  *
@@ -305,11 +305,11 @@ ev_stat_item_get(const char *path, UNUSED int event)
 }
 
 
-mrkthr_stat_t *
-mrkthr_stat_new(const char *path)
+mnthr_stat_t *
+mnthr_stat_new(const char *path)
 {
-    mrkthr_stat_t *res;
-    if ((res = malloc(sizeof(mrkthr_stat_t))) == NULL) {
+    mnthr_stat_t *res;
+    if ((res = malloc(sizeof(mnthr_stat_t))) == NULL) {
         FAIL("malloc");
     }
     res->ev = ev_stat_item_get(path, 0);
@@ -318,13 +318,13 @@ mrkthr_stat_new(const char *path)
 
 
 void
-mrkthr_stat_destroy(mrkthr_stat_t **st)
+mnthr_stat_destroy(mnthr_stat_t **st)
 {
     if (*st != NULL) {
         mnhash_item_t *hit;
 
         if ((hit = hash_get_item(&events, (*st)->ev)) == NULL) {
-            FAIL("mrkthr_stat_destroy");
+            FAIL("mnthr_stat_destroy");
         }
         hash_delete_pair(&events, hit);
         free(*st);
@@ -333,7 +333,7 @@ mrkthr_stat_destroy(mrkthr_stat_t **st)
 
 
 int
-mrkthr_stat_wait(mrkthr_stat_t *st)
+mnthr_stat_wait(mnthr_stat_t *st)
 {
     int res;
     mnhash_item_t *hit;
@@ -348,7 +348,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -367,7 +367,7 @@ mrkthr_stat_wait(mrkthr_stat_t *st)
     }
 
     if ((hit = hash_get_item(&events, st->ev)) == NULL) {
-        FAIL("mrkthr_stat_wait");
+        FAIL("mnthr_stat_wait");
     }
     ev = hit->key;
 
@@ -400,7 +400,7 @@ poller_msec2ticks_absolute(uint64_t msec)
 
 
 uint64_t
-mrkthr_msec2ticks(uint64_t msec)
+mnthr_msec2ticks(uint64_t msec)
 {
     return msec * 1000000;
 }
@@ -414,42 +414,42 @@ poller_ticks_absolute(uint64_t ticks)
 
 
 long double
-mrkthr_ticks2sec(uint64_t ticks)
+mnthr_ticks2sec(uint64_t ticks)
 {
     return (long double)ticks / (long double)1000000.0;
 }
 
 
 long double
-mrkthr_ticksdiff2sec(int64_t ticks)
+mnthr_ticksdiff2sec(int64_t ticks)
 {
     return (long double)ticks / (long double)1000000.0;
 }
 
 
 uint64_t
-mrkthr_get_now_nsec(void)
+mnthr_get_now_nsec(void)
 {
     return timecounter_now;
 }
 
 
 uint64_t
-mrkthr_get_now_nsec_precise(void)
+mnthr_get_now_nsec_precise(void)
 {
     return timecounter_now;
 }
 
 
 uint64_t
-mrkthr_get_now_ticks(void)
+mnthr_get_now_ticks(void)
 {
     return timecounter_now;
 }
 
 
 uint64_t
-mrkthr_get_now_ticks_precise(void)
+mnthr_get_now_ticks_precise(void)
 {
     return timecounter_now;
 }
@@ -460,7 +460,7 @@ mrkthr_get_now_ticks_precise(void)
  *
  */
 void
-poller_clear_event(mrkthr_ctx_t *ctx)
+poller_clear_event(mnthr_ctx_t *ctx)
 {
     if (ctx->pdata.ev != NULL) {
         ev_item_t *ev;
@@ -511,7 +511,7 @@ clear_event_stat(ev_item_t *ev)
 
 
 ssize_t
-mrkthr_get_rbuflen(int fd)
+mnthr_get_rbuflen(int fd)
 {
     ssize_t sz;
     int res;
@@ -531,7 +531,7 @@ mrkthr_get_rbuflen(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -570,7 +570,7 @@ mrkthr_get_rbuflen(int fd)
 
 
 int
-mrkthr_wait_for_read(int fd)
+mnthr_wait_for_read(int fd)
 {
     int res;
     UNUSED ev_item_t *ev, *ev1;
@@ -589,7 +589,7 @@ mrkthr_wait_for_read(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -618,7 +618,7 @@ mrkthr_wait_for_read(int fd)
 
 
 ssize_t
-mrkthr_get_wbuflen(int fd)
+mnthr_get_wbuflen(int fd)
 {
     ssize_t sz;
     int res;
@@ -638,7 +638,7 @@ mrkthr_get_wbuflen(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -681,7 +681,7 @@ mrkthr_get_wbuflen(int fd)
 
 
 int
-mrkthr_wait_for_write(int fd)
+mnthr_wait_for_write(int fd)
 {
     int res;
     ev_item_t *ev;
@@ -700,7 +700,7 @@ mrkthr_wait_for_write(int fd)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -727,7 +727,7 @@ mrkthr_wait_for_write(int fd)
 
 
 int
-mrkthr_wait_for_events(int fd, int *events)
+mnthr_wait_for_events(int fd, int *events)
 {
     int res;
     UNUSED ev_item_t *ev, *ev1;
@@ -745,7 +745,7 @@ mrkthr_wait_for_events(int fd, int *events)
          * in this case we are not allowed to wait for this event,
          * sorry.
          */
-        me->co.rc = MRKTHR_CO_RC_SIMULTANEOUS;
+        me->co.rc = MNTHR_CO_RC_SIMULTANEOUS;
         return -1;
     }
 
@@ -770,10 +770,10 @@ mrkthr_wait_for_events(int fd, int *events)
     me->pdata.ev = NULL;
 
     if (ev->ev.io.events & EV_READ) {
-        *events |= MRKTHR_WAIT_EVENT_READ;
+        *events |= MNTHR_WAIT_EVENT_READ;
     }
     if (ev->ev.io.events & EV_WRITE) {
-        *events |= MRKTHR_WAIT_EVENT_WRITE;
+        *events |= MNTHR_WAIT_EVENT_WRITE;
     }
 
     return res;
@@ -786,7 +786,7 @@ mrkthr_wait_for_events(int fd, int *events)
 static void
 ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 {
-    mrkthr_ctx_t *ctx;
+    mnthr_ctx_t *ctx;
     ev_item_t *ev;
 
     ctx = w->data;
@@ -849,7 +849,7 @@ ev_io_cb(UNUSED EV_P_ ev_io *w, UNUSED int revents)
 static void
 ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
 {
-    mrkthr_ctx_t *ctx;
+    mnthr_ctx_t *ctx;
     ev_item_t *ev;
 
     ctx = w->data;
@@ -898,13 +898,13 @@ ev_stat_cb(UNUSED EV_P_ ev_stat *w, UNUSED int revents)
  *
  */
 int
-mrkthr_loop(void)
+mnthr_loop(void)
 {
     int res;
 
-    PROFILE_START(mrkthr_sched0_p);
+    PROFILE_START(mnthr_sched0_p);
     res = ev_run(the_loop, 0);
-    PROFILE_STOP(mrkthr_sched0_p);
+    PROFILE_STOP(mnthr_sched0_p);
     return res;
 }
 
@@ -927,9 +927,9 @@ static void
 _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
 {
     mnbtrie_node_t *node;
-    mrkthr_ctx_t *ctx = NULL;
+    mnthr_ctx_t *ctx = NULL;
 
-    if (!(mrkthr_flags & CO_FLAG_SHUTDOWN)) {
+    if (!(mnthr_flags & CO_FLAG_SHUTDOWN)) {
         timecounter_now = (uint64_t)(ev_now(the_loop) * 1000000000.);
 
 #ifdef TRACE_VERBOSE
@@ -938,7 +938,7 @@ _prepare_cb(UNUSED EV_P_ UNUSED ev_prepare *w, UNUSED int revents)
         /* this will make sure there are no expired ctxes in the sleepq */
         poller_sift_sleepq();
 
-        /* get the first to wake sleeping mrkthr */
+        /* get the first to wake sleeping mnthr */
         if ((node = BTRIE_MIN(&the_sleepq)) != NULL) {
             ev_tstamp secs;
 
@@ -1007,7 +1007,7 @@ _syserr_cb(const char *msg)
 
 
 void
-poller_mrkthr_ctx_init(struct _mrkthr_ctx *ctx)
+poller_mnthr_ctx_init(struct _mnthr_ctx *ctx)
 {
     ctx->pdata.ev = NULL;
 }
