@@ -1,6 +1,7 @@
 CLEANFILES = *.core
 #CLEANFILES += *.in
 AM_MAKEFLAGS = -s
+AM_LIBTOOLFLAGS = --silent
 
 noinst_PROGRAMS=testco testsleep testclock testwaitfor testsocket testfile testprofile testsendfile testswitch testucontext testinterrupt
 

@@ -1,4 +1,5 @@
 AM_MAKEFLAGS = -s
+AM_LIBTOOLFLAGS = --silent
 
 if USE_EV
 dh_platform=
