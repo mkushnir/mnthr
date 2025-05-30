@@ -97,7 +97,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_CHECK_FUNCS([clock_gettime munmap strerror gettimeofday memset socket strdup sendfile])
+AC_CHECK_FUNCS([abort2 clock_gettime munmap strerror gettimeofday memset socket strdup sendfile])
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_MMAP

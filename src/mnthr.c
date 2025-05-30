@@ -139,6 +139,7 @@ static void resume_waitq_all(mnthr_waitq_t *);
 static mnthr_ctx_t *mnthr_ctx_new(void);
 static mnthr_ctx_t *mnthr_ctx_pop_free(void);
 static void set_resume(mnthr_ctx_t *);
+static void mnthr_ctx_finalize(struct _mnthr_ctx *);
 
 
 void
@@ -735,7 +736,7 @@ co_fini_other(struct _co *co)
 }
 
 
-void
+static void
 mnthr_ctx_finalize(mnthr_ctx_t *ctx)
 {
     /*
@@ -899,11 +900,11 @@ mnthr_gc(void)
  */
 #define VNEW_BODY(get_ctx_fn)                                                  \
     int i;                                                                     \
-    assert(mnthr_flags & CO_FLAG_INITIALIZED);                                \
+    assert(mnthr_flags & CO_FLAG_INITIALIZED);                                 \
     ctx = get_ctx_fn();                                                        \
     assert(ctx!= NULL);                                                        \
     if (ctx->co.id != -1) {                                                    \
-        mnthr_dump(ctx);                                                      \
+        mnthr_dump(ctx);                                                       \
         CTRACE("Unclear ctx: during thread %s creation", name);                \
     }                                                                          \
     assert(ctx->co.id == -1);                                                  \
@@ -915,7 +916,7 @@ mnthr_gc(void)
         ctx->co.name[0] = '\0';                                                \
     }                                                                          \
     if (_getcontext(&ctx->co.uc) != 0) {                                       \
-        TR(MNTHR_CTX_NEW + 1);                                                \
+        TR(MNTHR_CTX_NEW + 1);                                                 \
         ctx = NULL;                                                            \
         goto vnew_body_end;                                                    \
     }                                                                          \
@@ -926,7 +927,7 @@ mnthr_gc(void)
                                   MAP_PRIVATE|MAP_ANON,                        \
                                   -1,                                          \
                                   0)) == MAP_FAILED) {                         \
-            TR(_MNTHR_NEW + 2);                                               \
+            TR(_MNTHR_NEW + 2);                                                \
             ctx = NULL;                                                        \
             goto vnew_body_end;                                                \
         }                                                                      \
@@ -1039,8 +1040,8 @@ mnthr_dump(const mnthr_ctx_t *ctx)
 
 PRINTFLIKE(2, 3) int
 mnthr_set_name(mnthr_ctx_t *ctx,
-                     const char *fmt,
-                     ...)
+               const char *fmt,
+               ...)
 {
     va_list ap;
     int res;
@@ -1166,12 +1167,12 @@ yield(void)
 }
 
 
-#define MNTHR_SET_EXPIRE_TICKS(v, fn)                 \
-    if (v == MNTHR_SLEEP_FOREVER) {                   \
-        me->expire_ticks = MNTHR_SLEEP_FOREVER;       \
+#define MNTHR_SET_EXPIRE_TICKS(v, fn)                  \
+    if (v == MNTHR_SLEEP_FOREVER) {                    \
+        me->expire_ticks = MNTHR_SLEEP_FOREVER;        \
     } else {                                           \
         if (v == 0) {                                  \
-            me->expire_ticks = MNTHR_SLEEP_RESUME_NOW;\
+            me->expire_ticks = MNTHR_SLEEP_RESUME_NOW; \
         } else {                                       \
             me->expire_ticks = fn(v);                  \
         }                                              \
@@ -2256,7 +2257,7 @@ mnthr_sendfile(int fd,
 
 
 /**
- * Event Primitive.
+ * Event Primitive (Signal).
  */
 void
 mnthr_signal_init(mnthr_signal_t *signal, mnthr_ctx_t *ctx)
@@ -2648,6 +2649,43 @@ mnthr_rwlock_fini(mnthr_rwlock_t *lock)
     mnthr_cond_fini(&lock->cond);
     lock->nreaders = 0;
     lock->fwriter = false;
+}
+
+
+/**
+ * Coroutine based generator
+ */
+void
+mnthr_gen_init(mnthr_gen_t *gen)
+{
+    MNTHR_SIGNAL_INIT(&gen->s0);
+    MNTHR_SIGNAL_INIT(&gen->s1);
+    gen->udata = NULL;
+}
+
+
+void
+mnthr_gen_fini(mnthr_gen_t *gen)
+{
+    mnthr_signal_fini(&gen->s0);
+    mnthr_signal_fini(&gen->s1);
+    gen->udata = NULL;
+}
+
+
+int
+mnthr_gen_yield(mnthr_gen_t *gen, void *udata)
+{
+    gen->udata = udata;
+    mnthr_signal_send(&gen->s0);
+    return mnthr_signal_subscribe(&gen->s1);
+}
+
+
+int
+mnthr_gen_signal(mnthr_gen_t *gen, int rc)
+{
+    return mnthr_signal_error_and_join(&gen->s1, rc);
 }
 
 

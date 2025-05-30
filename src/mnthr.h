@@ -26,18 +26,18 @@ void mndiag_mnthr_str(int, char *, size_t);
 
 #define CTRACE(s, ...)                                         \
     do {                                                       \
-        struct timeval _mnthr_ts;                             \
-        gettimeofday(&_mnthr_ts, NULL);                       \
-        struct tm *_mnthr_tm = localtime(&_mnthr_ts.tv_sec); \
-        char _mnthr_ss[64];                                   \
-        strftime(_mnthr_ss,                                   \
-                 sizeof(_mnthr_ss),                           \
+        struct timeval _mnthr_ts;                              \
+        gettimeofday(&_mnthr_ts, NULL);                        \
+        struct tm *_mnthr_tm = localtime(&_mnthr_ts.tv_sec);   \
+        char _mnthr_ss[64];                                    \
+        strftime(_mnthr_ss,                                    \
+                 sizeof(_mnthr_ss),                            \
                  "%Y-%m-%d %H:%M:%S",                          \
-                 _mnthr_tm);                                  \
+                 _mnthr_tm);                                   \
         TRACE("%s.%06ld [% 4d] " s,                            \
-              _mnthr_ss,                                      \
-              (long)_mnthr_ts.tv_usec,                        \
-              mnthr_id(), ##__VA_ARGS__);                     \
+              _mnthr_ss,                                       \
+              (long)_mnthr_ts.tv_usec,                         \
+              mnthr_id(), ##__VA_ARGS__);                      \
     } while (0)                                                \
 
 
@@ -111,6 +111,11 @@ typedef struct _mnthr_rwlock {
     bool fwriter;
 } mnthr_rwlock_t;
 
+typedef struct _mnthr_gen {
+    mnthr_signal_t s0, s1;
+    void *udata;
+} mnthr_gen_t;
+
 int mnthr_init(void);
 int mnthr_fini(void);
 int mnthr_loop(void);
@@ -156,24 +161,24 @@ int mnthr_id(void);
 #define MNTHR_CO_RC_POLLER \
     MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MNTHR, 130, 5)
 
-#define MNTHR_CO_RC_STR(rc) (                                         \
+#define MNTHR_CO_RC_STR(rc) (                                          \
      (rc) == 0 ? "OK" :                                                \
-     (rc) == (int)MNTHR_CO_RC_EXITED ? "EXITED" :                     \
-     (rc) == (int)MNTHR_CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" : \
-     (rc) == (int)MNTHR_CO_RC_TIMEDOUT ? "TIMEDOUT" :                 \
-     (rc) == (int)MNTHR_CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :         \
-     (rc) == (int)MNTHR_CO_RC_POLLER ? "POLLER" :                     \
+     (rc) == (int)MNTHR_CO_RC_EXITED ? "EXITED" :                      \
+     (rc) == (int)MNTHR_CO_RC_USER_INTERRUPTED ? "USER_INTERRUPTED" :  \
+     (rc) == (int)MNTHR_CO_RC_TIMEDOUT ? "TIMEDOUT" :                  \
+     (rc) == (int)MNTHR_CO_RC_SIMULTANEOUS ? "SIMULTANEOUS" :          \
+     (rc) == (int)MNTHR_CO_RC_POLLER ? "POLLER" :                      \
      "UD"                                                              \
  )                                                                     \
 
 
-#define MNTHR_IS_CO_RC(rc)                            \
+#define MNTHR_IS_CO_RC(rc)                             \
     (((rc) &                                           \
       (MNDIAG_BIT_GLOBAL |                             \
        MNDIAG_BIT_PUBLIC |                             \
        MNDIAG_BIT_LIBRARY |                            \
        MNDIAG_BIT_CLASS)) ==                           \
-     MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MNTHR, -2, 0)) \
+     MNDIAG_PUBLIC_CODE(MNDIAG_LIBRARY_MNTHR, -2, 0))  \
 
 
 int mnthr_get_retval(void);
@@ -299,6 +304,24 @@ MNTHR_CPOINT int mnthr_rwlock_acquire_write(mnthr_rwlock_t *);
 MNTHR_CPOINT int mnthr_rwlock_try_acquire_write(mnthr_rwlock_t *);
 void mnthr_rwlock_release_write(mnthr_rwlock_t *);
 void mnthr_rwlock_fini(mnthr_rwlock_t *);
+
+void mnthr_gen_init(mnthr_gen_t *);
+void mnthr_gen_fini(mnthr_gen_t *);
+int mnthr_gen_yield(mnthr_gen_t *, void *);
+int mnthr_gen_signal(mnthr_gen_t *, int);
+
+#define MNTHR_GEN_RET(gen, res) mnthr_signal_error(&(gen)->s0, (res)); return (res)
+
+#define MNTHR_GEN_YIELD(gen, udata) mnthr_gen_yield(gen, (void *)(udata))
+
+#define MNTHR_GEN_WHILE(res, gen, __a1)                        \
+while (((res) = mnthr_signal_subscribe(&(gen)->s0)) == 0)      \
+{                                                              \
+    __a1;                                                      \
+    mnthr_signal_send(&(gen)->s1);                             \
+}                                                              \
+
+#define MNTHR_GEN_SIGNAL(gen, rc) mnthr_gen_signal(gen, rc)
 
 
 uint64_t mnthr_get_now_nsec(void);

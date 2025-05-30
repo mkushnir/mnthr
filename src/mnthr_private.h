@@ -297,7 +297,6 @@ int yield(void);
 void push_free_ctx(struct _mnthr_ctx *);
 void sleepq_remove(struct _mnthr_ctx *);
 void set_resume_fast(struct _mnthr_ctx *);
-void mnthr_ctx_finalize(struct _mnthr_ctx *);
 
 uint64_t poller_usec2ticks_absolute(uint64_t);
 uint64_t poller_msec2ticks_absolute(uint64_t);
