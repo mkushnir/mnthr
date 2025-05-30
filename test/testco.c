@@ -38,7 +38,7 @@ static void
 r(int n)
 {
     //const mnthr_ctx_t *me = mnthr_me();
-    int dummy = 1;
+    UNUSED int dummy = 1;
     UNUSED uint64_t now1, now2;
     //UNUSED const mnthr_ctx_t *me = mnthr_me();
 

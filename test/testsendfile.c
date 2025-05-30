@@ -45,7 +45,7 @@ static int
 run10(UNUSED int argc, void **argv)
 {
     int fd;
-    ssize_t total;
+    UNUSED ssize_t total;
 
     assert(argc == 1);
     fd = (intptr_t)(argv[0]);
