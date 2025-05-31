@@ -676,7 +676,7 @@ mnthr_loop(void)
                   tmout->tv_nsec + tmout->tv_sec * 1000000000 : -1),
               (long)(tmout != NULL ? tmout->tv_sec : -1),
               (long)(tmout != NULL ? tmout->tv_nsec : -1));
-        array_traverse(&kevents0, (array_traverser_t)kevent_dump, NULL);
+        array_traverse(&kevents0, kevent_dump, NULL);
 #endif
 
         if (ARRAY_ELNUM(&kevents0) != 0 || event_count != 0) {

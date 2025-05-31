@@ -626,8 +626,9 @@ mnthr_get_sleepq_volume(void)
 
 
 static int
-dump_ctx_traverser(mnthr_ctx_t **ctx, UNUSED void *udata)
+dump_ctx_traverser(void *o, UNUSED void *udata)
 {
+    mnthr_ctx_t **ctx = o;
     if (*ctx != NULL) {
         if ((*ctx)->co.id != -1) {
             mnthr_dump(*ctx);
@@ -641,7 +642,7 @@ void
 mnthr_dump_all_ctxes(void)
 {
     TRACEC("all ctxes:\n");
-    array_traverse(&ctxes, (array_traverser_t)dump_ctx_traverser, NULL);
+    array_traverse(&ctxes, dump_ctx_traverser, NULL);
     TRACEC("end of all ctxes\n");
 }
 
