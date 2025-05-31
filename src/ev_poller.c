@@ -125,8 +125,9 @@ static uint64_t timecounter_now;
  */
 
 static uint64_t
-ev_item_hash(ev_item_t *ev)
+ev_item_hash(void const *)
 {
+    ev_item_t *ev = (ev_item_t *)o;
     if (ev->hash == 0) {
         union {
             int *i;
@@ -158,7 +159,7 @@ ev_item_hash(ev_item_t *ev)
 
 
 static int
-ev_item_cmp(ev_item_t *a, ev_item_t *b)
+ev_item_cmp(void const *a, void const *b)
 {
     uint64_t ha, hb;
 
@@ -257,8 +258,9 @@ ev_item_destroy(ev_item_t **ev)
 
 
 static int
-ev_item_fini(ev_item_t *key, UNUSED void *v)
+ev_item_fini(void *k, UNUSED void *v)
 {
+    ev_item_t *key = k;
     ev_item_destroy(&key);
     return 0;
 }
@@ -1046,9 +1048,9 @@ poller_init(void)
 
     hash_init(&events,
               65521,
-              (hash_hashfn_t)ev_item_hash,
-              (hash_item_comparator_t)ev_item_cmp,
-              (hash_item_finalizer_t)ev_item_fini);
+              ev_item_hash,
+              ev_item_cmp,
+              ev_item_fini);
 }
 
 
