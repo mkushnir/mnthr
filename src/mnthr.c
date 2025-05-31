@@ -131,8 +131,8 @@ static DTQUEUE(_mnthr_ctx, free_list);
 mnbtrie_t the_sleepq;
 
 
-static int mnthr_ctx_init(mnthr_ctx_t **);
-static int mnthr_ctx_fini(mnthr_ctx_t **);
+static int mnthr_ctx_init(void *);
+static int mnthr_ctx_fini(void *);
 static void co_fini_ucontext(struct _co *);
 static void co_fini_other(struct _co *);
 static void resume_waitq_all(mnthr_waitq_t *);
@@ -534,8 +534,8 @@ mnthr_init(void)
     DTQUEUE_INIT(&free_list);
 
     if (array_init(&ctxes, sizeof(mnthr_ctx_t *), 0,
-                  (array_initializer_t)mnthr_ctx_init,
-                  (array_finalizer_t)mnthr_ctx_fini) != 0) {
+                  mnthr_ctx_init,
+                  mnthr_ctx_fini) != 0) {
         FAIL("array_init");
     }
 
@@ -650,8 +650,9 @@ mnthr_dump_all_ctxes(void)
  * mnthr_ctx management
  */
 static int
-mnthr_ctx_init(mnthr_ctx_t **pctx)
+mnthr_ctx_init(void *o)
 {
+    mnthr_ctx_t **pctx = o;
     mnthr_ctx_t *ctx;
 
     if ((ctx = malloc(sizeof(mnthr_ctx_t))) == NULL) {
@@ -767,8 +768,9 @@ mnthr_ctx_finalize(mnthr_ctx_t *ctx)
 
 
 static int
-mnthr_ctx_fini(mnthr_ctx_t **pctx)
+mnthr_ctx_fini(void *o)
 {
+    mnthr_ctx_t **pctx = o;
     if (*pctx != NULL) {
         co_fini_ucontext(&(*pctx)->co);
         mnthr_ctx_finalize(*pctx);
